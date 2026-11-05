@@ -1,6 +1,6 @@
 design/
 dist/
-public/pdfjs/
+public/
 src-tauri/
 test-pdfs/
 node_modules/

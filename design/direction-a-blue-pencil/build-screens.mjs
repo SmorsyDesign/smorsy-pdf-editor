@@ -285,6 +285,23 @@ const screens = {
   ${status({ page: 'Version 1.2', right: 'Works offline', zoom: '', toggle: false })}`,
   }),
 
+  'signed-view': ({ p }) => signedScreen(p, false),
+  'signed-warning': ({ p }) => signedScreen(p, true),
+
+  'scanned-page': ({ p }) => ({
+    title: 'Scanned page', file: 'Old tax letter.pdf',
+    content: `${bar({ p, mode: 'text', file: 'Old tax letter.pdf', state: 'No changes' })}
+  <div class="body no-panel">
+    ${thumbs(0)}
+    ${stage('<article class="paper paper-scan" aria-label="Scanned page"></article>', `<section class="notice scan-card" role="status">
+        <h3>${icon('info')}This page is a scan, so there's no text to edit</h3>
+        <p>It's a picture of the page rather than text. You can still add new text on top of it.</p>
+        <div class="notice-actions"><button class="btn btn-primary">Add text</button><button class="btn">Close</button></div>
+      </section>`)}
+  </div>
+  ${status({ page: 'Page 1 of 4', hint: 'Click an empty area to add text', toggle: false })}`,
+  }),
+
   'error-save': ({ p }) => ({
     title: "Can't save", file: LEASE,
     content: `${bar({ p, mode: 'text', file: LEASE, state: '2 unsaved changes' })}
@@ -308,6 +325,35 @@ const screens = {
   </div>`,
   }),
 };
+
+function signedScreen(p, warning) {
+  const dialog = warning ? `<div class="scrim">
+    <section class="dialog alert" role="alertdialog" aria-modal="true" aria-labelledby="signed-title">
+      <div class="alert-body">
+        ${icon('warn', 'signed-warn')}
+        <div>
+          <h2 id="signed-title">Editing will break the signature</h2>
+          <p>This PDF has a digital signature. If you edit it, your copy's signature will show as invalid in other PDF apps.</p>
+          <p>Your original file keeps its valid signature.</p>
+        </div>
+      </div>
+      <div class="alert-foot"><a class="btn" href="signed-view.html">Keep viewing</a><a class="btn btn-primary" href="edit-text.html">Edit anyway</a></div>
+    </section>
+  </div>` : '';
+  return {
+    title: warning ? 'Signed PDF warning' : 'Signed PDF', file: LEASE,
+    content: `${bar({ p, mode: 'select', file: LEASE, state: 'Digitally signed' }).replace('href="edit-text.html"', 'href="signed-warning.html"')}
+  <div class="body no-panel">
+    ${thumbs(0)}
+    <div class="signed-stage">
+      <div class="signed-strip" role="status">${icon('lock')}<span>This PDF has a digital signature. You're viewing it, so the signature stays valid.</span><a class="btn" href="signed-warning.html">Edit anyway</a></div>
+      <main class="canvas" aria-label="Page 1 of the document" tabindex="0">${lease({ tenant: '<span class="ink ink-caveat signed-ink">Mara Okafor</span>', date: '<span class="ink date-stamp">November 5, 2026</span>' }).replace('class="ln was-changed"', 'class="ln"').replace('class="paper "', 'class="paper"')}</main>
+    </div>
+  </div>
+  ${status({ hint: 'Select text to copy it', right: 'Signature still valid', toggle: false })}
+  ${dialog}`,
+  };
+}
 
 function signatureDialog({ p }, tab) {
   const tabs = [['draw', 'Draw'], ['type', 'Type'], ['upload', 'Upload']]
@@ -353,6 +399,7 @@ const groups = [
   ['Signature dialog', ['signature-draw', 'signature-type', 'signature-upload']],
   ['Forms', ['form']],
   ['Notices and errors', ['font-notice', 'update', 'error-open', 'error-save']],
+  ['Signed and scanned PDFs', ['signed-view', 'signed-warning', 'scanned-page']],
 ];
 
 mkdirSync(join(here, 'screens/win'), { recursive: true });

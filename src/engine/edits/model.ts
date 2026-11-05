@@ -1,0 +1,149 @@
+/** Positions are PDF points as displayed: origin at the page's top left, y going down. */
+export interface Rect {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+/** Each channel runs from 0 to 1. */
+export interface Color {
+  readonly r: number;
+  readonly g: number;
+  readonly b: number;
+}
+
+export type Alignment = 'left' | 'center' | 'right';
+
+/** 'original' tries the font already in the file before anything else. */
+export type FontId =
+  'original' | 'sans' | 'serif' | 'mono' | 'carlito' | 'caladea' | 'times-new-roman';
+
+export interface TextStyle {
+  readonly font: FontId;
+  readonly size: number;
+  readonly color: Color;
+  readonly bold: boolean;
+  readonly italic: boolean;
+  readonly align: Alignment;
+}
+
+/** A background-coloured patch over the original text. */
+export interface Cover {
+  readonly rect: Rect;
+  readonly angle: number;
+  readonly color: Color;
+}
+
+/** What was known about the font of the text being replaced. */
+export interface OriginalFont {
+  readonly name: string;
+  readonly serif: boolean;
+  readonly monospace: boolean;
+  readonly type3: boolean;
+  readonly bold: boolean;
+  readonly italic: boolean;
+}
+
+export interface TextBox {
+  readonly id: string;
+  readonly pageNumber: number;
+  readonly rect: Rect;
+  /** Degrees clockwise, as displayed. */
+  readonly angle: number;
+  readonly text: string;
+  /** Wrapped when the edit was made, so the saved lines match what the person saw. */
+  readonly lines: readonly string[];
+  /** Distance from the box's top to the first baseline. */
+  readonly firstBaseline: number;
+  readonly lineHeight: number;
+  readonly style: TextStyle;
+  readonly covers: readonly Cover[];
+  readonly original: OriginalFont | null;
+}
+
+export type TextBoxChanges = Partial<
+  Pick<TextBox, 'rect' | 'text' | 'lines' | 'style' | 'firstBaseline' | 'lineHeight'>
+>;
+
+export type Edit =
+  | { readonly kind: 'add-text'; readonly box: TextBox }
+  | { readonly kind: 'replace-text'; readonly box: TextBox }
+  | { readonly kind: 'update-text'; readonly id: string; readonly changes: TextBoxChanges }
+  | { readonly kind: 'remove-text'; readonly id: string };
+
+export interface EditEntry {
+  readonly edit: Edit;
+  /** Entries sharing a group undo together, so one drag is one undo. */
+  readonly group: string | number;
+}
+
+export interface EditLog {
+  readonly entries: readonly EditEntry[];
+  /** Entries before this index are active. */
+  readonly cursor: number;
+}
+
+export const EMPTY_LOG: EditLog = { entries: [], cursor: 0 };
+
+export function record(log: EditLog, edit: Edit, group?: string): EditLog {
+  const kept = log.entries.slice(0, log.cursor);
+  return {
+    entries: [...kept, { edit, group: group ?? log.entries.length }],
+    cursor: kept.length + 1,
+  };
+}
+
+export function canUndo(log: EditLog): boolean {
+  return log.cursor > 0;
+}
+
+export function canRedo(log: EditLog): boolean {
+  return log.cursor < log.entries.length;
+}
+
+export function undo(log: EditLog): EditLog {
+  const last = log.entries[log.cursor - 1];
+  if (!last) return log;
+  let cursor = log.cursor - 1;
+  while (cursor > 0 && log.entries[cursor - 1]?.group === last.group) cursor -= 1;
+  return { ...log, cursor };
+}
+
+export function redo(log: EditLog): EditLog {
+  const next = log.entries[log.cursor];
+  if (!next) return log;
+  let cursor = log.cursor + 1;
+  while (cursor < log.entries.length && log.entries[cursor]?.group === next.group) cursor += 1;
+  return { ...log, cursor };
+}
+
+export function activeEdits(log: EditLog): readonly Edit[] {
+  return log.entries.slice(0, log.cursor).map((entry) => entry.edit);
+}
+
+/** The number of undoable steps, which is what the person thinks of as their changes. */
+export function changeCount(log: EditLog): number {
+  return new Set(log.entries.slice(0, log.cursor).map((entry) => entry.group)).size;
+}
+
+export function deriveTextBoxes(edits: readonly Edit[]): readonly TextBox[] {
+  const boxes = new Map<string, TextBox>();
+  for (const edit of edits) {
+    switch (edit.kind) {
+      case 'add-text':
+      case 'replace-text':
+        boxes.set(edit.box.id, edit.box);
+        break;
+      case 'update-text': {
+        const current = boxes.get(edit.id);
+        if (current) boxes.set(edit.id, { ...current, ...edit.changes });
+        break;
+      }
+      case 'remove-text':
+        boxes.delete(edit.id);
+        break;
+    }
+  }
+  return [...boxes.values()];
+}

@@ -156,6 +156,19 @@ a.tool { color: inherit; text-decoration: none; }
 .update-card ul { margin: var(--space-2) 0 0; padding-left: var(--space-4); color: var(--text-muted); }
 .update-card .quiet { font-size: var(--text-sm); line-height: var(--line-sm); }
 
+/* Signed PDFs: a quiet strip above the page, so the page itself stays untouched. */
+.signed-stage { display: grid; grid-template-rows: auto minmax(0, 1fr); min-width: 0; min-height: 0; }
+.signed-stage > .canvas { min-height: 0; }
+.signed-strip { display: flex; align-items: center; gap: var(--space-2); min-height: 48px; padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4); background: var(--chrome); border-bottom: 1px solid var(--line); box-shadow: inset 1px 0 0 var(--line); color: var(--text-muted); }
+.signed-strip span { flex: 1; min-width: 0; }
+.signed-strip .icon { color: var(--accent); }
+.signed-ink { position: absolute; left: 8px; bottom: 0; }
+.alert-body .signed-warn { color: var(--caution); }
+
+/* Scanned pages */
+.paper-scan { background-color: #e9e6dc; background-image: repeating-linear-gradient(#55534c 0 3px, transparent 3px 22px); background-size: 589px 720px; background-position: 88px 96px; background-repeat: no-repeat; }
+.scan-card { top: var(--space-6); left: 0; right: 0; width: 480px; margin: 0 auto; }
+
 /* Dialogs */
 .scrim { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; background: var(--scrim); }
 .win .scrim { top: 60px; }

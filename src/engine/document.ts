@@ -1,10 +1,14 @@
 import {
+  OPS,
+  Util,
   getDocument,
   type PDFDocumentLoadingTask,
   type PDFDocumentProxy,
   type PDFPageProxy,
 } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { EngineError } from './errors';
+import { groupTextItems, type FontFacts, type PageText, type RawTextItem } from './extract';
+import { styleFromName } from './fonts/match';
 import { canvasPixels, displayedPageSize, type PageSize } from './zoom';
 
 /** Where pdf.js finds its bundled files. Set in the app; Node tests don't need them. */
@@ -30,6 +34,8 @@ export interface RenderTask {
 export interface PdfDocument {
   readonly pageCount: number;
   pageSize(pageNumber: number): Promise<PageSize>;
+  /** The lines and paragraphs on a page, and whether it's an image with no text. */
+  pageText(pageNumber: number): Promise<PageText>;
   render(request: RenderRequest): RenderTask;
   /** Frees what a page holds in memory. Call it when the page scrolls well out of view. */
   release(pageNumber: number): void;
@@ -45,6 +51,45 @@ function hasPdfHeader(bytes: Uint8Array): boolean {
     if (PDF_HEADER.every((value, offset) => bytes[start + offset] === value)) return true;
   }
   return false;
+}
+
+const IMAGE_OPERATORS: ReadonlySet<number> = new Set([
+  OPS.paintImageXObject,
+  OPS.paintInlineImageXObject,
+  OPS.paintImageMaskXObject,
+]);
+
+interface PdfJsFont {
+  readonly name?: string;
+  readonly bold?: boolean;
+  readonly black?: boolean;
+  readonly italic?: boolean;
+  readonly isSerifFont?: boolean;
+  readonly isMonospace?: boolean;
+  readonly isType3Font?: boolean;
+}
+
+function readFontFacts(
+  page: PDFPageProxy,
+  fontKey: string,
+  styles: Record<string, { ascent: number; descent: number; fontFamily: string }>,
+): FontFacts {
+  const font: PdfJsFont = page.commonObjs.has(fontKey)
+    ? (page.commonObjs.get(fontKey) as PdfJsFont)
+    : {};
+  const style = styles[fontKey];
+  const name = font.name ?? '';
+  const named = styleFromName(name);
+  return {
+    name,
+    bold: named.bold || font.bold === true || font.black === true,
+    italic: named.italic || font.italic === true,
+    serif: font.isSerifFont ?? style?.fontFamily === 'serif',
+    monospace: font.isMonospace ?? style?.fontFamily === 'monospace',
+    type3: font.isType3Font === true,
+    ascent: style?.ascent || 0.8,
+    descent: Math.abs(style?.descent ?? 0.2),
+  };
 }
 
 function translateOpenError(error: unknown): EngineError {
@@ -88,6 +133,35 @@ class PdfJsDocument implements PdfDocument {
   async pageSize(pageNumber: number): Promise<PageSize> {
     const { width, height } = (await this.page(pageNumber)).getViewport({ scale: 1 });
     return { width, height };
+  }
+
+  async pageText(pageNumber: number): Promise<PageText> {
+    const page = await this.page(pageNumber);
+    const viewport = page.getViewport({ scale: 1 });
+    // The operator list also loads the page's fonts, which is what makes their details available.
+    const [content, operators] = await Promise.all([page.getTextContent(), page.getOperatorList()]);
+
+    const items: RawTextItem[] = [];
+    const fonts = new Map<string, FontFacts>();
+    for (const item of content.items) {
+      if (!('str' in item)) continue;
+      const matrix = Util.transform(viewport.transform, item.transform as number[]) as number[];
+      const [a = 1, b = 0, c = 0, d = 1, e = 0, f = 0] = matrix;
+      items.push({
+        text: item.str,
+        matrix: [a, b, c, d, e, f],
+        width: item.width,
+        fontKey: item.fontName,
+      });
+      if (!fonts.has(item.fontName)) {
+        fonts.set(item.fontName, readFontFacts(page, item.fontName, content.styles));
+      }
+    }
+
+    const blocks = groupTextItems(items, pageNumber, fonts);
+    const scanned =
+      blocks.length === 0 && operators.fnArray.some((operator) => IMAGE_OPERATORS.has(operator));
+    return { blocks, scanned };
   }
 
   render({ pageNumber, canvas, zoomPercent, devicePixelRatio }: RenderRequest): RenderTask {
@@ -147,6 +221,7 @@ export async function openDocument(bytes: Uint8Array, assets?: PdfAssetUrls): Pr
   const loadingTask = getDocument({
     // pdf.js takes ownership of what it's given, and the original must survive for saving.
     data: bytes.slice(),
+    fontExtraProperties: true,
     ...assets,
   });
   try {

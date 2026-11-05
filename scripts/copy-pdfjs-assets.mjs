@@ -1,4 +1,5 @@
-// Copies the files pdf.js loads at runtime into the app, so it never needs the network.
+// Copies what the app loads at runtime into it, so it never needs the network: the files pdf.js
+// uses, and the fonts saved PDFs can embed.
 import { cpSync, mkdirSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,3 +14,7 @@ for (const folder of ['cmaps', 'iccs', 'standard_fonts', 'wasm']) {
   cpSync(join(source, folder), join(target, folder), { recursive: true });
 }
 cpSync(join(source, 'LICENSE'), join(target, 'LICENSE'));
+
+const fonts = join(root, 'public/fonts');
+rmSync(fonts, { recursive: true, force: true });
+cpSync(join(root, 'assets/fonts'), fonts, { recursive: true });

@@ -1,4 +1,5 @@
 mod save;
+mod system_font;
 
 pub fn run() {
     let builder = tauri::Builder::default()
@@ -6,7 +7,8 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .invoke_handler(tauri::generate_handler![
             save::write_file_atomic,
-            save::is_same_file
+            save::is_same_file,
+            system_font::read_system_font
         ]);
 
     #[cfg(feature = "e2e")]
