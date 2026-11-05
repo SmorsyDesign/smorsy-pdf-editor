@@ -444,8 +444,8 @@ test.describe('digitally signed PDFs', () => {
 
   test('open in View mode, and stay byte-identical if only viewed', async ({ page }) => {
     await openFixture(page, SIGNED, 'Signed.pdf');
-    await expect(page.getByText('This PDF has a digital signature')).toBeVisible();
-    await expect(page.getByText('Digitally signed')).toBeVisible();
+    await expect(page.getByText('This PDF looks digitally signed')).toBeVisible();
+    await expect(page.getByText('Looks signed')).toBeVisible();
     await queueSavePath(page, '/Users/test/Signed copy.pdf');
     await page.keyboard.press('ControlOrMeta+s');
     await expect(page.getByText('Copy saved')).toBeVisible();
@@ -461,7 +461,7 @@ test.describe('digitally signed PDFs', () => {
     await expect(warning.getByRole('button', { name: 'Keep viewing' })).toBeFocused();
     await warning.getByRole('button', { name: 'Keep viewing' }).click();
     await expect(page.getByTestId('edit-layer')).toHaveCount(0);
-    await expect(page.getByText('This PDF has a digital signature')).toBeVisible();
+    await expect(page.getByText('This PDF looks digitally signed')).toBeVisible();
   });
 
   test('Edit anyway unlocks editing', async ({ page }) => {
@@ -472,7 +472,7 @@ test.describe('digitally signed PDFs', () => {
       .getByRole('button', { name: 'Edit anyway' })
       .click();
     await expect(page.getByTestId('edit-layer').first()).toBeVisible();
-    await expect(page.getByText('This PDF has a digital signature')).toHaveCount(0);
+    await expect(page.getByText('This PDF looks digitally signed')).toHaveCount(0);
   });
 });
 

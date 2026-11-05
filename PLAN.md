@@ -103,6 +103,12 @@ Editing PDF text isn't like editing a Word document. A PDF stores positioned gly
 4. **Draw the new text** on top, in the same position and rotation.
 5. **Removing the original glyphs** moved to Phase 6: safe redaction needs the same content-stream rewriting. Until then replaced text stays patched, and the interface says so.
 
+### Decisions while building
+
+- **Embedded fonts are reused only for characters the page visibly draws with them.** A file can label an unused glyph wrongly, and typing that character would paint something else.
+- **IRS forms count as digitally signed.** They carry an Adobe usage-rights signature, which editing does break, so they open in View mode like any signed PDF.
+- **Quit is a custom menu item,** because the operating system's own one ends the app without asking. Quitting from the macOS Dock or at logout can't be intercepted by the windowing library yet, so those skip the prompt. The original file stays safe either way.
+
 ### Limits the interface will state
 
 | Situation                               | What happens                                                                                              |
@@ -115,7 +121,9 @@ Editing PDF text isn't like editing a Word document. A PDF stores positioned gly
 | Arabic, Hebrew, Indic scripts           | Read-only: `pdf-lib` doesn't shape these scripts, so they'd come out wrong.                               |
 | Chinese, Japanese, Korean               | Editable only where the file's own font has the glyphs. No bundled CJK font, because of size.             |
 | Longer replacement text                 | Wraps within its own block. The rest of the page doesn't reflow.                                          |
-| Scanned page                            | No text to edit. The app explains why and offers OCR.                                                     |
+| Scanned page                            | No text to edit. The app explains why, and offers OCR once it exists in Phase 6.                          |
+| PDF protected against changes           | Read-only, with an explanation. An exact copy can still be saved.                                         |
+| Text no available font can draw         | Flagged after the edit, and the save stops with a plain explanation rather than writing blanks.           |
 
 ## 5. Signing approach
 

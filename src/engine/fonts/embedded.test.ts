@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { PDFDocument } from '@cantoo/pdf-lib';
+import { PDFDict, PDFDocument, PDFName } from '@cantoo/pdf-lib';
 import { describe, expect, it } from 'vitest';
 import { embeddingAllowed, findEmbeddedFont, parseToUnicode } from './embedded';
 
@@ -88,5 +88,76 @@ describe('findEmbeddedFont', () => {
   it('returns null for a font that is not on the page', async () => {
     const doc = await load('03-subset-embedded.pdf');
     expect(findEmbeddedFont(doc.getPage(0), doc.context, 'NotAFont')).toBeNull();
+  });
+});
+
+describe('hostile ToUnicode maps', () => {
+  it('skips a range too big to be real, instead of working through it', () => {
+    const started = Date.now();
+    const map = parseToUnicode('beginbfrange <00000000> <FFFFFFFF> <0000> endbfrange');
+    expect(map.size).toBe(0);
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+
+  it('skips codes longer than a PDF allows', () => {
+    const huge = 'F'.repeat(16);
+    expect(
+      parseToUnicode(`beginbfrange <${'0'.repeat(16)}> <${huge}> <0000> endbfrange`).size,
+    ).toBe(0);
+  });
+
+  it('gives up on a map with more codes than Unicode has', () => {
+    const range = '<0000> <FFFF> <0000>\n';
+    expect(parseToUnicode(`beginbfrange ${range.repeat(20)} endbfrange`).size).toBe(0);
+  });
+
+  it('copes with sections that never close', () => {
+    const started = Date.now();
+    expect(parseToUnicode('beginbfchar '.repeat(200000)).size).toBe(0);
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+});
+
+describe('fonts that share a name', () => {
+  const NAME = 'LiberationSerif-8659';
+  const load = async () => {
+    const doc = await PDFDocument.load(
+      new Uint8Array(readFileSync('test-pdfs/03-subset-embedded.pdf')),
+    );
+    const page = doc.getPage(0);
+    return { doc, page, fonts: page.node.normalizedEntries().Font };
+  };
+
+  it('reuses a font the page has only one of', async () => {
+    const { doc, page } = await load();
+    expect(findEmbeddedFont(page, doc.context, NAME)).not.toBeNull();
+  });
+
+  const serifFont = (doc: PDFDocument, fonts: PDFDict) => {
+    for (const [, value] of fonts.entries()) {
+      const font = doc.context.lookup(value);
+      if (font instanceof PDFDict && font.get(PDFName.of('BaseFont')) === PDFName.of(NAME)) {
+        return { font, value };
+      }
+    }
+    throw new Error('The fixture has no such font.');
+  };
+
+  it('accepts several names for the same font', async () => {
+    const { doc, page, fonts } = await load();
+    fonts.set(PDFName.of('Another'), serifFont(doc, fonts).value);
+    expect(findEmbeddedFont(page, doc.context, NAME)).not.toBeNull();
+  });
+
+  it('refuses when a second font could be a decoy', async () => {
+    const { doc, page, fonts } = await load();
+    const decoy = doc.context.register(serifFont(doc, fonts).font.clone());
+    fonts.set(PDFName.of('Decoy'), decoy);
+    expect(findEmbeddedFont(page, doc.context, NAME)).toBeNull();
+  });
+
+  it('doesn’t confuse a different subset of the same typeface', async () => {
+    const { doc, page } = await load();
+    expect(findEmbeddedFont(page, doc.context, 'ABCDEF+LiberationSerif-8659')).toBeNull();
   });
 });

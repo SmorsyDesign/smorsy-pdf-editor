@@ -221,13 +221,10 @@ export class PdfEditor {
       doc.getPage(box.pageNumber - 1),
       doc.context,
       box.original?.name ?? '',
-      text,
     );
     if (!font) return null;
     const known = new Set(Array.from(box.original?.knownCharacters ?? ''));
-    const unknown = uniqueCharacters(text).filter(
-      (character) => character !== ' ' && !known.has(character),
-    );
+    const unknown = uniqueCharacters(text).filter((character) => !known.has(character));
     return [...new Set([...font.missing(text), ...unknown])];
   }
 
@@ -251,12 +248,7 @@ export class PdfEditor {
     };
 
     if (outcome.used === 'embedded') {
-      const font = findEmbeddedFont(
-        page,
-        doc.context,
-        box.original?.name ?? '',
-        box.lines.join(''),
-      );
+      const font = findEmbeddedFont(page, doc.context, box.original?.name ?? '');
       if (font) return { kind: 'embedded', font };
     }
     if (outcome.used === 'standard') {

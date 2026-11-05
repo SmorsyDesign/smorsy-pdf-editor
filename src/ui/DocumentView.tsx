@@ -168,7 +168,7 @@ export function DocumentView({
       return editor.changes === 1 ? '1 unsaved change' : `${editor.changes} unsaved changes`;
     }
     if (isProtected) return 'Protected';
-    if (signedLocked) return 'Digitally signed';
+    if (signedLocked) return 'Looks signed';
     return pdf.pageCount === 1 ? '1 page' : `${pdf.pageCount} pages`;
   };
 

@@ -333,7 +333,7 @@ function signedScreen(p, warning) {
         ${icon('warn', 'signed-warn')}
         <div>
           <h2 id="signed-title">Editing will break the signature</h2>
-          <p>This PDF has a digital signature. If you edit it, your copy's signature will show as invalid in other PDF apps.</p>
+          <p>This PDF looks digitally signed. If you edit it, your copy's signature will show as invalid in other PDF apps.</p>
           <p>Your original file and its signature stay as they are.</p>
         </div>
       </div>
@@ -342,11 +342,11 @@ function signedScreen(p, warning) {
   </div>` : '';
   return {
     title: warning ? 'Signed PDF warning' : 'Signed PDF', file: LEASE,
-    content: `${bar({ p, mode: 'select', file: LEASE, state: 'Digitally signed' }).replace('href="edit-text.html"', 'href="signed-warning.html"')}
+    content: `${bar({ p, mode: 'select', file: LEASE, state: 'Looks signed' }).replace('href="edit-text.html"', 'href="signed-warning.html"')}
   <div class="body no-panel">
     ${thumbs(0)}
     <div class="signed-stage">
-      <div class="signed-strip" role="status">${icon('lock')}<span>This PDF has a digital signature. You’re only viewing it, so nothing has changed.</span><a class="btn" href="signed-warning.html">Edit anyway</a></div>
+      <div class="signed-strip" role="status">${icon('lock')}<span>This PDF looks digitally signed, though the app can’t check signatures yet. You’re only viewing it, so nothing has changed.</span><a class="btn" href="signed-warning.html">Edit anyway</a></div>
       <main class="canvas" aria-label="Page 1 of the document" tabindex="0">${lease({ tenant: '<span class="ink ink-caveat signed-ink">Mara Okafor</span>', date: '<span class="ink date-stamp">November 5, 2026</span>' }).replace('class="ln was-changed"', 'class="ln"').replace('class="paper "', 'class="paper"')}</main>
     </div>
   </div>

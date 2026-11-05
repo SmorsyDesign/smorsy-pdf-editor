@@ -9,7 +9,6 @@ import {
   type PDFContext,
   type PDFPage,
 } from '@cantoo/pdf-lib';
-import { cleanFontName } from './match';
 
 export interface CharacterCode {
   readonly code: number;
@@ -56,6 +55,25 @@ function hexToText(hex: string): string {
   return text;
 }
 
+const MAX_CODE_BYTES = 4;
+const MAX_RANGE = 0x10000;
+const MAX_CODES = 0x110000;
+
+/** Finds marked sections directly, because a regex is very slow on sections left unclosed. */
+function sectionsOf(cmap: string, name: string): readonly string[] {
+  const sections: string[] = [];
+  const opening = `begin${name}`;
+  const closing = `end${name}`;
+  let at = cmap.indexOf(opening);
+  while (at !== -1) {
+    const end = cmap.indexOf(closing, at);
+    if (end === -1) break;
+    sections.push(cmap.slice(at + opening.length, end));
+    at = cmap.indexOf(opening, end);
+  }
+  return sections;
+}
+
 /**
  * Reverses a ToUnicode map, because editing needs text-to-code rather than code-to-text. A
  * character mapped from several codes is left out: a file could label a "9" glyph as "1", and
@@ -63,6 +81,7 @@ function hexToText(hex: string): string {
  */
 export function parseToUnicode(cmap: string): Map<string, CharacterCode> {
   const map = new Map<string, CharacterCode>();
+  let codesSeen = 0;
   const ambiguous = new Set<string>();
   const add = (code: number, bytes: number, text: string) => {
     const existing = map.get(text);
@@ -70,19 +89,23 @@ export function parseToUnicode(cmap: string): Map<string, CharacterCode> {
     else map.set(text, { code, bytes });
   };
 
-  for (const section of cmap.matchAll(/beginbfchar([\s\S]*?)endbfchar/g)) {
-    for (const entry of (section[1] ?? '').matchAll(/<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>/g)) {
+  for (const section of sectionsOf(cmap, 'bfchar')) {
+    for (const entry of section.matchAll(/<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>/g)) {
       const [, code = '', text = ''] = entry;
       add(parseInt(code, 16), code.length / 2, hexToText(text));
     }
   }
-  for (const section of cmap.matchAll(/beginbfrange([\s\S]*?)endbfrange/g)) {
+  for (const section of sectionsOf(cmap, 'bfrange')) {
     const pattern = /<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>\s*(?:<([0-9a-fA-F]+)>|\[([^\]]*)\])/g;
-    for (const entry of (section[1] ?? '').matchAll(pattern)) {
+    for (const entry of section.matchAll(pattern)) {
       const [, startHex = '', endHex = '', targetHex, targets] = entry;
       const start = parseInt(startHex, 16);
       const end = parseInt(endHex, 16);
       const bytes = startHex.length / 2;
+      // Bounds come from the file, and an enormous range would keep the worker busy for good.
+      if (bytes > MAX_CODE_BYTES || end - start >= MAX_RANGE) continue;
+      codesSeen += end - start + 1;
+      if (codesSeen > MAX_CODES) return new Map();
       if (targets !== undefined) {
         [...targets.matchAll(/<([0-9a-fA-F]+)>/g)].forEach((item, offset) => {
           add(start + offset, bytes, hexToText(item[1] ?? ''));
@@ -193,30 +216,32 @@ function embeddedFontFrom(
   };
 }
 
+const comparableName = (name: string) => name.replace(/[,_]/g, '-').replace(/\s/g, '');
+
 /**
- * Finds a font already in the page, for reuse. A page can hold several subsets of one font, so
- * the one covering the text wins. Fonts with no ToUnicode map are skipped: without one there's no
- * reliable way to know which code draws which letter.
+ * Finds the font that drew the text, for reuse. The name has to match exactly, subset tag included,
+ * and only one font object may have it: a file could list an unused font under the same name, whose
+ * glyphs don't match its labels. Without a ToUnicode map there's no reliable way to know which code
+ * draws which letter, so those aren't reused either.
  */
 export function findEmbeddedFont(
   page: PDFPage,
   context: PDFContext,
   name: string,
-  text = '',
 ): EmbeddedFont | null {
   const fonts = page.node.normalizedEntries().Font;
-  const wanted = cleanFontName(name);
-  let first: EmbeddedFont | null = null;
+  const wanted = comparableName(name);
+  let match: { readonly key: PDFName; readonly font: PDFDict } | null = null;
   for (const [key, value] of fonts.entries()) {
     const font = resolveDict(context, value);
     const baseFont = font?.get(PDFName.of('BaseFont'));
     if (!font || !(baseFont instanceof PDFName)) continue;
-    if (cleanFontName(baseFont.decodeText()) !== wanted) continue;
-    const codes = readToUnicode(font, context);
-    if (!codes) continue;
-    const candidate = embeddedFontFrom(key.decodeText(), codes, readWidths(font, context));
-    if (candidate.missing(text).length === 0) return candidate;
-    first ??= candidate;
+    if (comparableName(baseFont.decodeText()) !== wanted) continue;
+    // Several names can point at one font, which is fine. Two different fonts aren't.
+    if (match && match.font !== font) return null;
+    match ??= { key, font };
   }
-  return first;
+  if (!match) return null;
+  const codes = readToUnicode(match.font, context);
+  return codes && embeddedFontFrom(match.key.decodeText(), codes, readWidths(match.font, context));
 }

@@ -12,6 +12,12 @@ const FAMILY_NAMES = {
   caladea: 'Caladea',
 } as const;
 
+const listed = (characters: readonly string[]) =>
+  characters
+    .slice(0, 6)
+    .map((character) => (character === ' ' ? 'space' : character))
+    .join(' ');
+
 const familyNameOf = ({ outcome }: FontNoticeState) =>
   outcome.family ? FAMILY_NAMES[outcome.family] : 'the closest match';
 
@@ -63,8 +69,8 @@ export function FontCard({
           These characters can’t be saved
         </h3>
         <p>
-          No font available to the app has {outcome.uncovered.slice(0, 6).join(' ')}. Change or
-          remove them before you save.
+          No font available to the app has {listed(outcome.uncovered)}. Change or remove them before
+          you save.
         </p>
         <div className="notice-actions">
           <button type="button" className="btn btn-primary" onClick={onChooseFont}>
@@ -88,7 +94,7 @@ export function FontCard({
       </h3>
       <p>
         {outcome.missing.length > 0
-          ? `This file only stores the characters it used, and it’s missing ${outcome.missing.slice(0, 6).join(' ')}. `
+          ? `This file only stores the characters it used, and it’s missing ${listed(outcome.missing)}. `
           : 'That font isn’t available to the app. '}
         Your edit uses {familyName} instead, so it looks slightly different.
       </p>
@@ -193,7 +199,10 @@ export function SignedStrip({ onEditAnyway }: { onEditAnyway: () => void }) {
   return (
     <div className="signed-strip" role="status">
       <Icon name="lock" />
-      <span>This PDF has a digital signature. You’re only viewing it, so nothing has changed.</span>
+      <span>
+        This PDF looks digitally signed, though the app can’t check signatures yet. You’re only
+        viewing it, so nothing has changed.
+      </span>
       <button type="button" className="btn" onClick={onEditAnyway}>
         Edit anyway
       </button>
@@ -212,7 +221,7 @@ export function SignedWarning({
     <AlertDialog
       icon="warn"
       title="Editing will break the signature"
-      message="This PDF has a digital signature. If you edit it, your copy’s signature will show as invalid in other PDF apps."
+      message="This PDF looks digitally signed. If you edit it, your copy’s signature will show as invalid in other PDF apps."
       detail="Your original file and its signature stay as they are."
       cancelLabel="Keep viewing"
       confirmLabel="Edit anyway"

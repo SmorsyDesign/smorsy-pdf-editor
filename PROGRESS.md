@@ -56,7 +56,7 @@
 - [x] Digitally signed PDFs: open in View mode, warn before the first edit (design this screen first, for approval)
 - [x] Same-file check and Save flow from `PLAN.md` decision 2 (⌘S after the first save)
 - [x] Saving runs in a Web Worker
-- [x] Scanned pages: detect, explain, offer OCR
+- [x] Scanned pages: detect and explain, with new text allowed on top. The OCR offer comes with OCR itself in Phase 6
 - [x] Stretch decision: removing original letters moves to Phase 6, built with safe redaction, which needs the same content-stream rewriting. Replaced text stays patched, and the interface says so.
 - [ ] Part 7 gates and check-in
 
@@ -87,7 +87,7 @@
 
 ## Phase 6: Document tools
 
-- [ ] OCR (English bundled, in a Worker)
+- [ ] OCR (English bundled, in a Worker), offered from the scanned-page card built in Phase 2
 - [ ] Safe redaction, including removing original letters from the content stream (moved from Phase 2)
 - [ ] Page numbers, watermarks, headers and footers
 - [ ] Compression
@@ -99,7 +99,7 @@
 
 - [ ] Sign with .p12/.pfx
 - [ ] In-app self-signed certificate
-- [ ] Show and validate signature details
+- [ ] Show and validate signature details, replacing Phase 2's "looks digitally signed" wording, which is based on a text check
 - [ ] Explain "validity unknown" for self-signed
 - [ ] Part 7 gates and check-in
 
