@@ -21,6 +21,12 @@ pub fn run() {
             if let Ok(folder) = std::env::var("SMORSY_E2E_DIR") {
                 app.fs_scope().allow_directory(folder, true)?;
             }
+            // Systems pause rendering in covered windows, which would stall tests run on a
+            // computer that's also being used.
+            use tauri::Manager;
+            if let Some(window) = app.get_webview_window("main") {
+                window.set_always_on_top(true)?;
+            }
             Ok(())
         });
 

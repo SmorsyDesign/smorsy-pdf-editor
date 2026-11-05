@@ -36,7 +36,10 @@ async function waitForPageDrawn() {
       });
       return dark > 50;
     },
-    { timeoutMsg: 'the page was never drawn' },
+    {
+      timeoutMsg:
+        'The page was never drawn. If this ran on a computer in use, check the test window was on screen: systems pause drawing in hidden windows.',
+    },
   );
 }
 
@@ -60,7 +63,7 @@ async function invokeFromPage(command: string, body: unknown, path?: string) {
         await internals.invoke(name, args, options);
         return 'allowed';
       } catch (error) {
-        return (error as { kind?: string }).kind ?? String(error);
+        return (error as { kind?: string } | null)?.kind ?? String(error);
       }
     },
     command,
@@ -158,11 +161,71 @@ describe('the built app', () => {
   });
 
   it('asks before replacing the original, even when the name is spelled differently', async () => {
+    await openFromStartScreen(plainText);
+    await expect(pageIndicator()).toHaveText('Page 1 of 3');
     // macOS and Windows ignore case by default, so this is the same file under another spelling.
     await answerDialogs({ save: join(workspace, '01-PLAIN-TEXT.pdf') });
     await $('button=Save a copy').click();
     await expect($('h2=Replace your original file?')).toBeDisplayed();
     await $('button=Cancel').click();
+  });
+
+  it('edits text and saves it to disk, in the real app', async () => {
+    await openFromStartScreen(plainText);
+    await expect(pageIndicator()).toHaveText('Page 1 of 3');
+    await waitForPageDrawn();
+
+    await $('button=Edit text').click();
+    await $('[aria-label^="Edit text: Plain text, page 1"]').click();
+    const field = $('[data-testid="text-editor"] textarea');
+    await field.setValue('Edited in the real app');
+    await $('[aria-label="Delete this text"]').waitForDisplayed();
+
+    const target = join(workspace, 'Edited copy.pdf');
+    await answerDialogs({ save: target });
+    await $('button=Save a copy').click();
+    await expect($('span=Copy saved')).toBeDisplayed();
+
+    const saved = readFileSync(target);
+    expect(saved.equals(readFileSync(plainText))).toBe(false);
+    expect(saved.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+
+    const violations = await browser.execute(
+      () => (window as unknown as { cspViolations: string[] }).cspViolations,
+    );
+    expect(violations).toEqual([]);
+  });
+
+  it('offers the computer’s Times New Roman when it has one', async () => {
+    await openFromStartScreen(plainText);
+    await expect(pageIndicator()).toHaveText('Page 1 of 3');
+    await $('button=Edit text').click();
+    await $('[aria-label^="Edit text: Plain text, page 1"]').click();
+    await browser.waitUntil(() =>
+      browser.execute(() =>
+        Array.from(
+          document.querySelectorAll<HTMLOptionElement>('select[aria-label="Font"] option'),
+        ).some((option) => option.value === 'times-new-roman'),
+      ),
+    );
+    await browser.keys('Escape');
+  });
+
+  it('can select text in Select mode, under the production security policy', async () => {
+    await openFromStartScreen(plainText);
+    await expect(pageIndicator()).toHaveText('Page 1 of 3');
+    await browser.waitUntil(() =>
+      browser.execute(() => document.querySelector('[data-testid="select-layer"] span') !== null),
+    );
+    const violations = await browser.execute(
+      () => (window as unknown as { cspViolations: string[] }).cspViolations,
+    );
+    expect(violations).toEqual([]);
+  });
+
+  it('refuses to read a font outside its fixed list', async () => {
+    const outcome = await invokeFromPage('read_system_font', { style: '../../etc/passwd' });
+    expect(outcome).not.toBe('allowed');
   });
 
   it('refuses to write outside the allowed folder', async () => {

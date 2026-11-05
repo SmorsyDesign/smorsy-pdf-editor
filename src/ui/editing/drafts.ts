@@ -28,6 +28,7 @@ const DEFAULT_SIZE = 12;
 const DEFAULT_WIDTH = 240;
 const COVER_PADDING = 1;
 const RIGHT_MARGIN = 36;
+const WRAP_TOLERANCE = 2;
 
 export function draftForNewText(
   pageNumber: number,
@@ -81,7 +82,11 @@ export function draftForBlock(
     kind: 'replace',
     id: block.id,
     pageNumber: block.pageNumber,
-    rect: { ...block.rect, width: block.lines.length === 1 ? roomToRight : block.rect.width },
+    rect: {
+      ...block.rect,
+      // The small extra stops a paragraph re-wrapping because of tiny rounding in measured widths.
+      width: block.lines.length === 1 ? roomToRight : block.rect.width + WRAP_TOLERANCE,
+    },
     angle: block.angle,
     text: block.text,
     firstBaseline: block.firstBaseline,

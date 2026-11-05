@@ -1,6 +1,6 @@
 # Progress
 
-**Current phase:** 1, at check-in. Waiting for the owner to say "continue" before Phase 2.
+**Current phase:** 2, in Part 7 review.
 
 ## Phase 0: Plan and design
 
@@ -43,21 +43,21 @@
 
 ## Phase 2: Text editing
 
-- [ ] Mode bar from the approved design, showing modes as they become real (Select, Edit text)
-- [ ] Select mode: select and copy text, search
-- [ ] Immutable edit model; undo and redo
-- [ ] Add: place, move, resize, wrap
-- [ ] Add: font, size, colour, bold, italic, alignment
-- [ ] Edit existing: hover outline, click opens pre-filled and matched
-- [ ] Replace and delete with background-matched patch
-- [ ] Reuse embedded font when it has every glyph
-- [ ] Closest bundled font, plus notice
-- [ ] Times New Roman from the computer's own copy, checking its embedding flag; Liberation Serif fallback with notice
-- [ ] Digitally signed PDFs: open in View mode, warn before the first edit (design this screen first, for approval)
-- [ ] Same-file check and Save flow from `PLAN.md` decision 2 (⌘S after the first save)
-- [ ] Saving moves to a Web Worker once it does real work
-- [ ] Scanned pages: detect, explain, offer OCR
-- [ ] Stretch: remove original glyphs, per-page fallback, stated in the interface
+- [x] Mode bar from the approved design, showing modes as they become real (Select, Edit text)
+- [x] Select mode: select and copy text, search
+- [x] Immutable edit model; undo and redo
+- [x] Add: place, move, resize, wrap
+- [x] Add: font, size, colour, bold, italic, alignment
+- [x] Edit existing: hover outline, click opens pre-filled and matched
+- [x] Replace and delete with background-matched patch
+- [x] Reuse embedded font when it has every glyph
+- [x] Closest bundled font, plus notice
+- [x] Times New Roman from the computer's own copy, checking its embedding flag; Liberation Serif fallback with notice
+- [x] Digitally signed PDFs: open in View mode, warn before the first edit (design this screen first, for approval)
+- [x] Same-file check and Save flow from `PLAN.md` decision 2 (⌘S after the first save)
+- [x] Saving runs in a Web Worker
+- [x] Scanned pages: detect, explain, offer OCR
+- [x] Stretch decision: removing original letters moves to Phase 6, built with safe redaction, which needs the same content-stream rewriting. Replaced text stays patched, and the interface says so.
 - [ ] Part 7 gates and check-in
 
 ## Phase 3: Signatures
@@ -88,7 +88,7 @@
 ## Phase 6: Document tools
 
 - [ ] OCR (English bundled, in a Worker)
-- [ ] Safe redaction
+- [ ] Safe redaction, including removing original letters from the content stream (moved from Phase 2)
 - [ ] Page numbers, watermarks, headers and footers
 - [ ] Compression
 - [ ] Metadata removal

@@ -101,7 +101,7 @@ Editing PDF text isn't like editing a Word document. A PDF stores positioned gly
    4. The closest bundled font by style (serif, mono, bold, italic), with a notice.
 3. **Cover the original.** Sample the rendered pixels in a ring around the text. A flat colour gets a matching patch.
 4. **Draw the new text** on top, in the same position and rotation.
-5. **Stretch goal: remove the original glyphs.** Time-boxed in Phase 2, and used per page only when a re-render confirms the result is correct. Otherwise it falls back to the patch and says so.
+5. **Removing the original glyphs** moved to Phase 6: safe redaction needs the same content-stream rewriting. Until then replaced text stays patched, and the interface says so.
 
 ### Limits the interface will state
 
