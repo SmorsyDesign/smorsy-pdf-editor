@@ -7,6 +7,8 @@ import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { afterAll, describe, expect, it } from 'vitest';
 import { openDocument } from '../../src/engine/document';
 import { unchangedCopy } from '../../src/engine/copy';
+import type { TextBox } from '../../src/engine/edits/model';
+import { PdfEditor } from '../../src/engine/save/editor';
 
 const FOLDER = 'test-pdfs';
 const PASSWORDS: Readonly<Record<string, string>> = { '10-password-protected.pdf': 'smorsy-test' };
@@ -54,6 +56,37 @@ function qpdfStatus(path: string, password?: string): number | null {
   return spawnSync('qpdf', args, { stdio: 'ignore' }).status;
 }
 
+const EDIT_TEXT = 'Round trip edit';
+
+const editedBox: TextBox = {
+  id: 'round-trip',
+  pageNumber: 1,
+  rect: { x: 40, y: 40, width: 200, height: 16 },
+  angle: 0,
+  text: EDIT_TEXT,
+  lines: [EDIT_TEXT],
+  firstBaseline: 12,
+  lineHeight: 14,
+  style: {
+    font: 'sans',
+    size: 11,
+    color: { r: 0.8, g: 0, b: 0 },
+    bold: false,
+    italic: false,
+    align: 'left',
+  },
+  covers: [
+    { rect: { x: 40, y: 60, width: 80, height: 10 }, angle: 0, color: { r: 1, g: 1, b: 1 } },
+  ],
+  original: null,
+};
+
+const fonts = {
+  bundled: (file: string) =>
+    Promise.resolve(new Uint8Array(readFileSync(join('assets/fonts', file)))),
+  system: () => Promise.resolve(null),
+};
+
 describe('qpdf is available', () => {
   it('reports a version', () => {
     expect(execFileSync('qpdf', ['--version']).toString()).toContain('qpdf');
@@ -87,6 +120,25 @@ describe.each(files)('%s', (name) => {
   it('survives an unedited copy byte for byte', () => {
     expect(Buffer.compare(unchangedCopy(original), original)).toBe(0);
   });
+
+  // Password-protected files can't be opened to edit until Phase 6 adds passwords.
+  it.skipIf(password !== undefined)(
+    'survives open, edit, save and reopen, keeping the edit and everything else',
+    async () => {
+      const before = await inspect(original);
+      const saved = await new PdfEditor(original, fonts).save([editedBox]);
+
+      const path = join(temp, `edited-${name}`);
+      writeFileSync(path, saved);
+      expect([0, 3]).toContain(qpdfStatus(path));
+      expect(await inspect(saved)).toEqual(before);
+
+      const reopened = await openDocument(saved);
+      const { blocks } = await reopened.pageText(1);
+      expect(blocks.map((block) => block.text).join(' ')).toContain(EDIT_TEXT);
+      await reopened.close();
+    },
+  );
 
   it('keeps pages, annotations, links and bookmarks through a re-save', async () => {
     const before = await inspect(original, password);
