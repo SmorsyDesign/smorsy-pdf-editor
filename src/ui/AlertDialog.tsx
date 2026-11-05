@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Icon } from './Icon';
+import { Icon, type IconName } from './Icon';
 
 interface AlertDialogProps {
   readonly title: string;
@@ -9,6 +9,9 @@ interface AlertDialogProps {
   readonly confirmLabel: string;
   readonly cancelLabel: string;
   readonly destructive?: boolean;
+  readonly icon?: IconName;
+  readonly alternativeLabel?: string;
+  readonly onAlternative?: () => void;
   readonly onConfirm: () => void;
   readonly onCancel: () => void;
 }
@@ -22,6 +25,9 @@ export function AlertDialog({
   confirmLabel,
   cancelLabel,
   destructive = false,
+  icon = 'error',
+  alternativeLabel,
+  onAlternative,
   onConfirm,
   onCancel,
 }: AlertDialogProps) {
@@ -48,7 +54,10 @@ export function AlertDialog({
       }}
     >
       <div className="alert-body">
-        <Icon name="error" className="error-icon" />
+        <Icon
+          name={icon}
+          className={icon === 'warn' ? 'error-icon alert-icon-warn' : 'error-icon'}
+        />
         <div>
           <h2 id="alert-title">{title}</h2>
           <p id="alert-message">{message}</p>
@@ -66,6 +75,11 @@ export function AlertDialog({
         <button className="btn" autoFocus onClick={onCancel}>
           {cancelLabel}
         </button>
+        {alternativeLabel && (
+          <button className="btn" onClick={onAlternative}>
+            {alternativeLabel}
+          </button>
+        )}
         <button className={destructive ? 'btn btn-danger' : 'btn btn-primary'} onClick={onConfirm}>
           {confirmLabel}
         </button>

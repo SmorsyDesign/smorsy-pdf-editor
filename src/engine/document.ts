@@ -1,5 +1,6 @@
 import {
   OPS,
+  TextLayer,
   Util,
   getDocument,
   type PDFDocumentLoadingTask,
@@ -36,6 +37,8 @@ export interface PdfDocument {
   pageSize(pageNumber: number): Promise<PageSize>;
   /** The lines and paragraphs on a page, and whether it's an image with no text. */
   pageText(pageNumber: number): Promise<PageText>;
+  /** Fills a container with invisible, selectable text laid over the drawn page. */
+  renderTextLayer(pageNumber: number, container: HTMLElement, zoomPercent: number): RenderTask;
   render(request: RenderRequest): RenderTask;
   /** Frees what a page holds in memory. Call it when the page scrolls well out of view. */
   release(pageNumber: number): void;
@@ -162,6 +165,32 @@ class PdfJsDocument implements PdfDocument {
     const scanned =
       blocks.length === 0 && operators.fnArray.some((operator) => IMAGE_OPERATORS.has(operator));
     return { blocks, scanned };
+  }
+
+  renderTextLayer(pageNumber: number, container: HTMLElement, zoomPercent: number): RenderTask {
+    const stop = new AbortController();
+    const finished = (async () => {
+      const page = await this.page(pageNumber);
+      if (stop.signal.aborted) return;
+      const natural = page.getViewport({ scale: 1 });
+      const { width } = displayedPageSize(natural, zoomPercent);
+      const viewport = page.getViewport({ scale: width / natural.width });
+      const layer = new TextLayer({
+        textContentSource: page.streamTextContent(),
+        container,
+        viewport,
+      });
+      stop.signal.addEventListener('abort', () => {
+        layer.cancel();
+      });
+      await layer.render();
+    })();
+    return {
+      finished,
+      cancel: () => {
+        stop.abort();
+      },
+    };
   }
 
   render({ pageNumber, canvas, zoomPercent, devicePixelRatio }: RenderRequest): RenderTask {

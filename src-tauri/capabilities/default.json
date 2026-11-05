@@ -4,7 +4,10 @@
   "description": "Only what the main window needs. File access comes from the native dialogs at runtime.",
   "windows": ["main"],
   "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
     "core:menu:default",
+    "core:window:allow-destroy",
     "core:window:allow-set-title",
     "core:window:allow-start-dragging",
     "core:window:allow-internal-toggle-maximize",

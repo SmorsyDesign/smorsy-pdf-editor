@@ -373,6 +373,39 @@ async function colouredBackgrounds() {
   await save(doc, '15-coloured-backgrounds.pdf');
 }
 
+// Enough of a signature for the app to detect it. It isn't a valid one, because no test needs it to
+// verify yet; Phase 7's certificate signing brings real signatures.
+async function digitallySigned() {
+  const doc = await newDoc('Digitally signed');
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const page = doc.addPage([612, 792]);
+  drawLines(page, PARAGRAPH, { font });
+  const signature = doc.context.register(
+    doc.context.obj({
+      Type: 'Sig',
+      Filter: 'Adobe.PPKLite',
+      SubFilter: 'adbe.pkcs7.detached',
+      ByteRange: [0, 100, 200, 300],
+      Contents: PDFString.of('0000'),
+    }),
+  );
+  const field = doc.context.register(
+    doc.context.obj({
+      Type: 'Annot',
+      Subtype: 'Widget',
+      FT: 'Sig',
+      T: PDFString.of('Signature1'),
+      V: signature,
+      Rect: [72, 72, 272, 112],
+      P: page.ref,
+      F: 132,
+    }),
+  );
+  page.node.set(PDFName.of('Annots'), doc.context.obj([field]));
+  doc.catalog.set(PDFName.of('AcroForm'), doc.context.obj({ Fields: [field], SigFlags: 3 }));
+  await save(doc, '19-digitally-signed.pdf');
+}
+
 async function invalidFiles() {
   writeFileSync(join(invalid, 'not-a-pdf.pdf'), 'This is a text file with a .pdf name.\n');
   writeFileSync(join(invalid, 'empty.pdf'), '');
@@ -417,4 +450,5 @@ await bookmarks();
 await largeDocument();
 await imagesAndText();
 await colouredBackgrounds();
+await digitallySigned();
 await invalidFiles();

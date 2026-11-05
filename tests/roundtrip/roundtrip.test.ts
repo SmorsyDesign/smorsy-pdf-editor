@@ -6,7 +6,7 @@ import { PDFDocument } from '@cantoo/pdf-lib';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { afterAll, describe, expect, it } from 'vitest';
 import { openDocument } from '../../src/engine/document';
-import { unchangedCopy } from '../../src/engine/save';
+import { unchangedCopy } from '../../src/engine/copy';
 
 const FOLDER = 'test-pdfs';
 const PASSWORDS: Readonly<Record<string, string>> = { '10-password-protected.pdf': 'smorsy-test' };

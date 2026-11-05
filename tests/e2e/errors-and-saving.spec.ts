@@ -119,7 +119,7 @@ test.describe('saving', () => {
     await queueSavePath(page, ORIGINAL_PATH);
     await page.getByRole('button', { name: 'Save a copy' }).click();
     await dialog.getByRole('button', { name: 'Replace original' }).click();
-    await expect(page.getByText('Copy saved')).toBeVisible();
+    await expect(page.getByText('Original file updated')).toBeVisible();
     expect((await lastWrite(page))?.path).toBe(ORIGINAL_PATH);
   });
 
@@ -136,7 +136,7 @@ test.describe('saving', () => {
     await expect(dialog).toContainText('Lease.pdf');
 
     await dialog.getByRole('button', { name: 'Replace original' }).click();
-    await expect(page.getByText('Copy saved')).toBeVisible();
+    await expect(page.getByText('Original file updated')).toBeVisible();
     const write = await lastWrite(page);
     expect(sha256(Uint8Array.from(write?.bytes ?? []))).toBe(sha256(readFileSync(FIXTURE)));
     await expectOpenDocument(page, 3);

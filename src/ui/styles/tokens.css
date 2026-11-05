@@ -28,6 +28,11 @@
 
   /* Pages stay white in dark mode, so what's drawn on them keeps one colour. */
   --on-paper-danger: #a8231c;
+  --mark: #0b66a0;
+  --mark-wash: #e3f1fa;
+  --mark-selection: #b7dcf5;
+  --hit: #ffe98a;
+  --hit-current: #ffc53d;
 
   --desk: #dfe5e9;
   --chrome: #f4f6f7;
@@ -46,6 +51,7 @@
   --paper-edge: #aab5bd;
   --focus: #0b66a0;
   --danger: #a8231c;
+  --caution: #8a4f00;
   --scrim: #17222b66;
   --bar-shadow: #17222b29;
 }
@@ -69,6 +75,7 @@
     --paper-edge: #000000;
     --focus: #7cc8f5;
     --danger: #ff9f96;
+    --caution: #f2b866;
     --scrim: #00000099;
     --bar-shadow: #00000066;
   }

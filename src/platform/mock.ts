@@ -17,6 +17,8 @@ interface MockControls {
   lastWrite: { path: string; bytes: Uint8Array } | null;
   windowTitle: string;
   documentOpen: boolean;
+  closeGuard: (() => boolean) | null;
+  windowClosed: boolean;
   os: OsFamily;
 }
 
@@ -28,8 +30,12 @@ declare global {
 
 const SHORTCUTS: Readonly<Record<string, MenuCommand>> = {
   o: 'open',
-  s: 'save-copy',
+  s: 'save',
+  S: 'save-copy',
   w: 'close-document',
+  z: 'undo',
+  Z: 'redo',
+  f: 'find',
   '=': 'zoom-in',
   '-': 'zoom-out',
   '0': 'zoom-actual',
@@ -45,6 +51,8 @@ export function createMockPlatform(): Platform {
     lastWrite: null,
     windowTitle: '',
     documentOpen: false,
+    closeGuard: null,
+    windowClosed: false,
     os: detectOs(),
   };
   window.smorsyMock = controls;
@@ -63,6 +71,16 @@ export function createMockPlatform(): Platform {
       const next = controls.nextSavePath;
       controls.nextSavePath = null;
       return Promise.resolve(next);
+    },
+    readSystemFont() {
+      return Promise.resolve(null);
+    },
+    setCloseGuard(guard) {
+      controls.closeGuard = guard;
+    },
+    closeWindow() {
+      controls.windowClosed = true;
+      return Promise.resolve();
     },
     isSameFile(first, second) {
       return Promise.resolve(first === second);
@@ -85,7 +103,8 @@ export function createMockPlatform(): Platform {
     onCommand(listener) {
       // In the real app the native menu owns these keys.
       const onKey = (event: KeyboardEvent) => {
-        const command = SHORTCUTS[event.key];
+        // With Shift held, browsers disagree on whether a letter arrives in upper case.
+        const command = SHORTCUTS[event.shiftKey ? event.key.toUpperCase() : event.key];
         if (command && (event.metaKey || event.ctrlKey)) {
           event.preventDefault();
           listener(command);

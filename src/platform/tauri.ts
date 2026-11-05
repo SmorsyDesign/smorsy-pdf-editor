@@ -55,7 +55,16 @@ async function buildMenu(
     });
 
   const openItem = await item('open', 'Open…', 'CmdOrCtrl+O');
-  const saveItem = await item('save-copy', 'Save a Copy…', 'CmdOrCtrl+S', false);
+  const saveItem = await item('save', 'Save', 'CmdOrCtrl+S', false);
+  const saveCopyItem = await item('save-copy', 'Save a Copy…', 'CmdOrCtrl+Shift+S', false);
+  const undoItem = await item('undo', 'Undo', 'CmdOrCtrl+Z', false);
+  const redoItem = await item(
+    'redo',
+    'Redo',
+    os === 'win' ? 'CmdOrCtrl+Y' : 'CmdOrCtrl+Shift+Z',
+    false,
+  );
+  const findItem = await item('find', 'Find…', 'CmdOrCtrl+F', false);
   const closeItem = await item('close-document', 'Close Document', 'CmdOrCtrl+W', false);
   const zoomInItem = await item('zoom-in', 'Zoom In', 'CmdOrCtrl+=', false);
   const zoomOutItem = await item('zoom-out', 'Zoom Out', 'CmdOrCtrl+-', false);
@@ -69,6 +78,7 @@ async function buildMenu(
       openItem,
       await separator(),
       saveItem,
+      saveCopyItem,
       await separator(),
       closeItem,
       ...(os === 'mac' ? [] : [await PredefinedMenuItem.new({ item: 'Quit', text: 'Exit' })]),
@@ -77,8 +87,15 @@ async function buildMenu(
   const edit = await Submenu.new({
     text: 'Edit',
     items: [
+      undoItem,
+      redoItem,
+      await separator(),
+      await PredefinedMenuItem.new({ item: 'Cut' }),
       await PredefinedMenuItem.new({ item: 'Copy' }),
+      await PredefinedMenuItem.new({ item: 'Paste' }),
       await PredefinedMenuItem.new({ item: 'SelectAll' }),
+      await separator(),
+      findItem,
     ],
   });
   const view = await Submenu.new({
@@ -118,7 +135,18 @@ async function buildMenu(
     await menu.setAsWindowMenu(getCurrentWindow());
   }
 
-  return [saveItem, closeItem, zoomInItem, zoomOutItem, actualItem, fitItem];
+  return [
+    saveItem,
+    saveCopyItem,
+    closeItem,
+    undoItem,
+    redoItem,
+    findItem,
+    zoomInItem,
+    zoomOutItem,
+    actualItem,
+    fitItem,
+  ];
 }
 
 export async function createTauriPlatform(): Promise<Platform> {
@@ -148,6 +176,22 @@ export async function createTauriPlatform(): Promise<Platform> {
       return (
         testDialogAnswer('save') ?? save({ defaultPath: suggestedName, filters: [PDF_FILTER] })
       );
+    },
+    async readSystemFont(style) {
+      try {
+        return new Uint8Array(await invoke<ArrayBuffer>('read_system_font', { style }));
+      } catch {
+        // Not every computer has it, and the app has a fallback, so this isn't an error.
+        return null;
+      }
+    },
+    setCloseGuard(guard) {
+      void getCurrentWindow().onCloseRequested((event) => {
+        if (!guard()) event.preventDefault();
+      });
+    },
+    async closeWindow() {
+      await getCurrentWindow().destroy();
     },
     isSameFile(first, second) {
       return invoke<boolean>('is_same_file', { first, second });

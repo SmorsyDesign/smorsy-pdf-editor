@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { openDocument, type PdfDocument } from '../engine/document';
-import { copyFileName, unchangedCopy } from '../engine/save';
+import { copyFileName } from '../engine/copy';
 import {
   ReadFailure,
   SaveFailure,
@@ -11,7 +11,8 @@ import {
 } from '../platform';
 import { pdfAssets } from '../workers/pdf-setup';
 import { AlertDialog } from './AlertDialog';
-import { DocumentView } from './DocumentView';
+import { DocumentView, type DocumentViewHandle } from './DocumentView';
+import { useDocumentEditor } from './editing/useDocumentEditor';
 import { explainOpenFailure, explainSaveFailure, type OpenProblem } from './messages';
 import { StartScreen } from './StartScreen';
 import { installTabFocus } from './tabFocus';
@@ -19,13 +20,22 @@ import { installTabFocus } from './tabFocus';
 type Session =
   | { readonly status: 'empty' }
   | { readonly status: 'failed'; readonly fileName: string; readonly problem: OpenProblem }
-  | { readonly status: 'open'; readonly file: OpenedFile; readonly document: PdfDocument };
+  | {
+      readonly status: 'open';
+      readonly id: number;
+      readonly file: OpenedFile;
+      readonly document: PdfDocument;
+    };
+
+/** What was asked for when unsaved changes got in the way. */
+type LeaveAction = 'close' | 'open' | 'quit';
 
 // Each dialog keeps the file it's about, so it can't act on a different document.
 type Dialog =
   | { readonly kind: 'confirm-replace'; readonly file: OpenedFile; readonly path: string }
   | { readonly kind: 'save-failed'; readonly failure: SaveFailureKind; readonly detail: string }
-  | { readonly kind: 'open-failed'; readonly fileName: string; readonly problem: OpenProblem };
+  | { readonly kind: 'open-failed'; readonly fileName: string; readonly problem: OpenProblem }
+  | { readonly kind: 'unsaved'; readonly fileName: string; readonly then: LeaveAction };
 
 const APP_NAME = 'Smorsy PDF Editor';
 
@@ -38,11 +48,22 @@ export function App({ platform }: { platform: Platform }) {
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [opening, setOpening] = useState(false);
   const [announcement, setAnnouncement] = useState('');
-  const zoomCommandRef = useRef<((command: MenuCommand) => void) | null>(null);
+  // The first save makes a new file, and later saves update that copy.
+  const [savedPath, setSavedPath] = useState<string | null>(null);
+  const viewRef = useRef<DocumentViewHandle | null>(null);
   // Only one native dialog or file open at a time, however fast the menu is used.
   const busyRef = useRef(false);
+  const afterSaveRef = useRef<(() => void) | null>(null);
+  const sessionCounter = useRef(0);
   const hasDocumentRef = useRef(false);
   hasDocumentRef.current = session.status === 'open';
+
+  const openFile = session.status === 'open' ? session.file : null;
+  const editor = useDocumentEditor(openFile, platform);
+  const isDirtyRef = useRef(editor.isDirty);
+  isDirtyRef.current = editor.isDirty;
+  const fileNameRef = useRef('');
+  fileNameRef.current = openFile?.name ?? '';
 
   const exclusively = useCallback(async (task: () => Promise<void>) => {
     if (busyRef.current) return;
@@ -65,7 +86,9 @@ export function App({ platform }: { platform: Platform }) {
           setOpening(true);
           setAnnouncement('');
           const document = await openDocument(file.bytes, pdfAssets);
-          setSession({ status: 'open', file, document });
+          sessionCounter.current += 1;
+          setSavedPath(null);
+          setSession({ status: 'open', id: sessionCounter.current, file, document });
         } catch (error) {
           const fileName =
             error instanceof ReadFailure ? error.fileName : chosenName || 'This file';
@@ -80,12 +103,53 @@ export function App({ platform }: { platform: Platform }) {
     [exclusively, platform],
   );
 
-  const writeCopy = useCallback(
+  const closeDocument = useCallback(() => {
+    setSession({ status: 'empty' });
+    setSavedPath(null);
+    setAnnouncement('');
+  }, []);
+
+  const carryOut = useCallback(
+    (action: LeaveAction) => {
+      if (action === 'close') closeDocument();
+      if (action === 'open') void chooseAndOpen();
+      if (action === 'quit') platform.closeWindow().catch(logProblem);
+    },
+    [chooseAndOpen, closeDocument, platform],
+  );
+
+  /** Asks about unsaved changes first, then does what was asked. */
+  const leaveDocument = useCallback(
+    async (action: LeaveAction) => {
+      // Anything still being typed counts, so it can't be lost by acting quickly.
+      await viewRef.current?.flush();
+      if (isDirtyRef.current()) {
+        setDialog({ kind: 'unsaved', fileName: fileNameRef.current, then: action });
+        return;
+      }
+      carryOut(action);
+    },
+    [carryOut],
+  );
+
+  const writeTo = useCallback(
     async (file: OpenedFile, path: string) => {
       try {
-        await platform.writeFile(path, unchangedCopy(file.bytes));
-        setAnnouncement('Copy saved');
+        const bytes = await editor.buildBytes();
+        if (editor.isDirty()) {
+          // Proves the result opens, before it can replace anything on disk.
+          const check = await openDocument(bytes);
+          await check.close();
+        }
+        await platform.writeFile(path, bytes);
+        setSavedPath(path);
+        editor.markSaved();
+        setAnnouncement(path === file.path ? 'Original file updated' : 'Copy saved');
+        const next = afterSaveRef.current;
+        afterSaveRef.current = null;
+        next?.();
       } catch (error) {
+        afterSaveRef.current = null;
         setDialog(
           error instanceof SaveFailure
             ? { kind: 'save-failed', failure: error.kind, detail: error.message }
@@ -93,7 +157,7 @@ export function App({ platform }: { platform: Platform }) {
         );
       }
     },
-    [platform],
+    [editor, platform],
   );
 
   const saveCopy = useCallback(
@@ -103,24 +167,36 @@ export function App({ platform }: { platform: Platform }) {
         const { file } = session;
         setAnnouncement('');
         try {
+          await viewRef.current?.flush();
           const path = await platform.chooseSaveLocation(copyFileName(file.name));
-          if (path === null) return;
+          if (path === null) {
+            afterSaveRef.current = null;
+            return;
+          }
           if (await platform.isSameFile(file.path, path)) {
             setDialog({ kind: 'confirm-replace', file, path });
             return;
           }
-          await writeCopy(file, path);
+          await writeTo(file, path);
         } catch (error) {
+          afterSaveRef.current = null;
           setDialog({ kind: 'save-failed', failure: 'other', detail: String(error) });
         }
       }),
-    [exclusively, platform, session, writeCopy],
+    [exclusively, platform, session, writeTo],
   );
 
-  const closeDocument = useCallback(() => {
-    setSession({ status: 'empty' });
-    setAnnouncement('');
-  }, []);
+  const save = useCallback(async () => {
+    if (session.status !== 'open') return;
+    if (savedPath === null) {
+      await saveCopy();
+      return;
+    }
+    await exclusively(async () => {
+      await viewRef.current?.flush();
+      await writeTo(session.file, savedPath);
+    });
+  }, [exclusively, savedPath, saveCopy, session, writeTo]);
 
   const openDocumentInUse = session.status === 'open' ? session.document : null;
 
@@ -133,6 +209,17 @@ export function App({ platform }: { platform: Platform }) {
   }, [openDocumentInUse]);
 
   useEffect(installTabFocus, []);
+
+  useEffect(() => {
+    platform.setCloseGuard(() => {
+      if (!isDirtyRef.current() && !viewRef.current?.hasUnfinishedEdit()) return true;
+      void (async () => {
+        await viewRef.current?.flush();
+        setDialog({ kind: 'unsaved', fileName: fileNameRef.current, then: 'quit' });
+      })();
+      return false;
+    });
+  }, [platform]);
 
   useEffect(() => {
     const title = session.status === 'open' ? `${session.file.name} - ${APP_NAME}` : APP_NAME;
@@ -148,19 +235,19 @@ export function App({ platform }: { platform: Platform }) {
       if (dialogIsOpen) return;
       switch (command) {
         case 'open':
-          void chooseAndOpen();
+          if (!busyRef.current) void leaveDocument('open');
+          break;
+        case 'save':
+          void save();
           break;
         case 'save-copy':
           void saveCopy();
           break;
         case 'close-document':
-          if (!busyRef.current) closeDocument();
+          if (!busyRef.current) void leaveDocument('close');
           break;
-        case 'zoom-in':
-        case 'zoom-out':
-        case 'zoom-actual':
-        case 'zoom-fit':
-          zoomCommandRef.current?.(command);
+        default:
+          viewRef.current?.command(command);
           break;
       }
     };
@@ -172,7 +259,7 @@ export function App({ platform }: { platform: Platform }) {
         })
         .catch(logProblem);
     };
-  }, [chooseAndOpen, closeDocument, dialogIsOpen, platform, saveCopy]);
+  }, [dialogIsOpen, leaveDocument, platform, save, saveCopy]);
 
   const closeDialog = () => {
     setDialog(null);
@@ -182,15 +269,17 @@ export function App({ platform }: { platform: Platform }) {
     <>
       {session.status === 'open' ? (
         <DocumentView
-          key={session.file.path}
+          key={session.id}
           file={session.file}
           document={session.document}
           os={platform.os}
           announcement={announcement}
-          onSaveCopy={() => {
-            void saveCopy();
+          editor={editor}
+          saveLabel={savedPath === null ? 'Save a copy' : 'Save'}
+          onSave={() => {
+            void save();
           }}
-          zoomCommandRef={zoomCommandRef}
+          handleRef={viewRef}
         />
       ) : (
         <StartScreen
@@ -212,9 +301,12 @@ export function App({ platform }: { platform: Platform }) {
           destructive
           onConfirm={() => {
             closeDialog();
-            void writeCopy(dialog.file, dialog.path);
+            void writeTo(dialog.file, dialog.path);
           }}
-          onCancel={closeDialog}
+          onCancel={() => {
+            afterSaveRef.current = null;
+            closeDialog();
+          }}
         />
       )}
 
@@ -222,10 +314,10 @@ export function App({ platform }: { platform: Platform }) {
         <AlertDialog
           title="Your copy wasn’t saved"
           message={explainSaveFailure(dialog.failure)}
-          detail="Your original file is unchanged."
+          detail="Your edits are still here, and your original file is unchanged."
           technical={dialog.detail}
           confirmLabel="Save somewhere else"
-          cancelLabel="Cancel"
+          cancelLabel="Keep editing"
           onConfirm={() => {
             closeDialog();
             void saveCopy();
@@ -245,6 +337,31 @@ export function App({ platform }: { platform: Platform }) {
           onConfirm={() => {
             closeDialog();
             void chooseAndOpen();
+          }}
+          onCancel={closeDialog}
+        />
+      )}
+
+      {dialog?.kind === 'unsaved' && (
+        <AlertDialog
+          icon="warn"
+          title={`Save your changes to ${dialog.fileName}?`}
+          message="If you don’t save, your changes will be lost. Your original file stays as it is."
+          cancelLabel="Cancel"
+          alternativeLabel="Don’t save"
+          confirmLabel="Save"
+          onConfirm={() => {
+            const { then } = dialog;
+            closeDialog();
+            afterSaveRef.current = () => {
+              carryOut(then);
+            };
+            void save();
+          }}
+          onAlternative={() => {
+            const { then } = dialog;
+            closeDialog();
+            carryOut(then);
           }}
           onCancel={closeDialog}
         />

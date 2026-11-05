@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, type ReactNode, type RefObject } from 'react';
 import type { PdfDocument } from '../engine/document';
 import { LETTER_PAGE, MAX_ZOOM, MIN_ZOOM, displayedPageSize, type PageSize } from '../engine/zoom';
 import { PdfCanvas } from './PdfCanvas';
@@ -15,7 +15,10 @@ interface PageStackProps {
   readonly onCurrentPageChange: (pageNumber: number) => void;
   readonly onAvailableWidthChange: (width: number) => void;
   readonly onZoomTo: (percent: number) => void;
-  readonly scrollToPageRef: RefObject<((pageNumber: number) => void) | null>;
+  readonly keepOverlayOn: number | null;
+  readonly onBackgroundClick: () => void;
+  readonly scrollToPageRef: RefObject<((pageNumber: number, yOffset?: number) => void) | null>;
+  readonly renderOverlay: (pageNumber: number, page: PageSize, scale: number) => ReactNode;
 }
 
 // One notch of a mouse wheel, 100 units, changes the zoom by about a fifth.
@@ -30,10 +33,15 @@ export function PageStack({
   onCurrentPageChange,
   onAvailableWidthChange,
   onZoomTo,
+  keepOverlayOn,
+  onBackgroundClick,
   scrollToPageRef,
+  renderOverlay,
 }: PageStackProps) {
   const scrollerRef = useRef<HTMLElement>(null);
   const previousHeight = useRef(0);
+  const pageSizesRef = useRef(pageSizes);
+  pageSizesRef.current = pageSizes;
   // Pinches arrive as tiny steps, so the exact value is kept: rounding each would lose them.
   const exactPercent = useRef(percent);
   if (Math.round(exactPercent.current) !== percent) exactPercent.current = percent;
@@ -129,10 +137,16 @@ export function PageStack({
   }, [onZoomTo]);
 
   useEffect(() => {
-    scrollToPageRef.current = (pageNumber) => {
-      scrollerRef.current
-        ?.querySelector(`[data-page="${pageNumber}"]`)
-        ?.scrollIntoView({ block: 'start' });
+    scrollToPageRef.current = (pageNumber, yOffset) => {
+      const scroller = scrollerRef.current;
+      const page = scroller?.querySelector<HTMLElement>(`[data-page="${pageNumber}"]`);
+      if (!scroller || !page) return;
+      page.scrollIntoView({ block: 'start' });
+      if (yOffset !== undefined) {
+        const size = pageSizesRef.current[pageNumber - 1] ?? LETTER_PAGE;
+        const position = (yOffset / size.height) * page.clientHeight;
+        scroller.scrollTop += Math.max(0, position - scroller.clientHeight / 3);
+      }
     };
     return () => {
       scrollToPageRef.current = null;
@@ -142,7 +156,15 @@ export function PageStack({
   const estimate = pageSizes[0] ?? LETTER_PAGE;
 
   return (
-    <main ref={scrollerRef} className="canvas" tabIndex={0} aria-label={`Pages of ${fileName}`}>
+    <main
+      ref={scrollerRef}
+      className="canvas"
+      tabIndex={0}
+      aria-label={`Pages of ${fileName}`}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onBackgroundClick();
+      }}
+    >
       {pageSizes.map((size, index) => {
         const pageNumber = index + 1;
         const { width, height } = displayedPageSize(size ?? estimate, percent);
@@ -156,6 +178,10 @@ export function PageStack({
               height={height}
               active={measured && size !== undefined && activePages.has(pageNumber)}
             />
+            {measured &&
+              size !== undefined &&
+              (activePages.has(pageNumber) || keepOverlayOn === pageNumber) &&
+              renderOverlay(pageNumber, size, width / size.width)}
           </div>
         );
       })}

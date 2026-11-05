@@ -5,7 +5,19 @@ export function detectOs(): OsFamily {
 }
 
 export type MenuCommand =
-  'open' | 'save-copy' | 'close-document' | 'zoom-in' | 'zoom-out' | 'zoom-actual' | 'zoom-fit';
+  | 'open'
+  | 'save'
+  | 'save-copy'
+  | 'close-document'
+  | 'undo'
+  | 'redo'
+  | 'find'
+  | 'zoom-in'
+  | 'zoom-out'
+  | 'zoom-actual'
+  | 'zoom-fit';
+
+export type SystemFontStyle = 'regular' | 'bold' | 'italic' | 'bold-italic';
 
 export interface OpenedFile {
   readonly path: string;
@@ -55,7 +67,12 @@ export interface Platform {
   isSameFile(first: string, second: string): Promise<boolean>;
   /** Rejects with SaveFailure. */
   writeFile(path: string, bytes: Uint8Array): Promise<void>;
+  /** The computer's own Times New Roman, or null if it doesn't have it. */
+  readSystemFont(style: SystemFontStyle): Promise<Uint8Array | null>;
   setWindowTitle(title: string): Promise<void>;
+  /** The guard answers whether the window may close. If not, it arranges what happens instead. */
+  setCloseGuard(guard: () => boolean): void;
+  closeWindow(): Promise<void>;
   setDocumentOpen(open: boolean): Promise<void>;
   /** Returns a function that stops listening. */
   onCommand(listener: (command: MenuCommand) => void): Promise<() => void>;
