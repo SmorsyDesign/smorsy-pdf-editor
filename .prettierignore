@@ -1,0 +1,8 @@
+design/
+dist/
+public/pdfjs/
+src-tauri/
+test-pdfs/
+node_modules/
+package-lock.json
+SPEC.md

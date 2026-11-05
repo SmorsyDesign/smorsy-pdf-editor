@@ -1,0 +1,68 @@
+/* Blue Pencil design tokens, from design/direction-a-blue-pencil/tokens.css. */
+:root {
+  color-scheme: light dark;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  --font-ui: 'Atkinson Hyperlegible Next', system-ui, sans-serif;
+  --text-sm: 12px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --line-sm: 16px;
+  --line-md: 20px;
+  --line-lg: 24px;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+
+  --bar-height: 52px;
+  --status-height: 28px;
+  --thumbs-width: 148px;
+  --mac-controls-width: 80px;
+
+  --desk: #dfe5e9;
+  --chrome: #f4f6f7;
+  --chrome-raised: #ffffff;
+  --chrome-sunken: #e8ecef;
+  --line: #c9d1d7;
+  --line-strong: #7c8a95;
+  --text: #17222b;
+  --text-muted: #4d5b66;
+  --accent: #0b66a0;
+  --accent-on: #ffffff;
+  --accent-soft: #d8ebf7;
+  --accent-soft-text: #084b76;
+  --paper-edge: #aab5bd;
+  --focus: #0b66a0;
+  --danger: #a8231c;
+  --scrim: #17222b66;
+  --bar-shadow: #17222b29;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --desk: #11171b;
+    --chrome: #1a2127;
+    --chrome-raised: #232c33;
+    --chrome-sunken: #141a1f;
+    --line: #313c44;
+    --line-strong: #7f8e99;
+    --text: #e8edf0;
+    --text-muted: #a9b5be;
+    --accent: #7cc8f5;
+    --accent-on: #0a2231;
+    --accent-soft: #173347;
+    --accent-soft-text: #b5e0fa;
+    --paper-edge: #000000;
+    --focus: #7cc8f5;
+    --danger: #ff9f96;
+    --scrim: #00000099;
+    --bar-shadow: #00000066;
+  }
+}

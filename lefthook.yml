@@ -1,0 +1,15 @@
+pre-commit:
+  parallel: true
+  commands:
+    types:
+      glob: '*.{ts,tsx}'
+      run: npx tsc --noEmit
+    eslint:
+      glob: '*.{ts,tsx}'
+      run: npx eslint --max-warnings 0 {staged_files}
+    prettier:
+      glob: '*.{ts,tsx,css,html,json,md,yml}'
+      run: npx prettier --check --ignore-unknown {staged_files}
+    rustfmt:
+      glob: 'src-tauri/**/*.rs'
+      run: cargo fmt --manifest-path src-tauri/Cargo.toml --check

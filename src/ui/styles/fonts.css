@@ -1,0 +1,25 @@
+/* Bundled with the app: it never loads a font from the network. */
+@font-face {
+  font-family: 'Atkinson Hyperlegible Next';
+  font-weight: 400;
+  font-display: swap;
+  src: url('../fonts/atkinson-hyperlegible-next-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Atkinson Hyperlegible Next';
+  font-weight: 500;
+  font-display: swap;
+  src: url('../fonts/atkinson-hyperlegible-next-latin-500-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Atkinson Hyperlegible Next';
+  font-weight: 600;
+  font-display: swap;
+  src: url('../fonts/atkinson-hyperlegible-next-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Atkinson Hyperlegible Next';
+  font-weight: 700;
+  font-display: swap;
+  src: url('../fonts/atkinson-hyperlegible-next-latin-700-normal.woff2') format('woff2');
+}

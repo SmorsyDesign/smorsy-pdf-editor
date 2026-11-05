@@ -6,14 +6,14 @@
 
 Answered by the owner on 2026-11-05. The Blue Pencil screen set is approved.
 
-| # | Question | Decision |
-| --- | --- | --- |
-| 1 | GitHub repository | **One fully public repository.** Code, installers and `latest.json` all live there. |
-| 2 | ⌘S / Ctrl+S after the first save | First save always asks for a new file (`Name-edited.pdf`). After that, ⌘S updates that new copy. Choosing the original file needs a separate, explicit confirmation. |
-| 3 | Languages | **English only.** OCR is English only. Documents in other languages still open and display; their text is editable only where a bundled font or the file's own font has every character. Times New Roman must be available (see section 3). |
-| 4 | Minimum OS | macOS 14 Sonoma and Windows 10 22H2 x64 (see section 3). |
-| 5 | PDFs with a digital signature | **Open in View mode first.** You can read, search and copy. The first attempt to edit shows a warning that editing breaks the signature, and you choose whether to continue. |
-| 6 | Replace and delete | The patch covers the old text. The interface says so the first time and points to Redact for anything sensitive (Phase 6). |
+| #   | Question                         | Decision                                                                                                                                                                                                                                    |
+| --- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | GitHub repository                | **One fully public repository.** Code, installers and `latest.json` all live there.                                                                                                                                                         |
+| 2   | ⌘S / Ctrl+S after the first save | First save always asks for a new file (`Name-edited.pdf`). After that, ⌘S updates that new copy. Choosing the original file needs a separate, explicit confirmation.                                                                        |
+| 3   | Languages                        | **English only.** OCR is English only. Documents in other languages still open and display; their text is editable only where a bundled font or the file's own font has every character. Times New Roman must be available (see section 3). |
+| 4   | Minimum OS                       | macOS 14 Sonoma and Windows 10 22H2 x64 (see section 3).                                                                                                                                                                                    |
+| 5   | PDFs with a digital signature    | **Open in View mode first.** You can read, search and copy. The first attempt to edit shows a warning that editing breaks the signature, and you choose whether to continue.                                                                |
+| 6   | Replace and delete               | The patch covers the old text. The interface says so the first time and points to Redact for anything sensitive (Phase 6).                                                                                                                  |
 
 ### What follows from a public repository
 
@@ -29,32 +29,32 @@ Answered by the owner on 2026-11-05. The Blue Pencil screen set is approved.
 
 `/plugin` isn't available in the desktop app, so I checked the tools this session exposes and the local plugin folders instead.
 
-| Tool | Status |
-| --- | --- |
-| `frontend-design`, `playwright`, `pr-review-toolkit`, `code-simplifier`, `/security-review`, `claude-md-management` | Available |
-| `pdf` skill | Available. pdf-lib fixtures and `qpdf --check` are the fallback. |
-| `security-guidance` | Plugin data folder present. Its warnings only appear once code is being edited. |
-| `context7` | Available since 2026-11-05. Phase 0's version checks used the npm and crates.io registries and package READMEs; use `context7` before each API from Phase 1 on. |
-| `typescript-lsp` | A `typescript-native-lsp` plugin folder exists. Check it works once a TypeScript project exists. |
-| `rust-analyzer-lsp` | The plugin is missing, though the `rust-analyzer` program is installed. Continuing without the plugin; Rust stays minimal, and `clippy` covers the checks. |
+| Tool                                                                                                                | Status                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `frontend-design`, `playwright`, `pr-review-toolkit`, `code-simplifier`, `/security-review`, `claude-md-management` | Available                                                                                                                                                       |
+| `pdf` skill                                                                                                         | Available. pdf-lib fixtures and `qpdf --check` are the fallback.                                                                                                |
+| `security-guidance`                                                                                                 | Plugin data folder present. Its warnings only appear once code is being edited.                                                                                 |
+| `context7`                                                                                                          | Available since 2026-11-05. Phase 0's version checks used the npm and crates.io registries and package READMEs; use `context7` before each API from Phase 1 on. |
+| `typescript-lsp`                                                                                                    | A `typescript-native-lsp` plugin folder exists. Check it works once a TypeScript project exists.                                                                |
+| `rust-analyzer-lsp`                                                                                                 | The plugin is missing, though the `rust-analyzer` program is installed. Continuing without the plugin; Rust stays minimal, and `clippy` covers the checks.      |
 
 Installed on this Mac with Homebrew on 2026-11-05: Rust 1.99.1 with both Mac targets, `clippy` and `rustfmt`, `gh`, `qpdf`, and Node 26.13.0 LTS (Vitest doesn't support Node 25).
 
 ## 3. Confirmed stack
 
-| Area | Choice | Version | Licence | Latest release |
-| --- | --- | --- | --- | --- |
-| Shell | `tauri`, `@tauri-apps/cli`, `@tauri-apps/api` | 2.12 | MIT / Apache-2.0 | Oct 2026 |
-| Native plugins | dialog 2.8, fs 2.7, updater 2.14, single-instance 2.5, window-state 2.5, process 2.4 | as listed | MIT / Apache-2.0 | Sep–Oct 2026 |
-| UI | `vite` 8.3, `@vitejs/plugin-react` 6.2, `react` 19.3 | as listed | MIT | Oct–Nov 2026 |
-| Language | `typescript` | **6.0.3** | Apache-2.0 | Current 6.x |
-| Rendering | `pdfjs-dist`, **legacy build** | 6.5 | Apache-2.0 | Nov 2026 |
-| Editing, saving | **`@cantoo/pdf-lib`** + **`@cantoo/fontkit`** | 2.11, 2.0 | MIT | Sep 2026 |
-| Drawn signatures | `signature_pad` | 5.1 | MIT | Jul 2026 |
-| Certificate signing | `@signpdf/*` + `node-forge` (used under BSD-3-Clause) | 4.0, 1.4 | MIT, BSD | Oct–Nov 2026 |
-| OCR | `tesseract.js` + `@tesseract.js-data/eng` | 7.0, 1.0 | Apache-2.0, MIT | Dec 2025, Sep 2023 |
-| Tests | `vitest` 5.1, `@playwright/test` 1.64, `webdriverio` **9.33** + `@wdio/tauri-service` 1.5 | as listed | MIT, Apache-2.0 | Oct–Nov 2026 |
-| Linting | `eslint` 10, `typescript-eslint` 8.72, `prettier` 3.9, `lefthook` 2.2, clippy, rustfmt | as listed | MIT | Oct–Nov 2026 |
+| Area                | Choice                                                                                    | Version   | Licence          | Latest release     |
+| ------------------- | ----------------------------------------------------------------------------------------- | --------- | ---------------- | ------------------ |
+| Shell               | `tauri`, `@tauri-apps/cli`, `@tauri-apps/api`                                             | 2.12      | MIT / Apache-2.0 | Oct 2026           |
+| Native plugins      | dialog 2.8, fs 2.7, updater 2.14, single-instance 2.5, window-state 2.5, process 2.4      | as listed | MIT / Apache-2.0 | Sep–Oct 2026       |
+| UI                  | `vite` 8.3, `@vitejs/plugin-react` 6.2, `react` 19.3                                      | as listed | MIT              | Oct–Nov 2026       |
+| Language            | `typescript`                                                                              | **6.0.3** | Apache-2.0       | Current 6.x        |
+| Rendering           | `pdfjs-dist`, **legacy build**                                                            | 6.5       | Apache-2.0       | Nov 2026           |
+| Editing, saving     | **`@cantoo/pdf-lib`** + **`@cantoo/fontkit`**                                             | 2.11, 2.0 | MIT              | Sep 2026           |
+| Drawn signatures    | `signature_pad`                                                                           | 5.1       | MIT              | Jul 2026           |
+| Certificate signing | `@signpdf/*` + `node-forge` (used under BSD-3-Clause)                                     | 4.0, 1.4  | MIT, BSD         | Oct–Nov 2026       |
+| OCR                 | `tesseract.js` + `@tesseract.js-data/eng`                                                 | 7.0, 1.0  | Apache-2.0, MIT  | Dec 2025, Sep 2023 |
+| Tests               | `vitest` 5.1, `@playwright/test` 1.64, `webdriverio` **9.33** + `@wdio/tauri-service` 1.5 | as listed | MIT, Apache-2.0  | Oct–Nov 2026       |
+| Linting             | `eslint` 10, `typescript-eslint` 8.72, `prettier` 3.9, `lefthook` 2.2, clippy, rustfmt    | as listed | MIT              | Oct–Nov 2026       |
 
 ### Replacements and pins
 
@@ -81,8 +81,8 @@ Installed on this Mac with Homebrew on 2026-11-05: Rust 1.99.1 with both Mac tar
 ### Privacy design
 
 - The webview has **no route to the network**: the update check runs in Rust, so the CSP allows only the app's own files and its bridge to Rust.
-- CSP: `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; img-src 'self' blob: data:; font-src 'self' blob: data:; style-src 'self'; connect-src ipc: http://ipc.localhost`.
-- PDF.js loads its CMaps, standard fonts and WASM locally, with scripts inside PDFs disabled (`enableScripting: false`, `isEvalSupported: false`).
+- CSP: `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; img-src 'self' blob: data:; font-src 'self' blob: data:; style-src 'self'; connect-src 'self' ipc: http://ipc.localhost; object-src 'none'; base-uri 'none'; form-action 'none'`.
+- PDF.js loads its CMaps, standard fonts and WASM locally, and scripts inside PDFs never run, because the app doesn't load the `pdf.js` scripting sandbox.
 - Tesseract's default downloads from a CDN, so all its paths are set to bundled files and caching is off.
 - A Playwright test fails on **any** non-local request, including during OCR.
 - Clicking a web link inside a PDF asks first, then opens your browser. The app itself never fetches it.
@@ -103,17 +103,17 @@ Editing PDF text isn't like editing a Word document. A PDF stores positioned gly
 
 ### Limits the interface will state
 
-| Situation | What happens |
-| --- | --- |
-| Replaced or deleted text | The old text is hidden but still in the file, so search and copy can find it. Redact removes it properly. |
-| Text over a photo or gradient | The patch may be visible. A warning shows before you commit. |
-| A needed glyph is missing from the font | The closest font is used, with a notice naming both fonts. |
-| Type 3 fonts | Can't be reused, so a bundled font is substituted, with a notice. |
-| Skewed or perspective text | Read-only, with an explanation. Rotated text is editable. |
-| Arabic, Hebrew, Indic scripts | Read-only: `pdf-lib` doesn't shape these scripts, so they'd come out wrong. |
-| Chinese, Japanese, Korean | Editable only where the file's own font has the glyphs. No bundled CJK font, because of size. |
-| Longer replacement text | Wraps within its own block. The rest of the page doesn't reflow. |
-| Scanned page | No text to edit. The app explains why and offers OCR. |
+| Situation                               | What happens                                                                                              |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Replaced or deleted text                | The old text is hidden but still in the file, so search and copy can find it. Redact removes it properly. |
+| Text over a photo or gradient           | The patch may be visible. A warning shows before you commit.                                              |
+| A needed glyph is missing from the font | The closest font is used, with a notice naming both fonts.                                                |
+| Type 3 fonts                            | Can't be reused, so a bundled font is substituted, with a notice.                                         |
+| Skewed or perspective text              | Read-only, with an explanation. Rotated text is editable.                                                 |
+| Arabic, Hebrew, Indic scripts           | Read-only: `pdf-lib` doesn't shape these scripts, so they'd come out wrong.                               |
+| Chinese, Japanese, Korean               | Editable only where the file's own font has the glyphs. No bundled CJK font, because of size.             |
+| Longer replacement text                 | Wraps within its own block. The rest of the page doesn't reflow.                                          |
+| Scanned page                            | No text to edit. The app explains why and offers OCR.                                                     |
 
 ## 5. Signing approach
 
@@ -121,12 +121,12 @@ Editing PDF text isn't like editing a Word document. A PDF stores positioned gly
 
 **Certificate signatures (Phase 7):**
 
-| | `@signpdf` + `node-forge` in a Worker | Rust crates behind a Tauri command |
-| --- | --- | --- |
-| Fit with the spec | Keeps Rust minimal; engine stays testable in a browser | Adds a meaningful amount of Rust |
-| Maintenance | Both active | `cms`, `rsa`, `rcgen` are active; `p12` hasn't had a release since 2022; `openssl` complicates universal builds |
-| Key handling | In memory in a Worker | In memory in Rust, slightly better isolated |
-| Weak spots | RSA keys only; needs a `Buffer` polyfill; the placeholder helper expects original `pdf-lib` | More code to own |
+|                   | `@signpdf` + `node-forge` in a Worker                                                       | Rust crates behind a Tauri command                                                                              |
+| ----------------- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Fit with the spec | Keeps Rust minimal; engine stays testable in a browser                                      | Adds a meaningful amount of Rust                                                                                |
+| Maintenance       | Both active                                                                                 | `cms`, `rsa`, `rcgen` are active; `p12` hasn't had a release since 2022; `openssl` complicates universal builds |
+| Key handling      | In memory in a Worker                                                                       | In memory in Rust, slightly better isolated                                                                     |
+| Weak spots        | RSA keys only; needs a `Buffer` polyfill; the placeholder helper expects original `pdf-lib` | More code to own                                                                                                |
 
 **Decision: `@signpdf` + `node-forge`.** The Rust route's advantage is small for a family tool, and it's more to maintain. `@signpdf/placeholder-pdf-lib` is built against the original `pdf-lib`, so I'll test compatibility early in Phase 7 and write a small adapter if needed.
 
@@ -179,17 +179,17 @@ test-pdfs/     Fixtures, SOURCES.md, private/ (git-ignored)
 
 ## 8. Phases
 
-| Phase | Scope | Relative size |
-| --- | --- | --- |
-| 0 | Plan and design | S |
-| 1 | Foundation, CI, test PDFs | M |
-| 2 | Text editing | **XL** |
-| 3 | Signatures | M |
-| 4 | Annotations and forms | L |
-| 5 | Page tools | M |
-| 6 | Document tools | L |
-| 7 | Certificate signing | M |
-| 8 | Release | L |
+| Phase | Scope                     | Relative size |
+| ----- | ------------------------- | ------------- |
+| 0     | Plan and design           | S             |
+| 1     | Foundation, CI, test PDFs | M             |
+| 2     | Text editing              | **XL**        |
+| 3     | Signatures                | M             |
+| 4     | Annotations and forms     | L             |
+| 5     | Page tools                | M             |
+| 6     | Document tools            | L             |
+| 7     | Certificate signing       | M             |
+| 8     | Release                   | L             |
 
 Phase 2 may split if the stretch goal or font matching grows. I'll tell you if it does.
 

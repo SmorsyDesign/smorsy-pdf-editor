@@ -25,3 +25,6 @@ test-results/
 # Machine files
 .DS_Store
 Thumbs.db
+
+# Generated at install and build time
+public/pdfjs/
