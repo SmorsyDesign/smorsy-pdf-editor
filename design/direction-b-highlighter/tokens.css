@@ -1,0 +1,70 @@
+/* Direction B tokens. Named by job so they can carry straight into the build. */
+:root {
+  color-scheme: light dark;
+
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px;
+
+  --font-ui: "Familjen Grotesk", system-ui, sans-serif;
+  --text-sm: 12px; --text-md: 14px; --text-lg: 16px;
+  --line-sm: 16px; --line-md: 20px; --line-lg: 24px;
+
+  --radius-sm: 4px; --radius-md: 8px;
+
+  --title-height: 44px; --context-height: 48px; --strip-height: 108px;
+  --rail-width: 80px; --tray-width: 320px;
+
+  /* The highlighter and the rail stay the same in both themes. */
+  --marigold: #f4b41a;
+  --on-marigold: #24210f;
+  --rail: #2b2f25;
+  --rail-text: #dfe3d3;
+  --rail-hover: #3b4033;
+
+  /* Marks on the page never change, because the paper never changes. */
+  --mark: #8a5a00;
+  --mark-wash: #fff0c2;
+}
+
+:root, :root[data-theme="light"] {
+  --desk: #d3d7ca;
+  --chrome: #eef0e7;
+  --chrome-sunken: #e0e3d7;
+  --tray: #f6f7f1;
+  --line: #c6cabb;
+  --line-strong: #767b6a;
+  --text: #22251c;
+  --text-muted: #51564a;
+  --paper-edge: #a3a899;
+  --focus: #22251c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --desk: #161812;
+    --chrome: #22251c;
+    --chrome-sunken: #1a1c15;
+    --tray: #292d23;
+    --line: #3b4033;
+    --line-strong: #8c9180;
+    --text: #eceee3;
+    --text-muted: #b5b9a9;
+    --paper-edge: #000000;
+    --focus: #f4b41a;
+    --rail: #1a1c15;
+  }
+}
+
+:root[data-theme="dark"] {
+  --desk: #161812;
+  --chrome: #22251c;
+  --chrome-sunken: #1a1c15;
+  --tray: #292d23;
+  --line: #3b4033;
+  --line-strong: #8c9180;
+  --text: #eceee3;
+  --text-muted: #b5b9a9;
+  --paper-edge: #000000;
+  --focus: #f4b41a;
+  --rail: #1a1c15;
+}

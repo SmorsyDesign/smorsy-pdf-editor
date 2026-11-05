@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en" data-platform="mac">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smorsy PDF Editor: Highlighter</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../fonts/fonts.css">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="../shared/paper.css">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<svg class="sprite" width="0" height="0" aria-hidden="true">
+  <symbol id="i-select" viewBox="0 0 16 16"><path d="M3.5 2.5l9 5-4 1-2 4z"/></symbol>
+  <symbol id="i-text" viewBox="0 0 16 16"><path d="M3 4V2.75h10V4M8 2.75v10.5M6 13.25h4"/></symbol>
+  <symbol id="i-note" viewBox="0 0 16 16"><path d="M10.5 2.5l3 3-7.5 7.5-3.75.75.75-3.75zM2.5 14.5h11"/></symbol>
+  <symbol id="i-sign" viewBox="0 0 16 16"><path d="M2 11.5c2-5 3.5-8 4.75-8 1.75 0 -1.25 8 .5 8 1.25 0 1.75-2.75 3-2.75 1 0 .75 2 2 2h1.75M2 14.25h12"/></symbol>
+  <symbol id="i-pages" viewBox="0 0 16 16"><path d="M5.5 4.5v-2h8v9h-2M2.5 4.5h9v9h-9z"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 16 16"><path d="M5.5 3l-3 3 3 3M2.5 6h7a4 4 0 010 8h-3"/></symbol>
+  <symbol id="i-redo" viewBox="0 0 16 16"><path d="M10.5 3l3 3-3 3M13.5 6h-7a4 4 0 000 8h3"/></symbol>
+  <symbol id="i-left" viewBox="0 0 16 16"><path d="M2.5 4h11M2.5 8h7M2.5 12h9"/></symbol>
+  <symbol id="i-center" viewBox="0 0 16 16"><path d="M2.5 4h11M4.5 8h7M3.5 12h9"/></symbol>
+  <symbol id="i-right" viewBox="0 0 16 16"><path d="M2.5 4h11M6.5 8h7M4.5 12h9"/></symbol>
+  <symbol id="i-down" viewBox="0 0 16 16"><path d="M4 6l4 4 4-4"/></symbol>
+  <symbol id="i-close" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 16 16"><path d="M2.5 4.5h11M6 4.5v-2h4v2M4 4.5l.75 9h6.5l.75-9"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 16 16"><path d="M3 8h10"/></symbol>
+  <symbol id="i-info" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><path d="M8 7.5v3.5M8 5h0"/></symbol>
+</svg>
+
+<div class="window">
+  <nav class="rail" aria-label="Editor mode">
+    <div class="os-controls" aria-hidden="true"><i></i><i></i><i></i></div>
+    <button class="mode" aria-pressed="false"><svg class="icon icon-lg" aria-hidden="true"><use href="#i-select"/></svg>Select</button>
+    <button class="mode" aria-pressed="true"><svg class="icon icon-lg" aria-hidden="true"><use href="#i-text"/></svg>Edit text</button>
+    <button class="mode" aria-pressed="false"><svg class="icon icon-lg" aria-hidden="true"><use href="#i-note"/></svg>Annotate</button>
+    <button class="mode" aria-pressed="false"><svg class="icon icon-lg" aria-hidden="true"><use href="#i-sign"/></svg>Sign</button>
+    <button class="mode" aria-pressed="false"><svg class="icon icon-lg" aria-hidden="true"><use href="#i-pages"/></svg>Pages</button>
+  </nav>
+
+  <header class="title">
+    <span class="file-name">Lease renewal 2027.pdf</span>
+    <span class="file-state">2 unsaved changes</span>
+    <span class="spacer"></span>
+    <button class="icon-btn" aria-label="Undo"><svg class="icon" aria-hidden="true"><use href="#i-undo"/></svg></button>
+    <button class="icon-btn" aria-label="Redo" disabled><svg class="icon" aria-hidden="true"><use href="#i-redo"/></svg></button>
+    <button class="btn btn-primary">Save a copy</button>
+  </header>
+
+  <div class="main">
+    <div class="context" role="toolbar" aria-label="Text format">
+      <button class="fsel" aria-label="Font: Liberation Serif">Liberation Serif<svg class="icon" aria-hidden="true"><use href="#i-down"/></svg></button>
+      <button class="fsel" aria-label="Size: 12 point">12 pt<svg class="icon" aria-hidden="true"><use href="#i-down"/></svg></button>
+      <span class="sep"></span>
+      <button class="icon-btn" aria-label="Bold" aria-pressed="false"><b>B</b></button>
+      <button class="icon-btn" aria-label="Italic" aria-pressed="false"><em>I</em></button>
+      <span class="sep"></span>
+      <button class="icon-btn" aria-label="Align left" aria-pressed="true"><svg class="icon" aria-hidden="true"><use href="#i-left"/></svg></button>
+      <button class="icon-btn" aria-label="Align centre" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-center"/></svg></button>
+      <button class="icon-btn" aria-label="Align right" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-right"/></svg></button>
+      <span class="sep"></span>
+      <button class="icon-btn" aria-label="Text colour: near black"><span class="swatch"></span></button>
+      <span class="sep"></span>
+      <button class="btn"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>Add text box</button>
+      <div class="font-note"><svg class="icon" aria-hidden="true"><use href="#i-info"/></svg><span>Replaces Times New Roman, same widths</span></div>
+    </div>
+
+    <main class="canvas" aria-label="Page 1 of Lease renewal 2027.pdf" tabindex="0">
+      <article class="paper">
+        <span class="ln lh-name editable">Maple Court Apartments</span>
+        <span class="ln lh-addr editable">1840 Harbor Street, Portland, OR 97201</span>
+        <span class="ln doc-title editable gap-24">Lease Renewal Agreement</span>
+        <span class="ln editable gap-8">This agreement renews the lease for Apartment 4B between Maple Court</span>
+        <span class="ln editable changed">Apartments and Mara Okafor, dated March 3, 2025.</span>
+
+        <span class="ln doc-h editable gap-16">1. Renewal term</span>
+        <span class="ln editable is-hover">The renewal term begins on April 1, 2027 and ends on March 31, 2028.</span>
+
+        <span class="ln doc-h editable gap-16">2. Rent</span>
+        <div class="edit-open" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Edit text block" spellcheck="false">Monthly rent for the renewal term is $1,760<span class="caret"></span>, due on the first day of each<br>month. A late fee of $45 applies after the fifth day of the month.</div>
+
+        <span class="ln doc-h editable gap-16">3. Summary of terms</span>
+        <table class="terms gap-8">
+          <tr><td><span class="ln editable">Monthly rent</span></td><td><span class="ln editable">$1,760</span></td></tr>
+          <tr><td><span class="ln editable">Security deposit</span></td><td><span class="ln editable">$1,500, held from the original lease</span></td></tr>
+          <tr><td><span class="ln editable">Parking space</span></td><td><span class="ln editable">Space 22, included in rent</span></td></tr>
+          <tr><td><span class="ln editable">Notice to end lease</span></td><td><span class="ln editable">60 days in writing</span></td></tr>
+        </table>
+
+        <span class="ln doc-h editable gap-16">4. Other terms</span>
+        <span class="ln editable">All other terms of the original lease stay in effect. Pets remain subject to</span>
+        <span class="ln editable">the building policy attached as Schedule B. Tenant agrees to keep renter's</span>
+        <span class="ln editable">insurance in place for the full renewal term.</span>
+
+        <div class="sig-grid gap-40">
+          <div><div class="sig-line"></div><div class="sig-label">Tenant: Mara Okafor</div></div>
+          <div><div class="sig-line"></div><div class="sig-label">Date</div></div>
+        </div>
+        <div class="sig-grid gap-24">
+          <div><div class="sig-line"></div><div class="sig-label">Owner's agent: Daniel Reyes</div></div>
+          <div><div class="sig-line"></div><div class="sig-label">Date</div></div>
+        </div>
+
+        <div class="doc-foot"><span>Maple Court form LR-7</span><span>Page 1 of 4</span></div>
+      </article>
+    </main>
+
+    <div class="strip">
+      <ol aria-label="Pages">
+        <li><button class="thumb" aria-current="page" aria-label="Page 1, 2 changes"><span class="thumb-page"></span>1</button></li>
+        <li><button class="thumb" aria-label="Page 2"><span class="thumb-page"></span>2</button></li>
+        <li><button class="thumb" aria-label="Page 3"><span class="thumb-page"></span>3</button></li>
+        <li><button class="thumb" aria-label="Page 4"><span class="thumb-page"></span>4</button></li>
+      </ol>
+      <div class="strip-end">
+        <div class="strip-notes"><span class="strip-hint">Click a line to edit it. Highlighted lines are changed.</span><span>Your original file stays unchanged</span></div>
+        <div class="zoom" role="group" aria-label="Zoom">
+          <button class="icon-btn" aria-label="Zoom out"><svg class="icon" aria-hidden="true"><use href="#i-minus"/></svg></button>
+          <span>94%</span>
+          <button class="icon-btn" aria-label="Zoom in"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <aside class="tray" aria-label="Signatures">
+    <div class="tray-head">
+      <h2>Add a signature</h2>
+      <button class="icon-btn" aria-label="Close signatures"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
+    </div>
+    <p class="hint">Select one, then click where it goes on the page.</p>
+
+    <h3>Signatures <span>2 of 3</span></h3>
+    <ul class="slips">
+      <li class="slip"><button class="slip-pick" aria-pressed="true" aria-label="Place signature: Mara Okafor, handwritten"><span class="ink ink-caveat">Mara Okafor</span></button><button class="icon-btn slip-del" aria-label="Delete this signature"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg></button></li>
+      <li class="slip"><button class="slip-pick" aria-pressed="false" aria-label="Place signature: Mara Okafor, formal"><span class="ink ink-sacramento">Mara Okafor</span></button><button class="icon-btn slip-del" aria-label="Delete this signature"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg></button></li>
+      <li class="empty-slot">
+        <p>Create a signature</p>
+        <div class="create">
+          <button class="btn">Draw</button>
+          <button class="btn">Type</button>
+          <button class="btn">Upload</button>
+        </div>
+      </li>
+    </ul>
+
+    <h3>Initials <span>1 of 3</span></h3>
+    <ul class="initials slips">
+      <li class="slip"><button class="slip-pick" aria-pressed="false" aria-label="Place initials: M O"><span class="ink ink-dancing">M.O.</span></button></li>
+      <li><button class="initial-add" aria-label="Create initials"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>Create</button></li>
+    </ul>
+
+    <label class="check"><input type="checkbox" checked>Add today's date beside it</label>
+
+    <div class="tray-foot">
+      <p>Saved only on this computer. This places a picture of your signature, not a certified digital signature.</p>
+    </div>
+  </aside>
+</div>
+</body>
+</html>

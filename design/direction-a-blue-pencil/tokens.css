@@ -1,0 +1,103 @@
+/* Direction A tokens. Named by job so they can carry straight into the build. */
+:root {
+  color-scheme: light dark;
+
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px;
+
+  --font-ui: "Atkinson Hyperlegible Next", system-ui, sans-serif;
+  --text-sm: 12px; --text-md: 14px; --text-lg: 16px;
+  --line-sm: 16px; --line-md: 20px; --line-lg: 24px;
+
+  --radius-sm: 4px; --radius-md: 8px;
+  --target: 28px;
+
+  --bar-height: 52px; --status-height: 28px;
+  --thumbs-width: 148px; --panel-width: 300px;
+
+  /* Marks on the page stay one colour in both themes: the paper never changes. */
+  --mark: #0b66a0;
+  --mark-wash: #e3f1fa;
+  --mark-on: #ffffff;
+  --mark-caution: #9a5a00;
+  --mark-caution-wash: #fdf1dc;
+  --mark-selection: #b7dcf5;
+  --field-wash: #eef6fb;
+  --hit: #ffe98a;
+  --hit-current: #ffc53d;
+  --pen-red: #c2321f;
+  --note-yellow: #fff3b0;
+
+  --dialog-width: 560px;
+}
+
+:root, :root[data-theme="light"] {
+  --desk: #dfe5e9;
+  --chrome: #f4f6f7;
+  --chrome-raised: #ffffff;
+  --chrome-sunken: #e8ecef;
+  --line: #c9d1d7;
+  --line-strong: #7c8a95;
+  --text: #17222b;
+  --text-muted: #4d5b66;
+  --accent: #0b66a0;
+  --accent-on: #ffffff;
+  --accent-soft: #d8ebf7;
+  --accent-soft-text: #084b76;
+  --paper-edge: #aab5bd;
+  --focus: #0b66a0;
+  --bar-shadow: #17222b29;
+  --caution: #8a4f00;
+  --caution-soft: #fbeedb;
+  --danger: #a8231c;
+  --danger-soft: #fbe8e6;
+  --scrim: #17222b66;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --desk: #11171b;
+    --chrome: #1a2127;
+    --chrome-raised: #232c33;
+    --chrome-sunken: #141a1f;
+    --line: #313c44;
+    --line-strong: #7f8e99;
+    --text: #e8edf0;
+    --text-muted: #a9b5be;
+    --accent: #7cc8f5;
+    --accent-on: #0a2231;
+    --accent-soft: #173347;
+    --accent-soft-text: #b5e0fa;
+    --paper-edge: #000000;
+    --focus: #7cc8f5;
+    --bar-shadow: #00000066;
+  --caution: #f2b866;
+  --caution-soft: #38290f;
+  --danger: #ff9f96;
+  --danger-soft: #3b1a18;
+  --scrim: #00000099;
+  }
+}
+
+:root[data-theme="dark"] {
+  --desk: #11171b;
+  --chrome: #1a2127;
+  --chrome-raised: #232c33;
+  --chrome-sunken: #141a1f;
+  --line: #313c44;
+  --line-strong: #7f8e99;
+  --text: #e8edf0;
+  --text-muted: #a9b5be;
+  --accent: #7cc8f5;
+  --accent-on: #0a2231;
+  --accent-soft: #173347;
+  --accent-soft-text: #b5e0fa;
+  --paper-edge: #000000;
+  --focus: #7cc8f5;
+  --bar-shadow: #00000066;
+  --caution: #f2b866;
+  --caution-soft: #38290f;
+  --danger: #ff9f96;
+  --danger-soft: #3b1a18;
+  --scrim: #00000099;
+}

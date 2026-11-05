@@ -1,0 +1,49 @@
+/*
+  The document itself. It stays black on white in dark mode because a PDF is
+  shown as it will print. Sizes are a Letter page at 94% zoom (765 x 990 px).
+*/
+.paper {
+  position: relative;
+  flex: none;
+  width: 765px;
+  min-height: 990px;
+  padding: 72px 88px 88px;
+  background: #ffffff;
+  color: #1a1a1a;
+  font-family: "Tinos", "Liberation Serif", serif;
+  font-size: 15px;
+  line-height: 20px;
+  text-align: left;
+}
+
+.ln { display: block; width: fit-content; white-space: nowrap; border-radius: 2px; }
+.gap-8 { margin-top: 8px; }
+.gap-12 { margin-top: 12px; }
+.gap-16 { margin-top: 16px; }
+.gap-24 { margin-top: 24px; }
+.gap-40 { margin-top: 40px; }
+
+.lh-name { font-family: "Arimo", sans-serif; font-size: 16px; font-weight: 700; line-height: 20px; color: #1f3d36; }
+.lh-addr { font-family: "Arimo", sans-serif; font-size: 12px; line-height: 16px; color: #4a4a4a; }
+.doc-title { font-size: 24px; line-height: 32px; font-weight: 700; }
+.doc-h { font-weight: 700; }
+
+.terms { width: 100%; border-collapse: collapse; }
+.terms td { padding: 4px 8px; border: 1px solid #8a8a8a; }
+.terms td:first-child { width: 216px; }
+
+.sig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+.sig-line { height: 32px; border-bottom: 1px solid #1a1a1a; }
+.sig-label { font-family: "Arimo", sans-serif; font-size: 12px; line-height: 16px; color: #4a4a4a; margin-top: 4px; }
+.doc-foot {
+  position: absolute; left: 88px; right: 88px; bottom: 40px;
+  font-family: "Arimo", sans-serif; font-size: 12px; line-height: 16px; color: #4a4a4a;
+  display: flex; justify-content: space-between;
+}
+
+/* Saved signatures always sit on a white slip so dark ink stays readable. */
+.ink { color: #1c2a5a; white-space: nowrap; }
+.ink-caveat { font-family: "Caveat", cursive; font-weight: 500; font-size: 32px; line-height: 40px; }
+.ink-dancing { font-family: "Dancing Script", cursive; font-weight: 500; font-size: 28px; line-height: 40px; }
+.ink-sacramento { font-family: "Sacramento", cursive; font-size: 36px; line-height: 40px; }
+.ink-apple { font-family: "Homemade Apple", cursive; font-size: 16px; line-height: 40px; }

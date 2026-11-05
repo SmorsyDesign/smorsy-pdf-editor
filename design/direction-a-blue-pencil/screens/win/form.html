@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en" data-platform="win">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Form filling: Smorsy PDF Editor</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../../../fonts/fonts.css">
+<link rel="stylesheet" href="../../tokens.css">
+<link rel="stylesheet" href="../../../shared/paper.css">
+<link rel="stylesheet" href="../../styles.css">
+<link rel="stylesheet" href="../../screens.css">
+</head>
+<body>
+<div class="window win">
+  <div class="win-chrome" aria-hidden="true">
+    <div class="win-title"><span>Field trip consent.pdf - Smorsy PDF Editor</span><span class="win-controls"><i>–</i><i>□</i><i>×</i></span></div>
+    <div class="win-menu"><span>File</span><span>Edit</span><span>View</span><span>Document</span><span>Help</span></div>
+  </div>
+  <header class="bar">
+    <div class="bar-start">
+      <div class="file"><span class="file-name">Field trip consent.pdf</span><span class="file-state">Unsaved answers</span></div>
+    </div>
+    <nav class="modes" aria-label="Editor mode">
+      <a class="mode" href="select.html" aria-current="page"><svg class="icon " viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 2.5l9 5-4 1-2 4z"/></svg>Select</a>
+      <a class="mode" href="edit-text.html"><svg class="icon " viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4V2.75h10V4M8 2.75v10.5M6 13.25h4"/></svg>Edit text</a>
+      <a class="mode" href="annotate.html"><svg class="icon " viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 2.5l3 3-7.5 7.5-3.75.75.75-3.75zM2.5 14.5h11"/></svg>Annotate</a>
+      <a class="mode" href="sign.html"><svg class="icon " viewBox="0 0 16 16" aria-hidden="true"><path d="M2 11.5c2-5 3.5-8 4.75-8 1.75 0-1.25 8 .5 8 1.25 0 1.75-2.75 3-2.75 1 0 .75 2 2 2h1.75M2 14.25h12"/></svg>Sign</a>
+      <a class="mode" href="pages.html"><svg class="icon " viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 4.5v-2h8v9h-2M2.5 4.5h9v9h-9z"/></svg>Pages</a>
+    </nav>
+    <div class="bar-end">
+      <a class="icon-btn" href="select.html" aria-label="Search" title="Search (Ctrl+F)"><svg class="icon " viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5l3 3"/></svg></a>
+      <button class="icon-btn" aria-label="Undo" title="Undo (Ctrl+Z)"><svg class="icon " viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 3l-3 3 3 3M2.5 6h7a4 4 0 010 8h-3"/></svg></button>
+      <button class="icon-btn" aria-label="Redo" title="Redo (Ctrl+Y)" disabled><svg class="icon " viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 3l3 3-3 3M13.5 6h-7a4 4 0 000 8h3"/></svg></button>
+      <a class="btn btn-primary" href="error-save.html">Save a copy</a>
+    </div>
+  </header>
+  <div class="body">
+    <aside class="thumbs" aria-label="Pages"><ol>
+        <li><button class="thumb" aria-current="page" aria-label="Page 1"><span class="thumb-page"></span><span class="thumb-label">1</span></button></li>
+        <li><button class="thumb" aria-label="Page 2"><span class="thumb-page"></span><span class="thumb-label">2</span></button></li>
+      </ol></aside>
+    <div class="stage"><main class="canvas" aria-label="Page 1 of the document" tabindex="0"><form class="paper form-doc" aria-label="Field trip consent form">
+        <span class="ln lh-name">Cedar Grove Elementary School</span>
+        <span class="ln lh-addr">420 Alder Lane, Portland, OR 97214</span>
+        <span class="ln doc-title gap-16">Field Trip Consent Form</span>
+        <span class="ln gap-8">Grade 3 visit to the Oregon Coast Aquarium on May 14, 2027. Buses leave at 8:15 am</span>
+        <span class="ln">and return by 3:30 pm. Please return this form by April 30.</span>
+        <span class="ln doc-h form-h">Student</span>
+        <div class="f-grid">
+          <label class="f f-3"><span class="f-label">Full name</span><input class="f-input" value="Theo Okafor"></label>
+          <label class="f f-1 f-2"><span class="f-label">Grade</span><select class="f-input"><option>3</option></select></label>
+          <label class="f" style="grid-column:span 1"><span class="f-label">Room</span><input class="f-input" value="12"></label>
+        </div>
+        <span class="ln doc-h form-h">Parent or guardian</span>
+        <div class="f-grid">
+          <label class="f f-3"><span class="f-label">Full name</span><input class="f-input" value="Mara Okafor"></label>
+          <label class="f f-3"><span class="f-label">Phone</span><input class="f-input" value="(503) 555-0142"></label>
+          <label class="f f-3"><span class="f-label">Emergency contact (required)</span><input class="f-input is-focus"></label>
+          <label class="f f-3"><span class="f-label">Emergency phone (required)</span><input class="f-input"></label>
+        </div>
+        <span class="ln doc-h form-h">Health</span>
+        <div class="f-row gap-8">
+          <span>Food or medicine allergies?</span>
+          <label class="f-choice"><input type="radio" name="allergy" checked>No</label>
+          <label class="f-choice"><input type="radio" name="allergy">Yes</label>
+        </div>
+        <span class="ln doc-h form-h">Permission</span>
+        <label class="f-choice gap-8"><input type="checkbox" checked>I give permission for my child to attend this trip.</label>
+        <div class="f-grid form-h">
+          <div class="f f-4"><span class="f-label">Signature (required)</span><a class="f-sign" href="sign.html"><svg class="icon " viewBox="0 0 16 16" aria-hidden="true"><path d="M2 11.5c2-5 3.5-8 4.75-8 1.75 0-1.25 8 .5 8 1.25 0 1.75-2.75 3-2.75 1 0 .75 2 2 2h1.75M2 14.25h12"/></svg>Click to sign</a></div>
+          <label class="f f-2"><span class="f-label">Date (required)</span><input class="f-input" placeholder="MM/DD/YYYY"></label>
+        </div>
+        <div class="doc-foot"><span>Cedar Grove form 22-B</span><span>Page 1 of 2</span></div>
+      </form></main></div>
+    <aside class="panel" aria-label="Form progress">
+      <div class="panel-head"><h2>Fill in this form</h2></div>
+      <p class="hint">Press Tab to move to the next field.</p>
+      <p class="slot-note">7 of 11 fields filled</p>
+      <h3>Still needed</h3>
+      <div>
+        <button class="jump">Emergency contact</button>
+        <button class="jump">Emergency phone</button>
+        <button class="jump">Signature</button>
+        <button class="jump">Date</button>
+      </div>
+      <label class="lock"><input type="checkbox"><span>Lock answers when saving<small>Answers become part of the page, so nobody can change them. Your original file stays fillable.</small></span></label>
+    </aside>
+  </div>
+  <footer class="status">
+    <div class="status-part"><button class="icon-btn thumbs-toggle" aria-label="Show page thumbnails"><svg class="icon " viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 3h11v10h-11zM6 3v10"/></svg></button><span>Page 1 of 2</span></div>
+    <div class="status-part"><span>Your original file stays unchanged</span><div class="zoom" role="group" aria-label="Zoom">
+        <button class="icon-btn" aria-label="Zoom out"><svg class="icon " viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10"/></svg></button><span>94%</span><button class="icon-btn" aria-label="Zoom in"><svg class="icon " viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg></button>
+      </div></div>
+  </footer>
+</div>
+</body>
+</html>
