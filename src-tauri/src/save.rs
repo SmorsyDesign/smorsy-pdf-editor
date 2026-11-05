@@ -1,4 +1,4 @@
-use std::fs::{self, File};
+use std::fs::{self, OpenOptions};
 use std::io::{self, ErrorKind, Write};
 use std::path::{Path, PathBuf};
 
@@ -53,35 +53,22 @@ pub fn write_atomic(target: &Path, bytes: &[u8]) -> Result<(), SaveError> {
         Err(_) => None,
     };
 
-    let temp = temp_path(&target).ok_or(SaveError::InvalidRequest)?;
-    let result = write_and_rename(&temp, &target, bytes, existing.as_ref());
-    if result.is_err() {
-        // Best effort: the temp file may never have been created, and the real error matters more.
-        let _ = fs::remove_file(&temp);
+    let folder = target.parent().ok_or(SaveError::InvalidRequest)?;
+    let mut temp = tempfile::Builder::new()
+        .prefix(".smorsy-saving-")
+        // A random name that must not already exist, so nothing planted in a shared folder, such
+        // as a link to another file, can redirect this write. It's removed if the save fails.
+        .make_in(folder, |path| {
+            OpenOptions::new().write(true).create_new(true).open(path)
+        })?;
+    if let Some(metadata) = &existing {
+        // Set before any content goes in, so a private file's content is never less protected.
+        temp.as_file().set_permissions(metadata.permissions())?;
     }
-    result
-}
-
-fn write_and_rename(
-    temp: &Path,
-    target: &Path,
-    bytes: &[u8],
-    existing: Option<&fs::Metadata>,
-) -> Result<(), SaveError> {
-    let mut file = File::create(temp)?;
-    file.write_all(bytes)?;
-    file.sync_all()?;
-    drop(file);
-    if let Some(metadata) = existing {
-        fs::set_permissions(temp, metadata.permissions())?;
-    }
-    fs::rename(temp, target)?;
+    temp.write_all(bytes)?;
+    temp.as_file().sync_all()?;
+    temp.persist(&target).map_err(|failure| failure.error)?;
     Ok(())
-}
-
-fn temp_path(target: &Path) -> Option<PathBuf> {
-    let name = target.file_name()?.to_str()?;
-    Some(target.with_file_name(format!(".{name}.{}.saving", std::process::id())))
 }
 
 /// The bytes arrive as a raw request body because JSON would make large PDFs slow and huge. The
@@ -215,6 +202,19 @@ mod tests {
             .unwrap()
             .file_type()
             .is_symlink());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn new_files_get_normal_permissions_rather_than_the_temp_files() {
+        use std::os::unix::fs::PermissionsExt;
+        let folder = tempfile::tempdir().unwrap();
+        let normal = folder.path().join("normal.txt");
+        fs::write(&normal, b"x").unwrap();
+        let target = folder.path().join("saved.pdf");
+        write_atomic(&target, b"new").unwrap();
+        let mode_of = |path: &Path| fs::metadata(path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode_of(&target), mode_of(&normal));
     }
 
     #[test]
