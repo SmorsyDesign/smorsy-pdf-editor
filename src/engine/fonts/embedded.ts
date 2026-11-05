@@ -56,11 +56,18 @@ function hexToText(hex: string): string {
   return text;
 }
 
-/** Reverses a ToUnicode map, because editing needs text-to-code rather than code-to-text. */
+/**
+ * Reverses a ToUnicode map, because editing needs text-to-code rather than code-to-text. A
+ * character mapped from several codes is left out: a file could label a "9" glyph as "1", and
+ * typing "1" would then silently paint "9". Characters left out use a bundled font instead.
+ */
 export function parseToUnicode(cmap: string): Map<string, CharacterCode> {
   const map = new Map<string, CharacterCode>();
+  const ambiguous = new Set<string>();
   const add = (code: number, bytes: number, text: string) => {
-    if (!map.has(text)) map.set(text, { code, bytes });
+    const existing = map.get(text);
+    if (existing && existing.code !== code) ambiguous.add(text);
+    else map.set(text, { code, bytes });
   };
 
   for (const section of cmap.matchAll(/beginbfchar([\s\S]*?)endbfchar/g)) {
@@ -89,6 +96,7 @@ export function parseToUnicode(cmap: string): Map<string, CharacterCode> {
       }
     }
   }
+  for (const text of ambiguous) map.delete(text);
   return map;
 }
 

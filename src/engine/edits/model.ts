@@ -43,6 +43,8 @@ export interface OriginalFont {
   readonly type3: boolean;
   readonly bold: boolean;
   readonly italic: boolean;
+  /** Characters this font visibly draws on the page, the only ones safe to reuse it for. */
+  readonly knownCharacters?: string;
 }
 
 export interface TextBox {
@@ -89,7 +91,7 @@ export const EMPTY_LOG: EditLog = { entries: [], cursor: 0 };
 export function record(log: EditLog, edit: Edit, group?: string): EditLog {
   const kept = log.entries.slice(0, log.cursor);
   return {
-    entries: [...kept, { edit, group: group ?? log.entries.length }],
+    entries: [...kept, { edit, group: group ?? kept.length }],
     cursor: kept.length + 1,
   };
 }
@@ -125,6 +127,21 @@ export function activeEdits(log: EditLog): readonly Edit[] {
 /** The number of undoable steps, which is what the person thinks of as their changes. */
 export function changeCount(log: EditLog): number {
   return new Set(log.entries.slice(0, log.cursor).map((entry) => entry.group)).size;
+}
+
+/** The entry the log stands at, which identifies this exact state even after undo and redo. */
+export function currentEntry(log: EditLog): EditEntry | undefined {
+  return log.entries[log.cursor - 1];
+}
+
+/** How many undoable steps separate the current state from a saved one, in either direction. */
+export function changesSince(log: EditLog, saved: EditEntry | undefined): number {
+  const savedCursor = saved ? log.entries.indexOf(saved) + 1 : 0;
+  // A saved entry can be discarded by editing after an undo, and then nothing is shared.
+  if (saved && savedCursor === 0) return Math.max(changeCount(log), 1);
+  const from = Math.min(savedCursor, log.cursor);
+  const to = Math.max(savedCursor, log.cursor);
+  return new Set(log.entries.slice(from, to).map((entry) => entry.group)).size;
 }
 
 export function deriveTextBoxes(edits: readonly Edit[]): readonly TextBox[] {

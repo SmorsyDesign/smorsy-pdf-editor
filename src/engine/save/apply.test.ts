@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { PDFDocument, StandardFonts, pushGraphicsState, scale } from '@cantoo/pdf-lib';
+import { PDFDocument, PDFName, StandardFonts, pushGraphicsState, scale } from '@cantoo/pdf-lib';
 import { describe, expect, it } from 'vitest';
 import { openDocument } from '../document';
 import type { Cover, TextBox, TextStyle } from '../edits/model';
@@ -189,6 +189,7 @@ describe('choosing a font', () => {
     type3: false,
     bold: false,
     italic: false,
+    knownCharacters: 'rent',
   };
 
   it('reuses the embedded font when it has every character', async () => {
@@ -303,6 +304,108 @@ describe('choosing a font', () => {
     ]);
     const added = (await textOf(bytes)).find((block) => block.text === 'Added text');
     expect(added?.font.name).toContain('LiberationMono');
+  });
+});
+
+describe('text no font can draw', () => {
+  const unsupported = () =>
+    box({ text: '日本語', lines: ['日本語'], style: { ...STYLE, font: 'sans' } });
+
+  it('is identified before saving', async () => {
+    const editor = new PdfEditor(original('01-plain-text.pdf'), fontBytes);
+    expect((await editor.resolveFont(unsupported())).uncovered).toEqual(['日', '本', '語']);
+  });
+
+  it('stops the save, rather than writing blanks into the file', async () => {
+    await expect(saved('01-plain-text.pdf', [unsupported()])).rejects.toThrow(/unsupported-text/);
+  });
+
+  it('allows ordinary punctuation in a standard font', async () => {
+    const editor = new PdfEditor(original('02-standard-fonts.pdf'), fontBytes);
+    const outcome = await editor.resolveFont(
+      box({
+        text: 'It’s “fine” – really',
+        lines: ['It’s “fine” – really'],
+        style: { ...STYLE, font: 'original' },
+        original: {
+          name: 'Helvetica',
+          serif: false,
+          monospace: false,
+          type3: false,
+          bold: false,
+          italic: false,
+        },
+      }),
+    );
+    expect(outcome).toMatchObject({ used: 'standard', missing: [] });
+  });
+});
+
+describe('a misleading embedded font', () => {
+  const editorFor = () => new PdfEditor(original('03-subset-embedded.pdf'), fontBytes);
+  const original3 = {
+    name: 'LiberationSerif-8659',
+    serif: true,
+    monospace: false,
+    type3: false,
+    bold: false,
+    italic: false,
+  };
+
+  it('isn’t trusted for a character it doesn’t visibly draw on the page', async () => {
+    const outcome = await editorFor().resolveFont(
+      box({
+        text: 'rent',
+        lines: ['rent'],
+        style: { ...STYLE, font: 'original' },
+        original: { ...original3, knownCharacters: 'ren' },
+      }),
+    );
+    expect(outcome.used).toBe('bundled');
+    expect(outcome.missing).toEqual(['t']);
+  });
+});
+
+describe('unusual page boxes', () => {
+  async function pageWith(setup: (doc: PDFDocument) => void) {
+    const doc = await PDFDocument.create();
+    const font = await doc.embedFont(StandardFonts.Helvetica);
+    doc.addPage([612, 792]).drawText('Existing', { x: 72, y: 700, font, size: 12 });
+    setup(doc);
+    return doc.save();
+  }
+
+  it('places text correctly with a crop box starting away from zero', async () => {
+    const bytes = await pageWith((doc) => {
+      doc.getPage(0).setCropBox(50, 60, 400, 500);
+    });
+    const added = (await textOf(await new PdfEditor(bytes, fontBytes).save([box()]))).find(
+      (block) => block.text === 'Added text',
+    );
+    expect(added?.rect.x).toBeCloseTo(100, 0);
+    expect((added?.rect.y ?? 0) + (added?.firstBaseline ?? 0)).toBeCloseTo(212, 0);
+  });
+
+  it('places text correctly when the crop box overhangs the media box', async () => {
+    const bytes = await pageWith((doc) => {
+      doc.getPage(0).setCropBox(-100, -100, 800, 1000);
+    });
+    const added = (await textOf(await new PdfEditor(bytes, fontBytes).save([box()]))).find(
+      (block) => block.text === 'Added text',
+    );
+    expect(added?.rect.x).toBeCloseTo(100, 0);
+    expect((added?.rect.y ?? 0) + (added?.firstBaseline ?? 0)).toBeCloseTo(212, 0);
+  });
+
+  it('keeps size and position on a page with a larger unit', async () => {
+    const bytes = await pageWith((doc) => {
+      doc.getPage(0).node.set(PDFName.of('UserUnit'), doc.context.obj(2));
+    });
+    const added = (await textOf(await new PdfEditor(bytes, fontBytes).save([box()]))).find(
+      (block) => block.text === 'Added text',
+    );
+    expect(added?.rect.x).toBeCloseTo(100, 0);
+    expect(added?.size).toBeCloseTo(14, 0);
   });
 });
 

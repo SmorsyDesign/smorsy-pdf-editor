@@ -26,6 +26,16 @@ endbfrange`);
   });
 });
 
+describe('parseToUnicode, against a misleading file', () => {
+  it('won’t pick between two codes claiming the same character', () => {
+    const map = parseToUnicode(`2 beginbfchar
+<00FF> <0031>
+<0014> <0031>
+endbfchar`);
+    expect(map.has('1')).toBe(false);
+  });
+});
+
 describe('embeddingAllowed', () => {
   function fontWithFsType(fsType: number): Uint8Array {
     const bytes = new Uint8Array(12 + 16 + 10);

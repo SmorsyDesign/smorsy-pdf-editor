@@ -11,7 +11,10 @@ import type { TextBox } from '../../src/engine/edits/model';
 import { PdfEditor } from '../../src/engine/save/editor';
 
 const FOLDER = 'test-pdfs';
-const PASSWORDS: Readonly<Record<string, string>> = { '10-password-protected.pdf': 'smorsy-test' };
+const PASSWORDS: Readonly<Record<string, string>> = {
+  '10-password-protected.pdf': 'smorsy-test',
+  '20-owner-restricted.pdf': '',
+};
 const files = readdirSync(FOLDER).filter((name) => name.toLowerCase().endsWith('.pdf'));
 const temp = mkdtempSync(join(tmpdir(), 'smorsy-roundtrip-'));
 
@@ -27,7 +30,10 @@ interface Inspection {
 }
 
 async function inspect(bytes: Uint8Array, password?: string): Promise<Inspection> {
-  const task = getDocument({ data: bytes.slice(), ...(password ? { password } : {}) });
+  const task = getDocument({
+    data: bytes.slice(),
+    ...(password !== undefined ? { password } : {}),
+  });
   const document = await task.promise;
   let annotations = 0;
   let links = 0;
@@ -52,7 +58,7 @@ async function inspect(bytes: Uint8Array, password?: string): Promise<Inspection
 
 /** qpdf exits 0 for clean files, 3 for warnings it can repair, and 2 for real errors. */
 function qpdfStatus(path: string, password?: string): number | null {
-  const args = ['--check', ...(password ? [`--password=${password}`] : []), path];
+  const args = ['--check', ...(password !== undefined ? [`--password=${password}`] : []), path];
   return spawnSync('qpdf', args, { stdio: 'ignore' }).status;
 }
 
@@ -140,9 +146,40 @@ describe.each(files)('%s', (name) => {
     },
   );
 
+  it.skipIf(password !== undefined)('survives replacing real text in its own font', async () => {
+    const opened = await openDocument(original);
+    const { blocks } = await opened.pageText(1);
+    await opened.close();
+    const block = blocks.find((candidate) => candidate.readOnly === null);
+    if (!block) return;
+
+    const replacement: TextBox = {
+      ...editedBox,
+      id: block.id,
+      rect: block.rect,
+      angle: block.angle,
+      text: block.text,
+      lines: block.lines.map((line) => line.text),
+      firstBaseline: block.firstBaseline,
+      lineHeight: block.lineHeight,
+      style: { ...editedBox.style, font: 'original', size: block.size },
+      covers: block.lines.map((line) => ({
+        rect: line.rect,
+        angle: block.angle,
+        color: { r: 1, g: 1, b: 1 },
+      })),
+      original: block.font,
+    };
+    const saved = await new PdfEditor(original, fonts).save([replacement]);
+    const path = join(temp, `replaced-${name}`);
+    writeFileSync(path, saved);
+    expect([0, 3]).toContain(qpdfStatus(path));
+    expect(await inspect(saved)).toEqual(await inspect(original));
+  });
+
   it('keeps pages, annotations, links and bookmarks through a re-save', async () => {
     const before = await inspect(original, password);
-    const document = await PDFDocument.load(original, password ? { password } : {});
+    const document = await PDFDocument.load(original, password !== undefined ? { password } : {});
     const saved = await document.save();
 
     const path = join(temp, name);

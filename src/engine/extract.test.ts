@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { openDocument } from './document';
-import { hasDigitalSignature } from './extract';
+import { hasDigitalSignature, isEncrypted } from './extract';
 
 const open = (name: string) => openDocument(new Uint8Array(readFileSync(join('test-pdfs', name))));
 
@@ -81,11 +81,33 @@ describe('finding text on a page', () => {
     await doc.close();
   });
 
+  it('records which characters each font visibly draws', async () => {
+    const doc = await open('01-plain-text.pdf');
+    const [heading] = (await doc.pageText(1)).blocks;
+    expect(heading?.font.knownCharacters).toContain('P');
+    await doc.close();
+  });
+
+  it('finds text for searching without loading images', async () => {
+    const doc = await open('01-plain-text.pdf');
+    const blocks = await doc.searchableText(1);
+    expect(blocks[0]?.text).toBe('Plain text, page 1');
+    await doc.close();
+  });
+
   it('marks text that can’t be shaped correctly as read-only', async () => {
     const doc = await open('05-non-latin.pdf');
     const { blocks } = await doc.pageText(1);
     expect(blocks.every((block) => block.readOnly === null)).toBe(true);
     await doc.close();
+  });
+});
+
+describe('isEncrypted', () => {
+  it('spots a protected file and not an ordinary one', () => {
+    const read = (name: string) => new Uint8Array(readFileSync(join('test-pdfs', name)));
+    expect(isEncrypted(read('10-password-protected.pdf'))).toBe(true);
+    expect(isEncrypted(read('01-plain-text.pdf'))).toBe(false);
   });
 });
 

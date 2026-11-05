@@ -4,6 +4,8 @@ import {
   canRedo,
   canUndo,
   changeCount,
+  changesSince,
+  currentEntry,
   deriveTextBoxes,
   EMPTY_LOG,
   record,
@@ -76,6 +78,31 @@ describe('the edit log', () => {
     const undone = undo(log);
     expect(deriveTextBoxes(activeEdits(undone))[0]?.rect.x).toBe(10);
     expect(deriveTextBoxes(activeEdits(redo(undone)))[0]?.rect.x).toBe(13);
+  });
+
+  it('gives each edit made after an undo its own step', () => {
+    let log = record(EMPTY_LOG, { kind: 'add-text', box: box('a') });
+    log = record(log, { kind: 'add-text', box: box('b') });
+    log = undo(log);
+    log = record(log, { kind: 'add-text', box: box('c') });
+    log = record(log, { kind: 'add-text', box: box('d') });
+    expect(deriveTextBoxes(activeEdits(undo(log))).map((item) => item.id)).toEqual(['a', 'c']);
+  });
+
+  it('counts changes since the saved point, in either direction', () => {
+    let log = record(EMPTY_LOG, { kind: 'add-text', box: box('a') });
+    log = record(log, { kind: 'add-text', box: box('b') });
+    const saved = currentEntry(log);
+    expect(changesSince(log, saved)).toBe(0);
+    expect(changesSince(undo(log), saved)).toBe(1);
+    expect(changesSince(record(log, { kind: 'remove-text', id: 'a' }), saved)).toBe(1);
+  });
+
+  it('counts everything as changed when the saved point was discarded', () => {
+    let log = record(EMPTY_LOG, { kind: 'add-text', box: box('a') });
+    const saved = currentEntry(log);
+    log = record(undo(log), { kind: 'add-text', box: box('b') });
+    expect(changesSince(log, saved)).toBe(1);
   });
 
   it('undo and redo at the ends change nothing', () => {

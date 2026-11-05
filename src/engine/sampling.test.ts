@@ -54,6 +54,12 @@ describe('sampleAround', () => {
     expect(sampleAround(data, WIDTH, HEIGHT, inner).flat).toBe(true);
   });
 
+  it('treats transparent pixels as white paper', () => {
+    const data = new Uint8ClampedArray(WIDTH * HEIGHT * 4);
+    const result = sampleAround(data, WIDTH, HEIGHT, inner);
+    expect(result.background).toEqual({ r: 1, g: 1, b: 1 });
+  });
+
   it('falls back to white when there is nothing outside to sample', () => {
     const data = image(10, 10, () => [40, 40, 40]);
     const result = sampleAround(data, 10, 10, { x: 0, y: 0, width: 10, height: 10 });

@@ -25,6 +25,12 @@ describe('displayToUser', () => {
   });
 });
 
+describe('pages with a larger unit', () => {
+  it('scales positions down to PDF units', () => {
+    expect(displayToUser({ x: 72, y: 100 }, { ...letter(0), unit: 2 })).toEqual({ x: 36, y: 742 });
+  });
+});
+
 describe('userAngle', () => {
   it('reverses direction, because display angles run clockwise', () => {
     expect(userAngle(30, 0)).toBe(-30);

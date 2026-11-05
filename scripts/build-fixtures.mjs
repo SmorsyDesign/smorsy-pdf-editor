@@ -238,6 +238,16 @@ async function passwordProtected() {
     plain,
     join(out, '10-password-protected.pdf'),
   ]);
+  execFileSync('qpdf', [
+    '--encrypt',
+    '',
+    'smorsy-owner',
+    '256',
+    '--modify=none',
+    '--',
+    plain,
+    join(out, '20-owner-restricted.pdf'),
+  ]);
   rmSync(plain);
 }
 

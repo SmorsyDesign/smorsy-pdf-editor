@@ -23,6 +23,7 @@ Built by `npm run fixtures` (`scripts/build-fixtures.mjs`). The content is inven
 | `13-large-120-pages.pdf` | 120 pages, for performance checks |
 | `14-images-and-text.pdf` | A landscape page mixing an image and text |
 | `15-coloured-backgrounds.pdf` | Coloured text on flat and gradient backgrounds |
+| `20-owner-restricted.pdf` | Opens without a password, but an owner password forbids changes |
 | `19-digitally-signed.pdf` | A signature the app can detect. It doesn't verify, as no test needs that until Phase 7 |
 
 ## Real-world

@@ -8,7 +8,13 @@ import {
   type PDFPageProxy,
 } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { EngineError } from './errors';
-import { groupTextItems, type FontFacts, type PageText, type RawTextItem } from './extract';
+import {
+  groupTextItems,
+  type FontFacts,
+  type PageText,
+  type RawTextItem,
+  type TextBlock,
+} from './extract';
 import { styleFromName } from './fonts/match';
 import { canvasPixels, displayedPageSize, type PageSize } from './zoom';
 
@@ -37,6 +43,8 @@ export interface PdfDocument {
   pageSize(pageNumber: number): Promise<PageSize>;
   /** The lines and paragraphs on a page, and whether it's an image with no text. */
   pageText(pageNumber: number): Promise<PageText>;
+  /** Just the text, for searching. It skips the images and fonts, which a scan is full of. */
+  searchableText(pageNumber: number): Promise<readonly TextBlock[]>;
   /** Fills a container with invisible, selectable text laid over the drawn page. */
   renderTextLayer(pageNumber: number, container: HTMLElement, zoomPercent: number): RenderTask;
   render(request: RenderRequest): RenderTask;
@@ -95,6 +103,23 @@ function readFontFacts(
   };
 }
 
+function rawItems(items: readonly object[], transform: number[]): RawTextItem[] {
+  const raw: RawTextItem[] = [];
+  for (const item of items) {
+    if (!('str' in item)) continue;
+    const text = item as { str: string; transform: number[]; width: number; fontName: string };
+    const matrix = Util.transform(transform, text.transform) as number[];
+    const [a = 1, b = 0, c = 0, d = 1, e = 0, f = 0] = matrix;
+    raw.push({
+      text: text.str,
+      matrix: [a, b, c, d, e, f],
+      width: text.width,
+      fontKey: text.fontName,
+    });
+  }
+  return raw;
+}
+
 function translateOpenError(error: unknown): EngineError {
   const name = error instanceof Error ? error.name : '';
   const detail = error instanceof Error ? error.message : String(error);
@@ -144,21 +169,20 @@ class PdfJsDocument implements PdfDocument {
     // The operator list also loads the page's fonts, which is what makes their details available.
     const [content, operators] = await Promise.all([page.getTextContent(), page.getOperatorList()]);
 
-    const items: RawTextItem[] = [];
+    const items = rawItems(content.items, viewport.transform);
     const fonts = new Map<string, FontFacts>();
+    const drawn = new Map<string, Set<string>>();
     for (const item of content.items) {
       if (!('str' in item)) continue;
-      const matrix = Util.transform(viewport.transform, item.transform as number[]) as number[];
-      const [a = 1, b = 0, c = 0, d = 1, e = 0, f = 0] = matrix;
-      items.push({
-        text: item.str,
-        matrix: [a, b, c, d, e, f],
-        width: item.width,
-        fontKey: item.fontName,
-      });
       if (!fonts.has(item.fontName)) {
         fonts.set(item.fontName, readFontFacts(page, item.fontName, content.styles));
+        drawn.set(item.fontName, new Set());
       }
+      const characters = drawn.get(item.fontName);
+      for (const character of item.str) characters?.add(character);
+    }
+    for (const [key, facts] of fonts) {
+      fonts.set(key, { ...facts, knownCharacters: [...(drawn.get(key) ?? [])].join('') });
     }
 
     const blocks = groupTextItems(items, pageNumber, fonts);
@@ -191,6 +215,19 @@ class PdfJsDocument implements PdfDocument {
         stop.abort();
       },
     };
+  }
+
+  async searchableText(pageNumber: number): Promise<readonly TextBlock[]> {
+    const page = await this.page(pageNumber);
+    const viewport = page.getViewport({ scale: 1 });
+    const content = await page.getTextContent();
+    const blocks = groupTextItems(
+      rawItems(content.items, viewport.transform),
+      pageNumber,
+      new Map(),
+    );
+    page.cleanup();
+    return blocks;
   }
 
   render({ pageNumber, canvas, zoomPercent, devicePixelRatio }: RenderRequest): RenderTask {

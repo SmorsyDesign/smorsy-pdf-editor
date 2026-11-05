@@ -6,6 +6,8 @@ export interface PageBox {
   readonly height: number;
   /** 0, 90, 180 or 270, clockwise. */
   readonly rotation: number;
+  /** Size of one PDF unit in points, which a few documents change from the usual 1. */
+  readonly unit?: number;
 }
 
 export interface Point {
@@ -14,7 +16,10 @@ export interface Point {
 }
 
 /** Converts from the page as displayed (y down) to PDF space (y up, unrotated). */
-export function displayToUser({ x, y }: Point, box: PageBox): Point {
+export function displayToUser(point: Point, box: PageBox): Point {
+  const unit = box.unit ?? 1;
+  const x = point.x / unit;
+  const y = point.y / unit;
   switch (box.rotation) {
     case 90:
       return { x: box.x + y, y: box.y + x };

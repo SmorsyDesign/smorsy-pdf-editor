@@ -59,7 +59,10 @@ export function sampleAround(
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       const at = (y * width + x) * 4;
-      const pixel: Rgb = [data[at] ?? 255, data[at + 1] ?? 255, data[at + 2] ?? 255];
+      // Unpainted areas are transparent, and they show as the paper's white.
+      const alpha = (data[at + 3] ?? 255) / 255;
+      const onWhite = (value: number | undefined) => (value ?? 255) * alpha + 255 * (1 - alpha);
+      const pixel: Rgb = [onWhite(data[at]), onWhite(data[at + 1]), onWhite(data[at + 2])];
       const isInside =
         x >= inner.x && x < inner.x + inner.width && y >= inner.y && y < inner.y + inner.height;
       (isInside ? inside : ring).push(pixel);

@@ -259,6 +259,11 @@ export function groupTextItems(
   );
 }
 
+/** Files restricted by an owner password open normally, but can't be re-saved faithfully yet. */
+export function isEncrypted(bytes: Uint8Array): boolean {
+  return /\/Encrypt\s+(\d+\s+\d+\s+R|<<)/.test(new TextDecoder('latin1').decode(bytes));
+}
+
 /**
  * A signature dictionary has to record which bytes it covers, and it sits outside compressed
  * streams so it can be located, which makes this search dependable and fast on large files.
