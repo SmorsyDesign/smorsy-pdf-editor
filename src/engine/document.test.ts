@@ -58,6 +58,23 @@ describe('openDocument', () => {
     await doc.close();
   });
 
+  it('reports a broken page as unreadable while the other pages still work', async () => {
+    const doc = await openDocument(invalid('bad-page.pdf'));
+    expect(doc.pageCount).toBe(3);
+    await expect(doc.pageSize(1)).resolves.toBeDefined();
+    await expect(doc.pageSize(2)).rejects.toMatchObject({ code: 'page-unreadable' });
+    await expect(doc.pageSize(3)).resolves.toBeDefined();
+    await doc.close();
+  });
+
+  it('releasing a page is safe, even a broken one', async () => {
+    const doc = await openDocument(invalid('bad-page.pdf'));
+    doc.release(1);
+    doc.release(2);
+    await expect(doc.pageSize(1)).resolves.toBeDefined();
+    await doc.close();
+  });
+
   it('asks for a password rather than failing vaguely', async () => {
     expect((await openError(fixture('10-password-protected.pdf'))).code).toBe('password-required');
   });

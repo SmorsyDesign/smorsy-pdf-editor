@@ -1,8 +1,8 @@
 const FOCUSABLE =
-  'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), summary, [tabindex]:not([tabindex="-1"]), [contenteditable="true"]';
+  'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), summary, [tabindex], [contenteditable="true"]';
 
-function isVisible(element: HTMLElement): boolean {
-  return element.getClientRects().length > 0;
+function canTabTo(element: HTMLElement): boolean {
+  return element.tabIndex >= 0 && element.getClientRects().length > 0;
 }
 
 /**
@@ -15,14 +15,20 @@ export function installTabFocus(): () => void {
     if (event.key !== 'Tab' || event.metaKey || event.ctrlKey || event.altKey) return;
 
     const scope = document.querySelector<HTMLElement>('dialog[open]') ?? document.body;
-    const items = Array.from(scope.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(isVisible);
+    const items = Array.from(scope.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(canTabTo);
     if (items.length === 0) return;
 
     event.preventDefault();
-    const current = items.indexOf(document.activeElement as HTMLElement);
+    const active = document.activeElement as HTMLElement;
+    const current = items.indexOf(active);
     const step = event.shiftKey ? -1 : 1;
+    // Focus can sit on something outside the Tab order, such as a thumbnail reached by arrow keys.
+    const fromList = active
+      .closest('[aria-label="Pages"]')
+      ?.querySelector<HTMLElement>('[tabindex="0"]');
+    const anchor = current === -1 && fromList ? items.indexOf(fromList) : current;
     const fallback = event.shiftKey ? items.length - 1 : 0;
-    const next = current === -1 ? fallback : (current + step + items.length) % items.length;
+    const next = anchor === -1 ? fallback : (anchor + step + items.length) % items.length;
     items[next]?.focus();
   };
 

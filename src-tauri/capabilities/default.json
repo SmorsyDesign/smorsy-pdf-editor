@@ -4,11 +4,10 @@
   "description": "Only what the main window needs. File access comes from the native dialogs at runtime.",
   "windows": ["main"],
   "permissions": [
-    "core:event:default",
     "core:menu:default",
     "core:window:allow-set-title",
     "core:window:allow-start-dragging",
-    "core:window:allow-close",
+    "core:window:allow-internal-toggle-maximize",
     "dialog:allow-open",
     "dialog:allow-save",
     "fs:allow-read-file"

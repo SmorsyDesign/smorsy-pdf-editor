@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, type KeyboardEvent } from 'react';
 import type { PdfDocument } from '../engine/document';
-import { displayedPageSize, type PageSize } from '../engine/zoom';
+import { LETTER_PAGE, displayedPageSize, type PageSize } from '../engine/zoom';
 import { PdfCanvas } from './PdfCanvas';
+import { useVisibleItems } from './useVisibleItems';
 
 interface ThumbnailsProps {
   readonly document: PdfDocument;
@@ -11,7 +12,6 @@ interface ThumbnailsProps {
 }
 
 const THUMB_WIDTH = 92;
-const FALLBACK_PAGE: PageSize = { width: 612, height: 792 };
 
 function thumbZoom(page: PageSize): number {
   return (THUMB_WIDTH / displayedPageSize(page, 100).width) * 100;
@@ -19,28 +19,7 @@ function thumbZoom(page: PageSize): number {
 
 export function Thumbnails({ document, pageSizes, currentPage, onSelect }: ThumbnailsProps) {
   const listRef = useRef<HTMLElement>(null);
-  const [seen, setSeen] = useState<ReadonlySet<number>>(() => new Set([1]));
-
-  // A thumbnail stays drawn once seen: they're small, and redrawing while scrolling flickers.
-  useEffect(() => {
-    const list = listRef.current;
-    if (!list) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .map((entry) => Number((entry.target as HTMLElement).dataset['thumb']));
-        if (visible.length > 0) setSeen((current) => new Set([...current, ...visible]));
-      },
-      { root: list, rootMargin: '200px 0px' },
-    );
-    list.querySelectorAll('[data-thumb]').forEach((element) => {
-      observer.observe(element);
-    });
-    return () => {
-      observer.disconnect();
-    };
-  }, [document]);
+  const activeThumbs = useVisibleItems(listRef, 'data-thumb', '200px 0px', pageSizes.length);
 
   useEffect(() => {
     listRef.current
@@ -48,23 +27,36 @@ export function Thumbnails({ document, pageSizes, currentPage, onSelect }: Thumb
       ?.scrollIntoView({ block: 'nearest' });
   }, [currentPage]);
 
-  const estimate = pageSizes[0] ?? FALLBACK_PAGE;
+  // The list is one Tab stop, with arrows inside it. A long document would otherwise take
+  // hundreds of Tabs to get past.
+  const moveFocus = (event: KeyboardEvent<HTMLElement>) => {
+    const moves: Readonly<Record<string, number>> = { ArrowDown: 1, ArrowUp: -1 };
+    const step = moves[event.key];
+    const from = (event.target as HTMLElement).getAttribute('data-thumb');
+    if (!step || !from) return;
+    event.preventDefault();
+    listRef.current?.querySelector<HTMLElement>(`[data-thumb="${Number(from) + step}"]`)?.focus();
+  };
+
+  const estimate = pageSizes[0] ?? LETTER_PAGE;
 
   return (
-    <aside ref={listRef} className="thumbs" aria-label="Pages">
+    <aside ref={listRef} className="thumbs" aria-label="Pages" onKeyDown={moveFocus}>
       <ol>
         {pageSizes.map((size, index) => {
           const pageNumber = index + 1;
           const page = size ?? estimate;
           const zoom = thumbZoom(page);
           const { width, height } = displayedPageSize(page, zoom);
+          const isCurrent = pageNumber === currentPage;
           return (
             <li key={pageNumber}>
               <button
                 className="thumb"
                 data-thumb={pageNumber}
                 aria-label={`Page ${pageNumber}`}
-                {...(pageNumber === currentPage ? { 'aria-current': 'page' as const } : {})}
+                tabIndex={isCurrent ? 0 : -1}
+                {...(isCurrent ? { 'aria-current': 'page' as const } : {})}
                 onClick={() => {
                   onSelect(pageNumber);
                 }}
@@ -76,8 +68,8 @@ export function Thumbnails({ document, pageSizes, currentPage, onSelect }: Thumb
                     zoomPercent={zoom}
                     width={width}
                     height={height}
-                    active={size !== undefined && seen.has(pageNumber)}
-                    label=""
+                    active={size !== undefined && activeThumbs.has(pageNumber)}
+                    decorative
                   />
                 </span>
                 <span className="thumb-label">{pageNumber}</span>

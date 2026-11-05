@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import type { PdfDocument } from '../engine/document';
-import type { PageSize } from '../engine/zoom';
+import { LETTER_PAGE, type PageSize } from '../engine/zoom';
 
 const BATCH = 32;
 
 /**
- * Measures the first page immediately, so it can show at once, then the rest in small batches.
- * Pages not measured yet are undefined; callers estimate from the first page until they arrive.
+ * Measures pages in small batches, so a long document doesn't hold everything up.
+ * Pages not measured yet are undefined; callers estimate until they arrive. A page that can't be
+ * measured gets an estimated size, so it still has a place to explain that it couldn't be drawn.
  */
 export function usePageSizes(document: PdfDocument): readonly (PageSize | undefined)[] {
   const [sizes, setSizes] = useState<readonly (PageSize | undefined)[]>(() =>
@@ -21,21 +22,20 @@ export function usePageSizes(document: PdfDocument): readonly (PageSize | undefi
       const found = new Array<PageSize | undefined>(document.pageCount).fill(undefined);
       for (let start = 1; start <= document.pageCount && !stopped(); start += BATCH) {
         const end = Math.min(start + BATCH - 1, document.pageCount);
-        const batch = await Promise.all(
+        const batch = await Promise.allSettled(
           Array.from({ length: end - start + 1 }, (_, index) => document.pageSize(start + index)),
         );
-        batch.forEach((size, index) => {
-          found[start - 1 + index] = size;
+        batch.forEach((result, index) => {
+          found[start - 1 + index] =
+            result.status === 'fulfilled'
+              ? result.value
+              : (found.find((size) => size !== undefined) ?? LETTER_PAGE);
         });
         if (!stopped()) setSizes([...found]);
       }
     };
 
-    // This rejects if the document closes mid-measure, or a page is damaged. Unmeasured pages keep
-    // their estimated size, and a damaged page explains itself when it fails to draw.
-    measure().catch(() => {
-      stop.abort();
-    });
+    void measure();
     return () => {
       stop.abort();
     };

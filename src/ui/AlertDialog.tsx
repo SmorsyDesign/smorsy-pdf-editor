@@ -5,6 +5,7 @@ interface AlertDialogProps {
   readonly title: string;
   readonly message: string;
   readonly detail?: string;
+  readonly technical?: string;
   readonly confirmLabel: string;
   readonly cancelLabel: string;
   readonly destructive?: boolean;
@@ -12,11 +13,12 @@ interface AlertDialogProps {
   readonly onCancel: () => void;
 }
 
-/** Built on <dialog>, which gives focus trapping and Esc to cancel for free. */
+/** Built on <dialog> for Esc to cancel and a blocked background. tabFocus.ts keeps Tab inside. */
 export function AlertDialog({
   title,
   message,
   detail,
+  technical,
   confirmLabel,
   cancelLabel,
   destructive = false,
@@ -51,6 +53,12 @@ export function AlertDialog({
           <h2 id="alert-title">{title}</h2>
           <p id="alert-message">{message}</p>
           {detail && <p>{detail}</p>}
+          {technical && (
+            <details>
+              <summary>Technical details</summary>
+              {technical}
+            </details>
+          )}
         </div>
       </div>
       <div className="alert-foot">

@@ -13,7 +13,14 @@ const application = join(root, 'src-tauri/target/debug', binary);
 // WebdriverIO loads this file in several processes, and they must all share one folder.
 if (!process.env['SMORSY_E2E_DIR']) {
   const workspace = mkdtempSync(join(tmpdir(), 'smorsy-native-'));
-  copyFileSync(join(root, 'test-pdfs/01-plain-text.pdf'), join(workspace, '01-plain-text.pdf'));
+  for (const name of [
+    '01-plain-text.pdf',
+    '05-non-latin.pdf',
+    '09-scanned-image-only.pdf',
+    '16-irs-form-w9.pdf',
+  ]) {
+    copyFileSync(join(root, 'test-pdfs', name), join(workspace, name));
+  }
   process.env['SMORSY_E2E_DIR'] = workspace;
 }
 

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { openDocument, type PdfDocument } from '../engine/document';
-import { copyFileName, isSameFile, unchangedCopy } from '../engine/save';
+import { copyFileName, unchangedCopy } from '../engine/save';
 import {
+  ReadFailure,
   SaveFailure,
   type MenuCommand,
   type OpenedFile,
@@ -17,51 +18,68 @@ import { installTabFocus } from './tabFocus';
 
 type Session =
   | { readonly status: 'empty' }
-  | { readonly status: 'opening' }
   | { readonly status: 'failed'; readonly fileName: string; readonly problem: OpenProblem }
   | { readonly status: 'open'; readonly file: OpenedFile; readonly document: PdfDocument };
 
-type SaveDialog =
-  | { readonly kind: 'confirm-replace'; readonly path: string }
-  | { readonly kind: 'failed'; readonly failure: SaveFailureKind }
-  | null;
+// Each dialog keeps the file it's about, so it can't act on a different document.
+type Dialog =
+  | { readonly kind: 'confirm-replace'; readonly file: OpenedFile; readonly path: string }
+  | { readonly kind: 'save-failed'; readonly failure: SaveFailureKind; readonly detail: string }
+  | { readonly kind: 'open-failed'; readonly fileName: string; readonly problem: OpenProblem };
 
 const APP_NAME = 'Smorsy PDF Editor';
 
+const logProblem = (error: unknown) => {
+  console.error(error);
+};
+
 export function App({ platform }: { platform: Platform }) {
   const [session, setSession] = useState<Session>({ status: 'empty' });
-  const [saveDialog, setSaveDialog] = useState<SaveDialog>(null);
+  const [dialog, setDialog] = useState<Dialog | null>(null);
+  const [opening, setOpening] = useState(false);
   const [announcement, setAnnouncement] = useState('');
-  const openDocumentRef = useRef<PdfDocument | null>(null);
   const zoomCommandRef = useRef<((command: MenuCommand) => void) | null>(null);
+  // Only one native dialog or file open at a time, however fast the menu is used.
+  const busyRef = useRef(false);
+  const hasDocument = session.status === 'open';
+  const hasDocumentRef = useRef(hasDocument);
+  hasDocumentRef.current = hasDocument;
 
-  const closeCurrent = useCallback(() => {
-    const current = openDocumentRef.current;
-    openDocumentRef.current = null;
-    return current?.close();
+  const exclusively = useCallback(async (task: () => Promise<void>) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    try {
+      await task();
+    } finally {
+      busyRef.current = false;
+    }
   }, []);
 
-  const chooseAndOpen = useCallback(async () => {
-    let chosenName = '';
-    try {
-      const file = await platform.chooseFileToOpen();
-      if (!file) return;
-      chosenName = file.name;
-      setSession({ status: 'opening' });
-      setAnnouncement('');
-      await closeCurrent();
-      const document = await openDocument(file.bytes, pdfAssets);
-      openDocumentRef.current = document;
-      setSession({ status: 'open', file, document });
-    } catch (error) {
-      await closeCurrent();
-      setSession({
-        status: 'failed',
-        fileName: chosenName || 'This file',
-        problem: explainOpenFailure(error),
-      });
-    }
-  }, [closeCurrent, platform]);
+  const chooseAndOpen = useCallback(
+    () =>
+      exclusively(async () => {
+        let chosenName = '';
+        try {
+          const file = await platform.chooseFileToOpen();
+          if (!file) return;
+          chosenName = file.name;
+          setOpening(true);
+          setAnnouncement('');
+          const document = await openDocument(file.bytes, pdfAssets);
+          setSession({ status: 'open', file, document });
+        } catch (error) {
+          const fileName =
+            error instanceof ReadFailure ? error.fileName : chosenName || 'This file';
+          const problem = explainOpenFailure(error);
+          // A document that's already open stays open: a bad file shouldn't take it away.
+          if (hasDocumentRef.current) setDialog({ kind: 'open-failed', fileName, problem });
+          else setSession({ status: 'failed', fileName, problem });
+        } finally {
+          setOpening(false);
+        }
+      }),
+    [exclusively, platform],
+  );
 
   const writeCopy = useCallback(
     async (file: OpenedFile, path: string) => {
@@ -69,43 +87,66 @@ export function App({ platform }: { platform: Platform }) {
         await platform.writeFile(path, unchangedCopy(file.bytes));
         setAnnouncement('Copy saved');
       } catch (error) {
-        setSaveDialog({
-          kind: 'failed',
-          failure: error instanceof SaveFailure ? error.kind : 'other',
-        });
+        setDialog(
+          error instanceof SaveFailure
+            ? { kind: 'save-failed', failure: error.kind, detail: error.message }
+            : { kind: 'save-failed', failure: 'other', detail: String(error) },
+        );
       }
     },
     [platform],
   );
 
-  const saveCopy = useCallback(async () => {
-    if (session.status !== 'open') return;
-    setAnnouncement('');
-    const path = await platform.chooseSaveLocation(copyFileName(session.file.name));
-    if (path === null) return;
-    if (isSameFile(path, session.file.path, platform.os)) {
-      setSaveDialog({ kind: 'confirm-replace', path });
-      return;
-    }
-    await writeCopy(session.file, path);
-  }, [platform, session, writeCopy]);
+  const saveCopy = useCallback(
+    () =>
+      exclusively(async () => {
+        if (session.status !== 'open') return;
+        const { file } = session;
+        setAnnouncement('');
+        try {
+          const path = await platform.chooseSaveLocation(copyFileName(file.name));
+          if (path === null) return;
+          if (await platform.isSameFile(file.path, path)) {
+            setDialog({ kind: 'confirm-replace', file, path });
+            return;
+          }
+          await writeCopy(file, path);
+        } catch (error) {
+          setDialog({ kind: 'save-failed', failure: 'other', detail: String(error) });
+        }
+      }),
+    [exclusively, platform, session, writeCopy],
+  );
 
-  const closeDocument = useCallback(async () => {
-    await closeCurrent();
+  const closeDocument = useCallback(() => {
     setSession({ status: 'empty' });
     setAnnouncement('');
-  }, [closeCurrent]);
+  }, []);
+
+  const openDocumentInUse = session.status === 'open' ? session.document : null;
+
+  // Runs after the view has unmounted, so nothing is still drawing from a closed document.
+  useEffect(() => {
+    if (!openDocumentInUse) return;
+    return () => {
+      openDocumentInUse.close().catch(logProblem);
+    };
+  }, [openDocumentInUse]);
 
   useEffect(installTabFocus, []);
 
   useEffect(() => {
     const title = session.status === 'open' ? `${session.file.name} - ${APP_NAME}` : APP_NAME;
-    void platform.setWindowTitle(title);
-    void platform.setDocumentOpen(session.status === 'open');
+    platform.setWindowTitle(title).catch(logProblem);
+    platform.setDocumentOpen(session.status === 'open').catch(logProblem);
   }, [platform, session]);
+
+  const dialogIsOpen = dialog !== null;
 
   useEffect(() => {
     const onCommand = (command: MenuCommand) => {
+      // Native menus stay live behind an open dialog, so they must not change what it's about.
+      if (dialogIsOpen) return;
       switch (command) {
         case 'open':
           void chooseAndOpen();
@@ -114,7 +155,7 @@ export function App({ platform }: { platform: Platform }) {
           void saveCopy();
           break;
         case 'close-document':
-          void closeDocument();
+          if (!busyRef.current) closeDocument();
           break;
         case 'zoom-in':
         case 'zoom-out':
@@ -126,11 +167,17 @@ export function App({ platform }: { platform: Platform }) {
     };
     const subscription = platform.onCommand(onCommand);
     return () => {
-      void subscription.then((stop) => {
-        stop();
-      });
+      subscription
+        .then((stop) => {
+          stop();
+        })
+        .catch(logProblem);
     };
-  }, [chooseAndOpen, closeDocument, platform, saveCopy]);
+  }, [chooseAndOpen, closeDocument, dialogIsOpen, platform, saveCopy]);
+
+  const closeDialog = () => {
+    setDialog(null);
+  };
 
   return (
     <>
@@ -149,7 +196,7 @@ export function App({ platform }: { platform: Platform }) {
       ) : (
         <StartScreen
           os={platform.os}
-          busy={session.status === 'opening'}
+          busy={opening}
           failure={session.status === 'failed' ? session : null}
           onChooseFile={() => {
             void chooseAndOpen();
@@ -157,38 +204,50 @@ export function App({ platform }: { platform: Platform }) {
         />
       )}
 
-      {saveDialog?.kind === 'confirm-replace' && session.status === 'open' && (
+      {dialog?.kind === 'confirm-replace' && (
         <AlertDialog
           title="Replace your original file?"
-          message={`This saves over ${session.file.name}. You can’t undo this.`}
+          message={`This saves over ${dialog.file.name}. You can’t undo this.`}
           confirmLabel="Replace original"
           cancelLabel="Cancel"
           destructive
           onConfirm={() => {
-            const { path } = saveDialog;
-            setSaveDialog(null);
-            void writeCopy(session.file, path);
+            closeDialog();
+            void writeCopy(dialog.file, dialog.path);
           }}
-          onCancel={() => {
-            setSaveDialog(null);
-          }}
+          onCancel={closeDialog}
         />
       )}
 
-      {saveDialog?.kind === 'failed' && (
+      {dialog?.kind === 'save-failed' && (
         <AlertDialog
           title="Your copy wasn’t saved"
-          message={explainSaveFailure(saveDialog.failure)}
+          message={explainSaveFailure(dialog.failure)}
           detail="Your original file is unchanged."
+          technical={dialog.detail}
           confirmLabel="Save somewhere else"
           cancelLabel="Cancel"
           onConfirm={() => {
-            setSaveDialog(null);
+            closeDialog();
             void saveCopy();
           }}
-          onCancel={() => {
-            setSaveDialog(null);
+          onCancel={closeDialog}
+        />
+      )}
+
+      {dialog?.kind === 'open-failed' && (
+        <AlertDialog
+          title={`${dialog.fileName} can’t be opened`}
+          message={dialog.problem.reason}
+          detail={dialog.problem.advice}
+          technical={dialog.problem.technical}
+          confirmLabel="Choose another file"
+          cancelLabel="Keep current file"
+          onConfirm={() => {
+            closeDialog();
+            void chooseAndOpen();
           }}
+          onCancel={closeDialog}
         />
       )}
     </>

@@ -1,4 +1,4 @@
-import type { OsFamily } from '../engine/save';
+export type OsFamily = 'mac' | 'win';
 
 export type MenuCommand =
   'open' | 'save-copy' | 'close-document' | 'zoom-in' | 'zoom-out' | 'zoom-actual' | 'zoom-fit';
@@ -9,8 +9,16 @@ export interface OpenedFile {
   readonly bytes: Uint8Array;
 }
 
-export type SaveFailureKind =
-  'not-allowed' | 'no-space' | 'read-only' | 'invalid-request' | 'other';
+export const SAVE_FAILURE_KINDS = [
+  'not-allowed',
+  'no-space',
+  'read-only',
+  'in-use',
+  'invalid-request',
+  'other',
+] as const;
+
+export type SaveFailureKind = (typeof SAVE_FAILURE_KINDS)[number];
 
 export class SaveFailure extends Error {
   readonly kind: SaveFailureKind;
@@ -39,6 +47,8 @@ export interface Platform {
   chooseFileToOpen(): Promise<OpenedFile | null>;
   /** Resolves to null when the person cancels. */
   chooseSaveLocation(suggestedName: string): Promise<string | null>;
+  /** Compares what's on disk rather than the spelling, because one file can have many names. */
+  isSameFile(first: string, second: string): Promise<boolean>;
   /** Rejects with SaveFailure. */
   writeFile(path: string, bytes: Uint8Array): Promise<void>;
   setWindowTitle(title: string): Promise<void>;

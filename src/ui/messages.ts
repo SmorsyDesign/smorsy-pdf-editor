@@ -30,6 +30,12 @@ export function explainOpenFailure(error: unknown): OpenProblem {
           advice: 'Check it’s the right file, or ask the sender for a new copy.',
           technical,
         };
+      case 'open-failed':
+        return {
+          reason: 'Something unexpected stopped this file from opening. The file may be fine.',
+          advice: 'Try opening it again. If that doesn’t work, quit the app and open it again.',
+          technical,
+        };
       case 'password-required':
         return {
           reason: 'This PDF is protected with a password.',
@@ -38,6 +44,7 @@ export function explainOpenFailure(error: unknown): OpenProblem {
         };
       case 'damaged':
       case 'page-not-found':
+      case 'page-unreadable':
       case 'render-failed':
         return {
           reason:
@@ -48,8 +55,8 @@ export function explainOpenFailure(error: unknown): OpenProblem {
     }
   }
   return {
-    reason: 'Something unexpected stopped this file from opening.',
-    advice: 'Try opening it again. If that doesn’t work, the file may be damaged.',
+    reason: 'Something unexpected stopped this file from opening. The file may be fine.',
+    advice: 'Try opening it again. If that doesn’t work, quit the app and open it again.',
     technical: String(error),
   };
 }
@@ -60,6 +67,8 @@ export function explainSaveFailure(kind: SaveFailureKind): string {
       return 'The disk is full. Free up some space, or choose another location.';
     case 'read-only':
       return 'You don’t have permission to save there, or the disk is read-only.';
+    case 'in-use':
+      return 'Another app has that file open. Close it there, or choose another location.';
     case 'not-allowed':
       return 'The app wasn’t given access to that location. Choose it again in the save window.';
     case 'invalid-request':

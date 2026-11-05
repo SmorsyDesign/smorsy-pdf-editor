@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { copyFileName, isSameFile, unchangedCopy } from './save';
+import { copyFileName, unchangedCopy } from './save';
 
 describe('unchangedCopy', () => {
   it('returns byte-identical data, so an existing digital signature stays valid', () => {
@@ -26,17 +26,5 @@ describe('copyFileName', () => {
 
   it('copes with a name that has no extension', () => {
     expect(copyFileName('scan')).toBe('scan-edited.pdf');
-  });
-});
-
-describe('isSameFile', () => {
-  it('compares paths exactly on macOS', () => {
-    expect(isSameFile('/a/Lease.pdf', '/a/Lease.pdf', 'mac')).toBe(true);
-    expect(isSameFile('/a/Lease.pdf', '/a/lease.pdf', 'mac')).toBe(false);
-  });
-
-  it('ignores case and slash direction on Windows', () => {
-    expect(isSameFile('C:\\Docs\\Lease.pdf', 'c:/docs/LEASE.pdf', 'win')).toBe(true);
-    expect(isSameFile('C:\\Docs\\Lease.pdf', 'C:\\Docs\\Other.pdf', 'win')).toBe(false);
   });
 });

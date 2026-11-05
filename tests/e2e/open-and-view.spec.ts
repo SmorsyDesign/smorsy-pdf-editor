@@ -1,3 +1,4 @@
+import { readdirSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import {
   expectOpenDocument,
@@ -34,27 +35,17 @@ test('opens a PDF and draws it', async ({ page }) => {
   expect(await mockState(page, (mock) => mock.documentOpen)).toBe(true);
 });
 
-for (const [name, pages] of [
-  ['03-subset-embedded.pdf', 1],
-  ['05-non-latin.pdf', 1],
-  ['06-rotated-pages.pdf', 4],
-  ['07-mixed-sizes.pdf', 6],
-  ['08-fillable-form.pdf', 1],
-  ['11-annotations-links.pdf', 2],
-  ['16-irs-form-w9.pdf', 6],
-] as const) {
+const everyFixture = readdirSync('test-pdfs').filter(
+  (name) => name.endsWith('.pdf') && name !== '10-password-protected.pdf',
+);
+
+for (const name of everyFixture) {
   test(`draws ${name}`, async ({ page }) => {
     await openFixture(page, `test-pdfs/${name}`);
-    await expectOpenDocument(page, pages);
+    await expect(page.getByTestId('page-indicator')).toHaveText(/^Page 1 of \d+$/);
     await expectPageDrawn(page);
   });
 }
-
-test('draws an image-only scanned page', async ({ page }) => {
-  await openFixture(page, 'test-pdfs/09-scanned-image-only.pdf');
-  await expectOpenDocument(page, 1);
-  await expectPageDrawn(page);
-});
 
 test('a rotated page is displayed sideways', async ({ page }) => {
   await openFixture(page, 'test-pdfs/06-rotated-pages.pdf');
@@ -105,6 +96,33 @@ test('opening a second file replaces the first', async ({ page }) => {
   await expectPageDrawn(page);
 });
 
+test('fit to width returns from any zoom and follows the window', async ({ page }) => {
+  await openFixture(page, 'test-pdfs/14-images-and-text.pdf');
+  await expectOpenDocument(page, 1);
+  await page.keyboard.press('ControlOrMeta+0');
+  await page.keyboard.press('ControlOrMeta+=');
+  await expect(page.getByTestId('zoom-value')).toHaveText('125%');
+  await page.keyboard.press('ControlOrMeta+9');
+  await expect(page.getByRole('button', { name: 'Fit to width' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(page.getByTestId('zoom-value')).toHaveText('100%');
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await expect(page.getByTestId('zoom-value')).toHaveText('78%');
+});
+
+test('one damaged page explains itself, and the other pages still draw', async ({ page }) => {
+  await openFixture(page, 'tests/fixtures/bad-page.pdf');
+  await expectOpenDocument(page, 3);
+  await expectPageDrawn(page, 1);
+  await expect(page.getByText('Page 2 couldn’t be drawn')).toBeVisible();
+  await page.locator('main').evaluate((main) => {
+    main.scrollTop = main.scrollHeight;
+  });
+  await expectPageDrawn(page, 3);
+});
+
 test.describe('zoom', () => {
   test.beforeEach(async ({ page }) => {
     await openFixture(page, 'test-pdfs/01-plain-text.pdf');
@@ -132,13 +150,33 @@ test.describe('zoom', () => {
     await expect(page.getByTestId('zoom-value')).toHaveText('100%');
   });
 
-  test('fit to width follows the window', async ({ page }) => {
+  test('a zoomed-in page can be scrolled to its left edge', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 768 });
-    await page.keyboard.press('ControlOrMeta+9');
-    const zoomValue = page.getByRole('button', { name: 'Fit to width' });
-    await expect(zoomValue).toHaveAttribute('aria-pressed', 'true');
-    const box = await page.locator('[data-page="1"]').boundingBox();
-    expect(box?.width).toBeLessThanOrEqual(1024 - 148 - 48);
+    await page.keyboard.press('ControlOrMeta+0');
+    await page.keyboard.press('ControlOrMeta+=');
+    await page.keyboard.press('ControlOrMeta+=');
+    await page.keyboard.press('ControlOrMeta+=');
+    await expect(page.getByTestId('zoom-value')).toHaveText('200%');
+    const scroller = page.locator('main');
+    await scroller.evaluate((main) => {
+      main.scrollLeft = 0;
+    });
+    const pageBox = await page.locator('[data-page="1"]').boundingBox();
+    const scrollerBox = await scroller.boundingBox();
+    expect(pageBox?.x).toBeGreaterThanOrEqual(scrollerBox?.x ?? Infinity);
+  });
+
+  test('rapid zooming ends sharp, on the final size, with no error', async ({ page }) => {
+    await page.keyboard.press('ControlOrMeta+0');
+    for (let press = 0; press < 5; press += 1) {
+      await page.keyboard.press('ControlOrMeta+=');
+    }
+    await expect(page.getByTestId('zoom-value')).toHaveText('400%');
+    const canvas = page.locator('[data-page="1"] canvas');
+    await expect
+      .poll(() => canvas.evaluate((element: HTMLCanvasElement) => element.width))
+      .toBeGreaterThanOrEqual(3264);
+    await expectPageDrawn(page);
   });
 
   test('redraws sharply after zooming', async ({ page }) => {
@@ -169,10 +207,35 @@ test('a 100+ page document shows page 1 in under 2 seconds, without drawing ever
     .evaluateAll((canvases: HTMLCanvasElement[]) => canvases.filter((c) => c.width > 0).length);
   expect(drawn).toBeLessThan(10);
 
+  const drawnThumbnails = await page
+    .locator('aside canvas')
+    .evaluateAll((canvases: HTMLCanvasElement[]) => canvases.filter((c) => c.width > 0).length);
+  expect(drawnThumbnails).toBeLessThan(20);
+
   await page.locator('main').evaluate((main) => {
     main.scrollTop = main.scrollHeight / 2;
   });
-  await expect(page.getByTestId('page-indicator')).toHaveText(/Page 6\d of 120/);
+  await expect(page.getByTestId('page-indicator')).toHaveText('Page 61 of 120');
+  await expectPageDrawn(page, 61);
+  // Pages far out of view give their memory back.
+  await expect
+    .poll(() =>
+      page.locator('[data-page="1"] canvas').evaluate((canvas: HTMLCanvasElement) => canvas.width),
+    )
+    .toBe(0);
+});
+
+test('a long thumbnail list is one Tab stop, with arrow keys inside it', async ({ page }) => {
+  await openFixture(page, 'test-pdfs/13-large-120-pages.pdf');
+  await expectOpenDocument(page, 120);
+  const thumbnails = page.getByRole('complementary', { name: 'Pages' });
+  await thumbnails.getByRole('button', { name: 'Page 1', exact: true }).focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(thumbnails.getByRole('button', { name: 'Page 2', exact: true })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('page-indicator')).toHaveText('Page 2 of 120');
+  await page.keyboard.press('Tab');
+  await expect(page.locator('main')).toBeFocused();
 });
 
 test('light and dark follow the system, and pages stay white', async ({ page }) => {

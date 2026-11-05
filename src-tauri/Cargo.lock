@@ -3075,7 +3075,9 @@ name = "smorsy-pdf-editor"
 version = "0.1.0"
 dependencies = [
  "percent-encoding",
+ "same-file",
  "serde",
+ "serde_json",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",

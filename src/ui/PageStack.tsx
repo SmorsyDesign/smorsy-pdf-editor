@@ -1,7 +1,8 @@
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, type RefObject } from 'react';
 import type { PdfDocument } from '../engine/document';
-import { displayedPageSize, type PageSize } from '../engine/zoom';
+import { LETTER_PAGE, MAX_ZOOM, MIN_ZOOM, displayedPageSize, type PageSize } from '../engine/zoom';
 import { PdfCanvas } from './PdfCanvas';
+import { useVisibleItems } from './useVisibleItems';
 
 export const PAGE_STACK_PADDING = 24;
 
@@ -17,7 +18,8 @@ interface PageStackProps {
   readonly scrollToPageRef: RefObject<((pageNumber: number) => void) | null>;
 }
 
-const FALLBACK_PAGE: PageSize = { width: 612, height: 792 };
+// One notch of a mouse wheel, 100 units, changes the zoom by about a fifth.
+const WHEEL_SENSITIVITY = 400;
 
 export function PageStack({
   document,
@@ -31,12 +33,15 @@ export function PageStack({
   scrollToPageRef,
 }: PageStackProps) {
   const scrollerRef = useRef<HTMLElement>(null);
-  const [activePages, setActivePages] = useState<ReadonlySet<number>>(() => new Set([1]));
   const previousHeight = useRef(0);
-  const percentRef = useRef(percent);
-  percentRef.current = percent;
+  // Pinches arrive as tiny steps, so the exact value is kept: rounding each would lose them.
+  const exactPercent = useRef(percent);
+  if (Math.round(exactPercent.current) !== percent) exactPercent.current = percent;
 
-  // Measured before the first paint, so pages never lay out or draw at a wrong zoom.
+  // Pages draw when within a screen of the viewport, so scrolling rarely shows blanks.
+  const activePages = useVisibleItems(scrollerRef, 'data-page', '100% 0px', pageSizes.length);
+
+  // Measured before the first paint, so the first zoom is never based on a guessed width.
   useLayoutEffect(() => {
     const scroller = scrollerRef.current;
     if (!scroller) return;
@@ -49,32 +54,6 @@ export function PageStack({
       observer.disconnect();
     };
   }, [onAvailableWidthChange]);
-
-  // Pages draw when within a screen of the viewport, so scrolling rarely shows blanks.
-  useEffect(() => {
-    const scroller = scrollerRef.current;
-    if (!scroller) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        setActivePages((current) => {
-          const next = new Set(current);
-          for (const entry of entries) {
-            const pageNumber = Number((entry.target as HTMLElement).dataset['page']);
-            if (entry.isIntersecting) next.add(pageNumber);
-            else next.delete(pageNumber);
-          }
-          return next;
-        });
-      },
-      { root: scroller, rootMargin: '100% 0px' },
-    );
-    scroller.querySelectorAll('[data-page]').forEach((element) => {
-      observer.observe(element);
-    });
-    return () => {
-      observer.disconnect();
-    };
-  }, [document]);
 
   useEffect(() => {
     const scroller = scrollerRef.current;
@@ -120,20 +99,24 @@ export function PageStack({
   useEffect(() => {
     const scroller = scrollerRef.current;
     if (!scroller) return;
+    const zoomTo = (next: number) => {
+      exactPercent.current = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, next));
+      onZoomTo(exactPercent.current);
+    };
     const onWheel = (event: WheelEvent) => {
       if (!event.ctrlKey) return;
       event.preventDefault();
-      onZoomTo(percentRef.current * Math.exp(-event.deltaY / 100));
+      zoomTo(exactPercent.current * Math.exp(-event.deltaY / WHEEL_SENSITIVITY));
     };
     let gestureStart = 100;
     const onGestureStart = (event: Event) => {
       event.preventDefault();
-      gestureStart = percentRef.current;
+      gestureStart = exactPercent.current;
     };
     const onGestureChange = (event: Event) => {
       event.preventDefault();
       const { scale } = event as Event & { scale: number };
-      onZoomTo(gestureStart * scale);
+      zoomTo(gestureStart * scale);
     };
     scroller.addEventListener('wheel', onWheel, { passive: false });
     scroller.addEventListener('gesturestart', onGestureStart);
@@ -156,7 +139,7 @@ export function PageStack({
     };
   }, [scrollToPageRef]);
 
-  const estimate = pageSizes[0] ?? FALLBACK_PAGE;
+  const estimate = pageSizes[0] ?? LETTER_PAGE;
 
   return (
     <main ref={scrollerRef} className="canvas" tabIndex={0} aria-label={`Pages of ${fileName}`}>

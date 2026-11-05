@@ -184,7 +184,8 @@ button:disabled {
 .canvas {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  /* "safe" keeps the left of a zoomed-in page reachable by scrolling. */
+  align-items: safe center;
   gap: var(--space-6);
   overflow: auto;
   padding: var(--space-6);
@@ -203,7 +204,7 @@ button:disabled {
 .page-failed {
   position: absolute;
   inset: var(--space-4) var(--space-4) auto;
-  color: #a8231c;
+  color: var(--on-paper-danger);
   text-align: center;
 }
 
@@ -384,9 +385,30 @@ button:disabled {
   margin: var(--space-2) 0 0;
   color: var(--text-muted);
 }
+.alert details {
+  margin-top: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--line-sm);
+  overflow-wrap: anywhere;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.alert summary {
+  min-height: 24px;
+  font-weight: 500;
+}
 .alert-foot {
   display: flex;
   justify-content: flex-end;
   gap: var(--space-2);
   padding: 0 var(--space-5) var(--space-5);
+}
+
+.startup-failure {
+  max-width: 512px;
+  margin: 0 auto;
+  padding: var(--space-8);
+  font-size: var(--text-lg);
+  line-height: var(--line-lg);
 }

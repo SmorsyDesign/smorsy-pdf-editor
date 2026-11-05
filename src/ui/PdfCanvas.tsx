@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PdfDocument } from '../engine/document';
-import { EngineError } from '../engine/errors';
 
 interface PdfCanvasProps {
   readonly document: PdfDocument;
@@ -9,7 +8,8 @@ interface PdfCanvasProps {
   readonly width: number;
   readonly height: number;
   readonly active: boolean;
-  readonly label?: string;
+  /** Thumbnails repeat what the page itself says, so screen readers skip them. */
+  readonly decorative?: boolean;
 }
 
 // Waits for a zoom gesture to settle; the old bitmap scales with CSS until then.
@@ -22,7 +22,7 @@ export function PdfCanvas({
   width,
   height,
   active,
-  label,
+  decorative = false,
 }: PdfCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [failed, setFailed] = useState(false);
@@ -34,6 +34,7 @@ export function PdfCanvas({
       // Off-screen pages give their memory back; a long document would otherwise run out.
       canvas.width = 0;
       canvas.height = 0;
+      document.release(pageNumber);
       return;
     }
 
@@ -51,8 +52,8 @@ export function PdfCanvas({
           setFailed(false);
         })
         .catch((error: unknown) => {
-          if (error instanceof EngineError) setFailed(true);
-          else throw error;
+          console.error(error);
+          setFailed(true);
         });
     }, delay);
 
@@ -67,13 +68,15 @@ export function PdfCanvas({
       <canvas
         ref={canvasRef}
         className="pdf-canvas"
-        role="img"
-        aria-label={label ?? `Page ${pageNumber}`}
+        {...(decorative
+          ? { 'aria-hidden': true }
+          : { role: 'img', 'aria-label': `Page ${pageNumber}` })}
         style={{ width, height }}
       />
-      {failed && (
+      {failed && !decorative && (
         <span className="page-failed" role="alert">
-          This page couldn’t be drawn. The rest of the file is still safe to read.
+          Page {pageNumber} couldn’t be drawn. It may be damaged. The rest of the file can still be
+          read.
         </span>
       )}
     </>

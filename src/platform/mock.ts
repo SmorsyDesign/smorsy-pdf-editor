@@ -1,9 +1,9 @@
-import type { OsFamily } from '../engine/save';
 import {
   ReadFailure,
   SaveFailure,
   type MenuCommand,
   type OpenedFile,
+  type OsFamily,
   type Platform,
   type SaveFailureKind,
 } from './types';
@@ -62,6 +62,9 @@ export function createMockPlatform(): Platform {
       const next = controls.nextSavePath;
       controls.nextSavePath = null;
       return Promise.resolve(next);
+    },
+    isSameFile(first, second) {
+      return Promise.resolve(first === second);
     },
     writeFile(path, bytes) {
       const failure = controls.nextWriteFailure;

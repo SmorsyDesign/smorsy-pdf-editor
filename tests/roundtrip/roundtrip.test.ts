@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { PDFDocument } from '@cantoo/pdf-lib';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { afterAll, describe, expect, it } from 'vitest';
+import { openDocument } from '../../src/engine/document';
 import { unchangedCopy } from '../../src/engine/save';
 
 const FOLDER = 'test-pdfs';
@@ -68,6 +69,16 @@ describe('the set is big enough', () => {
 describe.each(files)('%s', (name) => {
   const password = PASSWORDS[name];
   const original = new Uint8Array(readFileSync(join(FOLDER, name)));
+
+  it('opens through the engine', async () => {
+    if (password) {
+      await expect(openDocument(original)).rejects.toMatchObject({ code: 'password-required' });
+      return;
+    }
+    const document = await openDocument(original);
+    expect(document.pageCount).toBeGreaterThan(0);
+    await document.close();
+  });
 
   it('is a valid PDF to begin with', () => {
     expect([0, 3]).toContain(qpdfStatus(join(FOLDER, name), password));

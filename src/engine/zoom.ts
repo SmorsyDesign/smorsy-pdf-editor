@@ -3,6 +3,9 @@ export interface PageSize {
   readonly height: number;
 }
 
+/** The size to assume for a page until its real size is known. */
+export const LETTER_PAGE: PageSize = { width: 612, height: 792 };
+
 export const MIN_ZOOM = 25;
 export const MAX_ZOOM = 500;
 
@@ -11,7 +14,8 @@ const STEPS = [25, 50, 75, 100, 125, 150, 200, 300, 400, 500] as const;
 // PDF pages are measured in points (1/72 inch) and screens in CSS pixels (1/96 inch).
 const POINTS_TO_PIXELS = 96 / 72;
 
-// WebKit refuses to draw on canvases larger than this; going over gives a blank page.
+// A conservative limit: browsers refuse to draw on canvases past their own, and a refusal gives
+// a blank page rather than an error.
 const MAX_CANVAS_AREA = 16_777_216;
 
 export function clampZoom(percent: number): number {

@@ -2,6 +2,7 @@ import {
   getDocument,
   type PDFDocumentLoadingTask,
   type PDFDocumentProxy,
+  type PDFPageProxy,
 } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { EngineError } from './errors';
 import { canvasPixels, displayedPageSize, type PageSize } from './zoom';
@@ -30,6 +31,8 @@ export interface PdfDocument {
   readonly pageCount: number;
   pageSize(pageNumber: number): Promise<PageSize>;
   render(request: RenderRequest): RenderTask;
+  /** Frees what a page holds in memory. Call it when the page scrolls well out of view. */
+  release(pageNumber: number): void;
   close(): Promise<void>;
 }
 
@@ -50,7 +53,11 @@ function translateOpenError(error: unknown): EngineError {
   if (name === 'PasswordException') {
     return new EngineError('password-required', detail, { cause: error });
   }
-  return new EngineError('damaged', detail, { cause: error });
+  if (name === 'InvalidPDFException') {
+    return new EngineError('damaged', detail, { cause: error });
+  }
+  // Anything else is the app failing, so the person shouldn't be told their file is damaged.
+  return new EngineError('open-failed', detail, { cause: error });
 }
 
 class PdfJsDocument implements PdfDocument {
@@ -66,11 +73,16 @@ class PdfJsDocument implements PdfDocument {
     return this.proxy.numPages;
   }
 
-  private async page(pageNumber: number) {
+  private async page(pageNumber: number): Promise<PDFPageProxy> {
     if (!Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > this.pageCount) {
       throw new EngineError('page-not-found', `Page ${pageNumber} of ${this.pageCount}`);
     }
-    return this.proxy.getPage(pageNumber);
+    try {
+      return await this.proxy.getPage(pageNumber);
+    } catch (error) {
+      // A file can open and still have a page that's broken inside it.
+      throw new EngineError('page-unreadable', `Page ${pageNumber}`, { cause: error });
+    }
   }
 
   async pageSize(pageNumber: number): Promise<PageSize> {
@@ -113,6 +125,14 @@ class PdfJsDocument implements PdfDocument {
         stop.abort();
       },
     };
+  }
+
+  release(pageNumber: number): void {
+    // Nothing to free if the page can't load, and pdf.js skips pages that are still drawing.
+    this.page(pageNumber).then(
+      (page) => page.cleanup(),
+      () => undefined,
+    );
   }
 
   close(): Promise<void> {

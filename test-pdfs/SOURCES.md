@@ -40,4 +40,4 @@ Liberation fonts 2.1.5, SIL Open Font License, from https://github.com/liberatio
 
 ## Files that should fail to open
 
-These are in `tests/fixtures/` rather than here, because they can't be round-tripped: `not-a-pdf.pdf`, `empty.pdf` and `truncated.pdf`.
+These are in `tests/fixtures/` rather than here, because they can't be round-tripped: `not-a-pdf.pdf`, `empty.pdf`, `truncated.pdf` and `bad-page.pdf`, which opens but has a broken second page.

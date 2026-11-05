@@ -1,7 +1,14 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
-import { expectOpenDocument, gotoApp, mockState, openFixture, ORIGINAL_PATH } from './helpers';
+import {
+  expectOpenDocument,
+  gotoApp,
+  mockState,
+  openFixture,
+  ORIGINAL_PATH,
+  queueOpen,
+} from './helpers';
 
 const FIXTURE = 'test-pdfs/01-plain-text.pdf';
 
@@ -50,10 +57,23 @@ test.describe('files that can’t open say why', () => {
 
   test('you can recover by choosing another file', async ({ page }) => {
     await openFixture(page, 'tests/fixtures/not-a-pdf.pdf', 'Bad.pdf');
-    await expect(page.getByRole('button', { name: 'Choose another file' })).toBeVisible();
+    await queueOpen(page, FIXTURE, 'Good.pdf');
     await page.getByRole('button', { name: 'Choose another file' }).click();
-    await expect(page.getByRole('heading', { name: 'Bad.pdf can’t be opened' })).toBeVisible();
+    await expectOpenDocument(page, 3);
+    await expect(page.getByText('Good.pdf')).toBeVisible();
   });
+});
+
+test('a bad file leaves the open document where it was', async ({ page }) => {
+  await openFixture(page, FIXTURE, 'Good.pdf');
+  await expectOpenDocument(page, 3);
+  await queueOpen(page, 'tests/fixtures/not-a-pdf.pdf', 'Bad.pdf');
+  await page.keyboard.press('ControlOrMeta+o');
+  const dialog = page.getByRole('alertdialog', { name: 'Bad.pdf can’t be opened' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Keep current file' }).click();
+  await expect(page.getByText('Good.pdf')).toBeVisible();
+  await expectOpenDocument(page, 3);
 });
 
 test.describe('saving', () => {
@@ -101,6 +121,25 @@ test.describe('saving', () => {
     await dialog.getByRole('button', { name: 'Replace original' }).click();
     await expect(page.getByText('Copy saved')).toBeVisible();
     expect((await lastWrite(page))?.path).toBe(ORIGINAL_PATH);
+  });
+
+  test('the menu can’t change which file an open confirmation is about', async ({ page }) => {
+    await queueSavePath(page, ORIGINAL_PATH);
+    await page.getByRole('button', { name: 'Save a copy' }).click();
+    const dialog = page.getByRole('alertdialog', { name: 'Replace your original file?' });
+    await expect(dialog).toContainText('Lease.pdf');
+
+    // Native menus stay live behind a dialog, which these shortcuts stand in for.
+    await queueOpen(page, 'test-pdfs/06-rotated-pages.pdf', 'Other.pdf');
+    await page.keyboard.press('ControlOrMeta+o');
+    await page.keyboard.press('ControlOrMeta+w');
+    await expect(dialog).toContainText('Lease.pdf');
+
+    await dialog.getByRole('button', { name: 'Replace original' }).click();
+    await expect(page.getByText('Copy saved')).toBeVisible();
+    const write = await lastWrite(page);
+    expect(sha256(Uint8Array.from(write?.bytes ?? []))).toBe(sha256(readFileSync(FIXTURE)));
+    await expectOpenDocument(page, 3);
   });
 
   test('the confirmation starts on Cancel, and Esc cancels', async ({ page }) => {

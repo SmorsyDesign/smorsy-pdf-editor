@@ -1,4 +1,5 @@
-// Regenerates test-pdfs/. Run with `npm run fixtures`; needs qpdf and the Liberation fonts in assets/.
+// Regenerates test-pdfs/ 01 to 15 and tests/fixtures/. Run with `npm run fixtures`; needs qpdf and
+// the Liberation fonts in assets/.
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -377,6 +378,28 @@ async function invalidFiles() {
   writeFileSync(join(invalid, 'empty.pdf'), '');
   const whole = readFileSync(join(out, '01-plain-text.pdf'));
   writeFileSync(join(invalid, 'truncated.pdf'), whole.subarray(0, Math.floor(whole.length / 4)));
+
+  // Opens fine, but its second page points at something that isn't a page. The extra layer in the
+  // page tree stops pdf.js repairing this at open, which it does when the last page can't load.
+  const doc = await newDoc('One damaged page');
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  for (let n = 1; n <= 3; n += 1) {
+    doc.addPage([612, 792]).drawText(`Page ${n}`, { x: 72, y: 700, font, size: 18 });
+  }
+  const root = doc.catalog.Pages();
+  const [first, , third] = doc.getPages();
+  const broken = doc.context.register(PDFNumber.of(5));
+  const branch = doc.context.register(
+    doc.context.obj({
+      Type: 'Pages',
+      Parent: doc.catalog.get(PDFName.of('Pages')),
+      Count: 2,
+      Kids: [first.ref, broken],
+    }),
+  );
+  root.set(PDFName.of('Kids'), doc.context.obj([branch, third.ref]));
+  root.set(PDFName.of('Count'), PDFNumber.of(3));
+  writeFileSync(join(invalid, 'bad-page.pdf'), await doc.save({ useObjectStreams: false }));
 }
 
 await plainText();

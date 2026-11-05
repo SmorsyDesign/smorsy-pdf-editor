@@ -1,4 +1,4 @@
-import type { OsFamily } from '../engine/save';
+import type { OsFamily } from '../platform';
 import { Icon } from './Icon';
 import type { OpenProblem } from './messages';
 import { shortcutLabel } from './shortcuts';

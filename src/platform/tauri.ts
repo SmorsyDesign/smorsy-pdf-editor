@@ -3,23 +3,16 @@ import { Menu, MenuItem, PredefinedMenuItem, Submenu } from '@tauri-apps/api/men
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { readFile } from '@tauri-apps/plugin-fs';
-import type { OsFamily } from '../engine/save';
 import {
   ReadFailure,
+  SAVE_FAILURE_KINDS,
   SaveFailure,
   type MenuCommand,
+  type OsFamily,
   type Platform,
-  type SaveFailureKind,
 } from './types';
 
 const PDF_FILTER = { name: 'PDF', extensions: ['pdf'] };
-const SAVE_FAILURES: readonly SaveFailureKind[] = [
-  'not-allowed',
-  'no-space',
-  'read-only',
-  'invalid-request',
-  'other',
-];
 
 /** Native dialogs can't be automated. Only test builds read answers here: Vite strips it from releases. */
 function testDialogAnswer(dialog: 'open' | 'save'): string | undefined {
@@ -38,7 +31,7 @@ function toSaveFailure(error: unknown): SaveFailure {
   if (typeof error === 'object' && error !== null && 'kind' in error) {
     const { kind } = error;
     const detail = 'detail' in error && typeof error.detail === 'string' ? error.detail : '';
-    const known = SAVE_FAILURES.find((candidate) => candidate === kind);
+    const known = SAVE_FAILURE_KINDS.find((candidate) => candidate === kind);
     if (known) return new SaveFailure(known, detail);
   }
   return new SaveFailure('other', String(error));
@@ -122,7 +115,7 @@ async function buildMenu(os: OsFamily, send: (command: MenuCommand) => void): Pr
     const menu = await Menu.new({ items: [app, file, edit, view, window] });
     await menu.setAsAppMenu();
   } else {
-    // Windows menus belong to a window; the app-wide call only applies on macOS.
+    // Windows menus belong to a window, so the menu is set on this one.
     const menu = await Menu.new({ items: [file, edit, view] });
     await menu.setAsWindowMenu(getCurrentWindow());
   }
@@ -157,6 +150,9 @@ export async function createTauriPlatform(): Promise<Platform> {
       return (
         testDialogAnswer('save') ?? save({ defaultPath: suggestedName, filters: [PDF_FILTER] })
       );
+    },
+    isSameFile(first, second) {
+      return invoke<boolean>('is_same_file', { first, second });
     },
     async writeFile(path, bytes) {
       try {

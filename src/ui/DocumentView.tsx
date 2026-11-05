@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import type { PdfDocument } from '../engine/document';
-import type { OsFamily } from '../engine/save';
-import { clampZoom, fitWidthZoom, zoomIn, zoomOut, type PageSize } from '../engine/zoom';
-import type { MenuCommand, OpenedFile } from '../platform';
+import { LETTER_PAGE, clampZoom, fitWidthZoom, zoomIn, zoomOut } from '../engine/zoom';
+import type { MenuCommand, OpenedFile, OsFamily } from '../platform';
 import { Icon } from './Icon';
 import { PageStack, PAGE_STACK_PADDING } from './PageStack';
 import { shortcutLabel } from './shortcuts';
@@ -20,8 +19,6 @@ interface DocumentViewProps {
 
 type ZoomState = { readonly mode: 'fit' } | { readonly mode: 'manual'; readonly percent: number };
 
-const FALLBACK_PAGE: PageSize = { width: 612, height: 792 };
-
 export function DocumentView({
   file,
   document,
@@ -36,7 +33,7 @@ export function DocumentView({
   const [currentPage, setCurrentPage] = useState(1);
   const scrollToPageRef = useRef<((pageNumber: number) => void) | null>(null);
 
-  const firstPage = pageSizes[0] ?? FALLBACK_PAGE;
+  const firstPage = pageSizes[0] ?? LETTER_PAGE;
   const percent =
     zoom.mode === 'manual'
       ? zoom.percent
@@ -128,7 +125,7 @@ export function DocumentView({
             >
               <Icon name="minus" />
             </button>
-            <span className="zoom-value" data-testid="zoom-value">
+            <span className="zoom-value" data-testid="zoom-value" aria-live="polite">
               {percent}%
             </span>
             <button
