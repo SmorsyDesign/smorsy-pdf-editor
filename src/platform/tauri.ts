@@ -7,6 +7,7 @@ import {
   ReadFailure,
   SAVE_FAILURE_KINDS,
   SaveFailure,
+  detectOs,
   type MenuCommand,
   type OsFamily,
   type Platform,
@@ -37,11 +38,11 @@ function toSaveFailure(error: unknown): SaveFailure {
   return new SaveFailure('other', String(error));
 }
 
-interface MenuHandles {
-  readonly documentItems: readonly MenuItem[];
-}
-
-async function buildMenu(os: OsFamily, send: (command: MenuCommand) => void): Promise<MenuHandles> {
+/** Returns the items that only work while a document is open. */
+async function buildMenu(
+  os: OsFamily,
+  send: (command: MenuCommand) => void,
+): Promise<readonly MenuItem[]> {
   const item = (id: MenuCommand, text: string, accelerator: string, enabled = true) =>
     MenuItem.new({
       id,
@@ -64,17 +65,14 @@ async function buildMenu(os: OsFamily, send: (command: MenuCommand) => void): Pr
 
   const file = await Submenu.new({
     text: 'File',
-    items:
-      os === 'mac'
-        ? [openItem, await separator(), saveItem, await separator(), closeItem]
-        : [
-            openItem,
-            await separator(),
-            saveItem,
-            await separator(),
-            closeItem,
-            await PredefinedMenuItem.new({ item: 'Quit', text: 'Exit' }),
-          ],
+    items: [
+      openItem,
+      await separator(),
+      saveItem,
+      await separator(),
+      closeItem,
+      ...(os === 'mac' ? [] : [await PredefinedMenuItem.new({ item: 'Quit', text: 'Exit' })]),
+    ],
   });
   const edit = await Submenu.new({
     text: 'Edit',
@@ -120,13 +118,13 @@ async function buildMenu(os: OsFamily, send: (command: MenuCommand) => void): Pr
     await menu.setAsWindowMenu(getCurrentWindow());
   }
 
-  return { documentItems: [saveItem, closeItem, zoomInItem, zoomOutItem, actualItem, fitItem] };
+  return [saveItem, closeItem, zoomInItem, zoomOutItem, actualItem, fitItem];
 }
 
 export async function createTauriPlatform(): Promise<Platform> {
-  const os: OsFamily = navigator.userAgent.includes('Windows') ? 'win' : 'mac';
+  const os = detectOs();
   const listeners = new Set<(command: MenuCommand) => void>();
-  const { documentItems } = await buildMenu(os, (command) => {
+  const documentItems = await buildMenu(os, (command) => {
     listeners.forEach((listener) => {
       listener(command);
     });

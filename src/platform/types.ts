@@ -1,5 +1,9 @@
 export type OsFamily = 'mac' | 'win';
 
+export function detectOs(): OsFamily {
+  return navigator.userAgent.includes('Windows') ? 'win' : 'mac';
+}
+
 export type MenuCommand =
   'open' | 'save-copy' | 'close-document' | 'zoom-in' | 'zoom-out' | 'zoom-actual' | 'zoom-fit';
 

@@ -7,6 +7,11 @@ export interface OpenProblem {
   readonly technical: string;
 }
 
+const UNEXPECTED_OPEN_FAILURE = {
+  reason: 'Something unexpected stopped this file from opening. The file may be fine.',
+  advice: 'Try opening it again. If that doesn’t work, quit the app and open it again.',
+};
+
 export function explainOpenFailure(error: unknown): OpenProblem {
   if (error instanceof ReadFailure) {
     return {
@@ -31,11 +36,7 @@ export function explainOpenFailure(error: unknown): OpenProblem {
           technical,
         };
       case 'open-failed':
-        return {
-          reason: 'Something unexpected stopped this file from opening. The file may be fine.',
-          advice: 'Try opening it again. If that doesn’t work, quit the app and open it again.',
-          technical,
-        };
+        return { ...UNEXPECTED_OPEN_FAILURE, technical };
       case 'password-required':
         return {
           reason: 'This PDF is protected with a password.',
@@ -54,11 +55,7 @@ export function explainOpenFailure(error: unknown): OpenProblem {
         };
     }
   }
-  return {
-    reason: 'Something unexpected stopped this file from opening. The file may be fine.',
-    advice: 'Try opening it again. If that doesn’t work, quit the app and open it again.',
-    technical: String(error),
-  };
+  return { ...UNEXPECTED_OPEN_FAILURE, technical: String(error) };
 }
 
 export function explainSaveFailure(kind: SaveFailureKind): string {

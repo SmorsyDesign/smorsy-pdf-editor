@@ -38,6 +38,24 @@ button:disabled {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+.error-icon {
+  width: 24px;
+  height: 24px;
+  color: var(--danger);
+}
+/* The interface can't otherwise be selected, but these are meant to be copied into a bug report. */
+details {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--line-sm);
+  overflow-wrap: anywhere;
+  user-select: text;
+  -webkit-user-select: text;
+}
+summary {
+  min-height: 24px;
+  font-weight: 500;
+}
 
 .window {
   display: grid;
@@ -117,13 +135,13 @@ button:disabled {
 .icon-btn {
   display: inline-grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--text);
+  color: var(--text-muted);
 }
 .icon-btn:hover {
   background: var(--chrome-sunken);
@@ -231,14 +249,6 @@ button:disabled {
   align-items: center;
   gap: var(--space-1);
 }
-.zoom .icon-btn {
-  width: 24px;
-  height: 24px;
-  color: var(--text-muted);
-}
-.zoom .icon-btn[aria-pressed='true'] {
-  color: var(--accent-soft-text);
-}
 .zoom-value {
   min-width: 40px;
   text-align: center;
@@ -255,7 +265,6 @@ button:disabled {
 }
 /* The sheet is interface, not a document, so unlike a PDF page it follows the theme. */
 .start-sheet {
-  position: relative;
   display: flex;
   flex: none;
   flex-direction: column;
@@ -263,22 +272,22 @@ button:disabled {
   min-height: 560px;
   padding: 64px 56px 40px;
   background: var(--chrome-raised);
-  color: var(--text);
   box-shadow: 0 0 0 1px var(--paper-edge);
 }
 .start-sheet h1 {
-  position: relative;
   margin: 0;
   font-size: 32px;
   font-weight: 700;
   line-height: 40px;
 }
 .start-sheet p {
-  position: relative;
   margin: var(--space-3) 0 0;
   color: var(--text-muted);
   font-size: var(--text-lg);
   line-height: var(--line-lg);
+}
+.start-sheet .tick {
+  position: relative;
 }
 .start-sheet .tick::before {
   position: absolute;
@@ -296,7 +305,6 @@ button:disabled {
   opacity: 1;
 }
 .start-actions {
-  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -330,23 +338,8 @@ button:disabled {
   line-height: 32px;
   overflow-wrap: anywhere;
 }
-.start-error .err-icon {
-  width: 24px;
-  height: 24px;
-  color: var(--danger);
-}
 .start-sheet details {
   margin-top: var(--space-4);
-  color: var(--text-muted);
-  font-size: var(--text-sm);
-  line-height: var(--line-sm);
-  overflow-wrap: anywhere;
-  user-select: text;
-  -webkit-user-select: text;
-}
-.start-sheet summary {
-  min-height: 24px;
-  font-weight: 500;
 }
 
 /* Alerts */
@@ -370,11 +363,6 @@ button:disabled {
   gap: var(--space-3);
   padding: var(--space-5);
 }
-.alert-icon {
-  width: 24px;
-  height: 24px;
-  color: var(--danger);
-}
 .alert h2 {
   margin: 0 0 var(--space-1);
   font-size: var(--text-lg);
@@ -387,16 +375,6 @@ button:disabled {
 }
 .alert details {
   margin-top: var(--space-2);
-  color: var(--text-muted);
-  font-size: var(--text-sm);
-  line-height: var(--line-sm);
-  overflow-wrap: anywhere;
-  user-select: text;
-  -webkit-user-select: text;
-}
-.alert summary {
-  min-height: 24px;
-  font-weight: 500;
 }
 .alert-foot {
   display: flex;

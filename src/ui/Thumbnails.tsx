@@ -56,7 +56,7 @@ export function Thumbnails({ document, pageSizes, currentPage, onSelect }: Thumb
                 data-thumb={pageNumber}
                 aria-label={`Page ${pageNumber}`}
                 tabIndex={isCurrent ? 0 : -1}
-                {...(isCurrent ? { 'aria-current': 'page' as const } : {})}
+                aria-current={isCurrent ? 'page' : undefined}
                 onClick={() => {
                   onSelect(pageNumber);
                 }}

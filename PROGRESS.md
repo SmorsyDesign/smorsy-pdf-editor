@@ -1,6 +1,6 @@
 # Progress
 
-**Current phase:** 1 (Foundation), not started. Phase 0 is approved. Waiting for the owner to sign in to GitHub.
+**Current phase:** 1, at check-in. Waiting for the owner to say "continue" before Phase 2.
 
 ## Phase 0: Plan and design
 
@@ -21,25 +21,25 @@
 
 - [x] Owner accepts the Xcode licence
 - [x] Owner authorises `context7`
-- [ ] Owner signs in to GitHub (`gh auth login`) and git identity set to the no-reply address
+- [x] Owner signs in to GitHub (`gh auth login`) and git identity set to the no-reply address
 - [x] Project moved to a permanent folder
 - [x] Open questions in `PLAN.md` answered
 - [x] Install Rust, `qpdf`, `gh`, Node 26 LTS
-- [ ] Initialise git; first commit; create the public repository
+- [x] Initialise git; first commit; create the public repository
 
 ## Phase 1: Foundation
 
-- [ ] Tauri + Vite scaffold
-- [ ] Design tokens carried into the build
-- [ ] App shell and native menus
-- [ ] Open and render PDFs
-- [ ] Thumbnails
-- [ ] Zoom
-- [ ] Save a copy via the native dialog (unedited copies are byte-identical)
-- [ ] Test scripts
-- [ ] GitHub Actions: unsigned macOS and Windows builds
-- [ ] `test-pdfs/`, at least 15 files, with `SOURCES.md`
-- [ ] Part 7 gates and check-in
+- [x] Tauri + Vite scaffold
+- [x] Design tokens carried into the build
+- [x] App shell and native menus
+- [x] Open and render PDFs
+- [x] Thumbnails
+- [x] Zoom
+- [x] Save a copy via the native dialog (unedited copies are byte-identical)
+- [x] Test scripts
+- [x] GitHub Actions: unsigned macOS and Windows builds
+- [x] `test-pdfs/`, at least 15 files, with `SOURCES.md`
+- [x] Part 7 gates and check-in
 
 ## Phase 2: Text editing
 
@@ -51,7 +51,9 @@
 - [ ] Reuse embedded font when it has every glyph
 - [ ] Closest bundled font, plus notice
 - [ ] Times New Roman from the computer's own copy, checking its embedding flag; Liberation Serif fallback with notice
-- [ ] Digitally signed PDFs: open in View mode, warn before the first edit (design this screen first)
+- [ ] Digitally signed PDFs: open in View mode, warn before the first edit (design this screen first, for approval)
+- [ ] Same-file check and Save flow from `PLAN.md` decision 2 (⌘S after the first save)
+- [ ] Saving moves to a Web Worker once it does real work
 - [ ] Scanned pages: detect, explain, offer OCR
 - [ ] Stretch: remove original glyphs, per-page fallback, stated in the interface
 - [ ] Part 7 gates and check-in
@@ -116,4 +118,7 @@
 
 ## Skipped minor findings
 
-None yet.
+- **Phase 1, native menus aren't automated.** WebdriverIO can't click them. Menu permissions are covered, because the app won't start without them, and clicking them goes on the manual checklist.
+- **Phase 1, replacing a file keeps its permissions but not extended attributes or Windows ACLs.** Only saving over the original or an existing file is affected, and that needs confirmation. Revisit if anyone relies on them.
+- **Phase 1, no JPX, JBIG2 or predefined CMap fixture.** Generating one needs an encoder. Native tests confirm the app can load these `pdf.js` files.
+- **Phase 1, one native test helper's first form returned false in the real app and the cause wasn't traced.** Rewritten to count pixels and compare outside the page; it fails correctly and passes in both engines.

@@ -48,7 +48,7 @@ export function AlertDialog({
       }}
     >
       <div className="alert-body">
-        <Icon name="error" className="alert-icon" />
+        <Icon name="error" className="error-icon" />
         <div>
           <h2 id="alert-title">{title}</h2>
           <p id="alert-message">{message}</p>

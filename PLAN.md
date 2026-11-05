@@ -69,8 +69,9 @@ Installed on this Mac with Homebrew on 2026-11-05: Rust 1.99.1 with both Mac tar
 ### Additions to the spec's list
 
 - `window-state` remembers window size and position; `process` restarts the app after an update.
-- `tauri-plugin-wdio` 1.5 is the driver that lets tests control the built app on macOS. It runs a WebDriver server inside the app, so it's compiled **only in test builds**, and CI fails if it appears in a release build.
-- Fonts (all open licence): **Liberation Sans, Serif and Mono**, which match the widths of Arial, Times New Roman and Courier New, so replaced text keeps its layout. **Carlito and Caladea** do the same for Calibri and Cambria. Handwriting: **Caveat, Dancing Script, Sacramento, Homemade Apple**. Licence files ship with the app.
+- `tauri-plugin-wdio` and `tauri-plugin-wdio-webdriver` 1.5 let tests control the built app on macOS and Windows. The second runs a WebDriver server inside the app, so both are compiled **only in test builds**, and CI fails if they appear in a release build.
+- `same-file` and `tempfile`, for the same-file check and safe temporary files when saving.
+- Fonts (all open licence): **Liberation Sans, Serif and Mono**, which match the widths of Arial, Times New Roman and Courier New, so replaced text keeps its layout. **Carlito and Caladea** do the same for Calibri and Cambria. Handwriting: **Caveat, Dancing Script, Sacramento, Homemade Apple**. The interface uses **Atkinson Hyperlegible Next**. Their licences ship with the app from Phase 8.
 - **Times New Roman can't be bundled:** it's a commercial font, and its licence doesn't allow shipping it inside another app. macOS and Windows both include it, though, so the app uses **the computer's own copy** when the owner picks Times New Roman or a document needs it. Only the characters used are embedded in the saved PDF, so it looks right for anyone who opens it. This Mac's four Times New Roman files all carry the "editable embedding" permission (`fsType` 8). The app checks that flag on each computer before embedding, which still needs testing on Windows. If the font is missing or doesn't allow it, the app uses Liberation Serif, which has identical widths, and says so. This is the one font not bundled, and a small Rust command reads only those named font files.
 
 ### Minimum OS
@@ -165,17 +166,20 @@ type Edit = AddText | ReplaceText | DeleteText | PlaceSignature | Annotate
 
 ```text
 src/
-  engine/      PDF logic only, no React or Tauri: extract/ fonts/ edits/ save/ sign/ ocr/
-  platform/    The only Tauri callers: interface, tauri implementation, browser mock
-  workers/     Rendering, save, signing and OCR entry points
-  ui/          React: shell/ canvas/ panels/ dialogs/ tokens/
-src-tauri/     Minimal Rust: file associations, scope grants, menus
-assets/        Bundled fonts with licences, OCR data
+  engine/      PDF logic only, no React or Tauri
+  platform/    The only Tauri callers: interface, Tauri implementation, browser mock
+  workers/     pdf.js worker setup; save, signing and OCR workers as those phases add them
+  ui/          React components, styles and fonts
+src-tauri/     Minimal Rust: atomic saves and the same-file check
+assets/        Icon source and bundled document fonts, with licences
 design/        Phase 0 prototypes and screenshots
-tests/         e2e/ (Playwright), native/ (WebdriverIO)
+scripts/       Fixture generation, pdf.js assets, the release check
+tests/         e2e/ (Playwright), native/ (WebdriverIO), roundtrip/, fixtures/ (files that shouldn't open)
 test-pdfs/     Fixtures, SOURCES.md, private/ (git-ignored)
 .github/       CI workflows
 ```
+
+Later phases add folders inside `engine/` and `ui/` as they outgrow one level. File associations and OCR data arrive in Phases 8 and 6.
 
 ## 8. Phases
 

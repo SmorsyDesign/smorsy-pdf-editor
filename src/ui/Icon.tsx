@@ -11,7 +11,7 @@ const PATHS = {
   fit: <path d="M2.5 8h11M5 5.5L2.5 8 5 10.5M11 5.5L13.5 8 11 10.5" />,
 } as const;
 
-export type IconName = keyof typeof PATHS;
+type IconName = keyof typeof PATHS;
 
 export function Icon({ name, className = '' }: { name: IconName; className?: string }) {
   return (

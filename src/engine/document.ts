@@ -15,7 +15,7 @@ export interface PdfAssetUrls {
   readonly iccUrl: string;
 }
 
-export interface RenderRequest {
+interface RenderRequest {
   readonly pageNumber: number;
   readonly canvas: HTMLCanvasElement;
   readonly zoomPercent: number;

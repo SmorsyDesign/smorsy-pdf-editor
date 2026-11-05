@@ -1,6 +1,7 @@
 import {
   ReadFailure,
   SaveFailure,
+  detectOs,
   type MenuCommand,
   type OpenedFile,
   type OsFamily,
@@ -8,7 +9,7 @@ import {
   type SaveFailureKind,
 } from './types';
 
-export interface MockControls {
+interface MockControls {
   /** What the next open dialog returns. Leave empty to act as if the person cancelled. */
   nextOpen: OpenedFile | 'read-failure' | null;
   nextSavePath: string | null;
@@ -44,7 +45,7 @@ export function createMockPlatform(): Platform {
     lastWrite: null,
     windowTitle: '',
     documentOpen: false,
-    os: navigator.userAgent.includes('Windows') ? 'win' : 'mac',
+    os: detectOs(),
   };
   window.smorsyMock = controls;
 

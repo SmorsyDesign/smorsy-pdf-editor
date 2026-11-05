@@ -20,16 +20,16 @@ Desktop PDF editor for macOS and Windows, for the owner and their family. Tauri 
 
 ## Commands
 
-Phase 0 has no app code. Phase 1 adds these npm scripts; update this list if they change.
-
-- `npm run dev`: Vite dev server
+- `npm run dev`: Vite dev server, with the browser mock
 - `npm run tauri dev`: desktop app in development
 - `npm run tauri build`: installers
 - `npm run check`: types, ESLint, Prettier, clippy, rustfmt
-- `npm test`: Vitest engine and unit tests
+- `npm test`: Vitest engine tests
+- `npm run test:rust`: Rust tests
 - `npm run test:e2e`: Playwright in Chromium and WebKit
-- `npm run test:native`: WebdriverIO against the built app
-- `npm run test:roundtrip`: round-trip every file in `test-pdfs/`
+- `npm run test:roundtrip`: round-trip every file in `test-pdfs/`; needs `qpdf`
+- `npm run test:native`: WebdriverIO against the test build. Build it first: `npx tauri build --debug --no-bundle --features e2e --config src-tauri/tauri.e2e.conf.json`
+- `npm run fixtures`: regenerate `test-pdfs/` 01 to 15 and `tests/fixtures/`
 
 Node is pinned to 26 LTS in `.nvmrc`. Use terse test reporters and show only failures.
 
@@ -37,7 +37,7 @@ Node is pinned to 26 LTS in `.nvmrc`. Use terse test reporters and show only fai
 
 - `src/engine/`: all PDF logic behind a typed API. No React or Tauri imports. Fully unit-tested.
 - `src/platform/`: the only code that calls Tauri, behind an interface with a browser mock.
-- `src/workers/`: rendering, OCR, signing and saving always run in Web Workers.
+- Rendering, OCR, signing and saving run in Web Workers. `pdf.js` parses and paints in its own two, set up in `src/workers/`. Saving needs one from Phase 2, when it does real work.
 - `src-tauri/`: minimal Rust, only what the web layer can't do well.
 - Every change is an entry in the immutable edit log. The canvas renders from it, undo and redo walk it, and saving applies it to the original bytes in one pass.
 - Least-privilege Tauri capabilities: only files the user picks or opens via the OS. Strict CSP; never load remote content.

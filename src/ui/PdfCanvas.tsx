@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { PdfDocument } from '../engine/document';
+import type { PdfDocument, RenderTask } from '../engine/document';
 
 interface PdfCanvasProps {
   readonly document: PdfDocument;
@@ -38,7 +38,7 @@ export function PdfCanvas({
       return;
     }
 
-    let task: ReturnType<PdfDocument['render']> | null = null;
+    let task: RenderTask | null = null;
     const delay = canvas.width === 0 ? 0 : RENDER_DELAY_MS;
     const timer = window.setTimeout(() => {
       task = document.render({

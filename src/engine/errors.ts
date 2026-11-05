@@ -1,4 +1,4 @@
-export type EngineErrorCode =
+type EngineErrorCode =
   | 'empty-file'
   | 'not-a-pdf'
   | 'damaged'

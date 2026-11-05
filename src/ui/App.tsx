@@ -41,9 +41,8 @@ export function App({ platform }: { platform: Platform }) {
   const zoomCommandRef = useRef<((command: MenuCommand) => void) | null>(null);
   // Only one native dialog or file open at a time, however fast the menu is used.
   const busyRef = useRef(false);
-  const hasDocument = session.status === 'open';
-  const hasDocumentRef = useRef(hasDocument);
-  hasDocumentRef.current = hasDocument;
+  const hasDocumentRef = useRef(false);
+  hasDocumentRef.current = session.status === 'open';
 
   const exclusively = useCallback(async (task: () => Promise<void>) => {
     if (busyRef.current) return;

@@ -22,7 +22,7 @@ export function StartScreen({ os, busy, failure, onChooseFile }: StartScreenProp
         {failure ? (
           <section className="start-sheet" role="alert">
             <div className="start-error">
-              <Icon name="error" className="err-icon" />
+              <Icon name="error" className="error-icon" />
               <h1>{failure.fileName} can’t be opened</h1>
             </div>
             <p>{failure.problem.reason}</p>
