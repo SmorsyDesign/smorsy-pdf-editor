@@ -1,0 +1,103 @@
+name: Build and test
+
+on:
+  push:
+    branches: [main, 'phase-*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Checks and tests
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: brew install qpdf
+      - run: npm ci
+      - run: npx playwright install chromium webkit
+      - run: npm run assets
+      - run: npm run check
+      - run: npm test
+      - run: npm run test:rust
+      - run: npm run test:roundtrip
+      - run: npm run test:e2e
+
+  native:
+    name: Native tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+      - run: npm test
+      - run: npm run test:rust
+      - name: Build the test version of the app
+        run: npx tauri build --debug --no-bundle --features e2e --config src-tauri/tauri.e2e.conf.json
+      - run: npm run test:native
+
+  installers:
+    name: Unsigned build (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS
+            os: macos-latest
+            args: --target universal-apple-darwin
+            binary: src-tauri/target/universal-apple-darwin/release/smorsy-pdf-editor
+            artifacts: src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+          - name: Windows
+            os: windows-latest
+            args: ''
+            binary: src-tauri/target/release/smorsy-pdf-editor.exe
+            artifacts: src-tauri/target/release/bundle/nsis/*.exe
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.os == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+      - run: npx tauri build ${{ matrix.args }}
+      - name: Confirm no test code reached the release
+        run: node scripts/check-release-clean.mjs ${{ matrix.binary }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: smorsy-pdf-editor-${{ matrix.name }}
+          path: ${{ matrix.artifacts }}
+          if-no-files-found: error

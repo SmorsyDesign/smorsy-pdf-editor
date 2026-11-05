@@ -21,6 +21,15 @@ const SAVE_FAILURES: readonly SaveFailureKind[] = [
   'other',
 ];
 
+/** Native dialogs can't be automated. Only test builds read answers here: Vite strips it from releases. */
+function testDialogAnswer(dialog: 'open' | 'save'): string | undefined {
+  if (import.meta.env.MODE !== 'e2e') return undefined;
+  const { smorsyTestDialogs } = window as unknown as {
+    smorsyTestDialogs?: Partial<Record<'open' | 'save', string>>;
+  };
+  return smorsyTestDialogs?.[dialog];
+}
+
 function fileNameOf(path: string): string {
   return path.split(/[\\/]/).at(-1) ?? path;
 }
@@ -133,7 +142,9 @@ export async function createTauriPlatform(): Promise<Platform> {
   return {
     os,
     async chooseFileToOpen() {
-      const path = await open({ multiple: false, directory: false, filters: [PDF_FILTER] });
+      const path =
+        testDialogAnswer('open') ??
+        (await open({ multiple: false, directory: false, filters: [PDF_FILTER] }));
       if (path === null) return null;
       const name = fileNameOf(path);
       try {
@@ -143,7 +154,9 @@ export async function createTauriPlatform(): Promise<Platform> {
       }
     },
     async chooseSaveLocation(suggestedName) {
-      return save({ defaultPath: suggestedName, filters: [PDF_FILTER] });
+      return (
+        testDialogAnswer('save') ?? save({ defaultPath: suggestedName, filters: [PDF_FILTER] })
+      );
     },
     async writeFile(path, bytes) {
       try {
