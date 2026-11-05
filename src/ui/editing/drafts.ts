@@ -23,6 +23,8 @@ export interface TextDraft {
   readonly backgroundNotFlat: boolean;
   /** True when the text being replaced had several styles, and the edit will have one. */
   readonly mixedStyles: boolean;
+  /** What was typed before an edit failed. Never counts as unchanged, so a retry can't lose it. */
+  readonly retry?: { readonly text: string; readonly rect: Rect; readonly style: TextStyle };
 }
 
 const DEFAULT_SIZE = 12;

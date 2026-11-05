@@ -73,6 +73,7 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
   const logRef = useRef(log);
   const savedRef = useRef(savedEntry);
   const clientRef = useRef<Promise<SaveClient> | null>(null);
+  const createClientRef = useRef<(() => Promise<SaveClient>) | null>(null);
   // A font check answers later, by which time the edit it's about may have been undone.
   const latestChange = useRef(0);
 
@@ -88,7 +89,7 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
     if (!file) return;
 
     const stop = new AbortController();
-    clientRef.current = (async () => {
+    const createClient = async () => {
       const fonts = await Promise.all(SYSTEM_STYLES.map((style) => platform.readSystemFont(style)));
       const systemFonts: Partial<Record<SystemFontStyle, Uint8Array>> = {};
       SYSTEM_STYLES.forEach((style, index) => {
@@ -99,12 +100,14 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
         setTimesAvailable(systemFonts.regular ? embeddingAllowed(systemFonts.regular) : false);
       }
       return new SaveClient(file.bytes, systemFonts);
-    })();
-    const client = clientRef.current;
+    };
+    createClientRef.current = createClient;
+    clientRef.current = createClient();
     return () => {
       stop.abort();
+      const client = clientRef.current;
       clientRef.current = null;
-      void client.then((opened) => {
+      void client?.then((opened) => {
         opened.close();
       });
     };
@@ -135,6 +138,7 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
         })
         .catch((error: unknown) => {
           console.error(error);
+          if (change !== latestChange.current) return;
           setProblem(
             'The app couldn’t check the font for this edit, so it may not save correctly. Check the text after saving, or undo the edit.',
           );
@@ -158,8 +162,13 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
     if (active.length === 0) {
       return { bytes: unchangedCopy(file?.bytes ?? new Uint8Array()), edited: false, entry };
     }
-    const client = await clientRef.current;
+    let client = await clientRef.current;
     if (!client) throw new Error('The document closed before it could be saved.');
+    // The edits are safe on this side, so a worker that died only needs replacing.
+    if (client.failed && createClientRef.current) {
+      clientRef.current = createClientRef.current();
+      client = await clientRef.current;
+    }
     return { bytes: await client.save(active), edited: true, entry };
   }, [file]);
 

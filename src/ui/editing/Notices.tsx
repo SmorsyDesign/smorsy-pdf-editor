@@ -1,3 +1,4 @@
+import { nameCharacter } from '../../engine/errors';
 import { cleanFontName } from '../../engine/fonts/match';
 import { AlertDialog } from '../AlertDialog';
 import { Icon } from '../Icon';
@@ -13,10 +14,7 @@ const FAMILY_NAMES = {
 } as const;
 
 const listed = (characters: readonly string[]) =>
-  characters
-    .slice(0, 6)
-    .map((character) => (character === ' ' ? 'space' : character))
-    .join(' ');
+  characters.slice(0, 6).map(nameCharacter).join(' ');
 
 const familyNameOf = ({ outcome }: FontNoticeState) =>
   outcome.family ? FAMILY_NAMES[outcome.family] : 'the closest match';

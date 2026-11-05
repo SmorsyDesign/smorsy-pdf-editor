@@ -12,7 +12,7 @@ export type SaveDialog =
 /** 'asking' means a dialog will decide, so anything waiting on the save keeps waiting. */
 type Outcome = 'saved' | 'asking' | 'stopped';
 
-function failureDialog(error: unknown): SaveDialog {
+function failureDialog(error: unknown, otherwise: SaveFailureKind): SaveDialog {
   if (error instanceof SaveFailure) {
     return { kind: 'save-failed', failure: error.kind, detail: error.message };
   }
@@ -23,7 +23,7 @@ function failureDialog(error: unknown): SaveDialog {
         failure: 'unsupported-text',
         detail: detail.slice(UNSUPPORTED_TEXT.length),
       }
-    : { kind: 'save-failed', failure: 'other', detail };
+    : { kind: 'save-failed', failure: otherwise, detail };
 }
 
 interface SaveFlowOptions {
@@ -57,7 +57,7 @@ export function useSaveFlow({
   /** Runs once the save has let go of the app, because what's next may need a turn of its own. */
   const settle = useCallback(
     (outcome: Outcome | undefined) => {
-      if (outcome === 'asking') return;
+      if (outcome === 'asking' || outcome === undefined) return;
       const next = afterSave.current;
       afterSave.current = null;
       // An edit made while saving isn't in the file, so it's not safe to carry on and lose it.
@@ -84,7 +84,7 @@ export function useSaveFlow({
         });
         return 'saved';
       } catch (error) {
-        showDialog(failureDialog(error));
+        showDialog(failureDialog(error, 'build-failed'));
         return 'stopped';
       }
     },
@@ -105,7 +105,7 @@ export function useSaveFlow({
         }
         return await writeTo(file, path);
       } catch (error) {
-        showDialog(failureDialog(error));
+        showDialog(failureDialog(error, 'other'));
         return 'stopped';
       }
     });

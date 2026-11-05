@@ -62,6 +62,8 @@ export function explainSaveFailure(kind: SaveFailureKind, detail = ''): string {
   switch (kind) {
     case 'unsupported-text':
       return `No font available to the app has these characters: ${detail}. Change or remove them, then save again.`;
+    case 'build-failed':
+      return 'Something went wrong while building the edited file, so nothing was written.';
     case 'no-space':
       return 'The disk is full. Free up some space, or choose another location.';
     case 'read-only':

@@ -53,6 +53,11 @@ export class SaveClient {
     throw new Error('The save worker gave an unexpected reply.');
   }
 
+  /** The worker has gone, so a fresh client is needed. The edits themselves live elsewhere. */
+  get failed(): boolean {
+    return this.failure !== null;
+  }
+
   close(): void {
     this.worker.terminate();
   }

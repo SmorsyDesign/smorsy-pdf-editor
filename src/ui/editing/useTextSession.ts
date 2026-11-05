@@ -35,13 +35,16 @@ async function editFromDraft(
   rect: Rect,
   style: TextStyle,
 ): Promise<Edit> {
-  const measure = await preparedMeasure(style, draft.original);
+  // Deleting has nothing to measure, so a font problem can't stop it.
+  const measure = text === '' ? () => 0 : await preparedMeasure(style, draft.original);
   const ratio = style.size / draft.style.size;
   const lineHeight = draft.lineHeight * ratio;
-  const lines = wrapText(text, rect.width, measure);
+  // Fonts have no glyph for a pasted tab, and it would stop the save over an invisible character.
+  const plainText = text.replaceAll('\t', '    ');
+  const lines = wrapText(plainText, rect.width, measure);
   const fields = {
     rect: { ...rect, height: Math.max(lines.length, 1) * lineHeight },
-    text,
+    text: plainText,
     lines,
     style,
     lineHeight,
@@ -82,7 +85,9 @@ export function useTextSession(editor: DocumentEditor) {
   const commitDraft = useCallback(
     (current: TextDraft, text: string, rect: Rect, style: TextStyle) => {
       setDraft(null);
+      draftRef.current = null;
       const unchanged =
+        !current.retry &&
         text === current.text &&
         rect === current.rect &&
         JSON.stringify(style) === JSON.stringify(current.style);
@@ -93,11 +98,13 @@ export function useTextSession(editor: DocumentEditor) {
       pendingCommit.current = pendingCommit.current
         .then(async () => {
           apply(await editFromDraft(current, text, rect, style));
+          commitFailed.current = false;
+          reportProblem(null);
         })
         .catch((error: unknown) => {
           console.error(error);
           commitFailed.current = true;
-          setDraft((open) => open ?? { ...current, text, rect, style });
+          setDraft({ ...current, retry: { text, rect, style } });
           reportProblem(
             'That edit couldn’t be applied, because its font didn’t load. Your text is still here. Try again, or choose another font.',
           );
@@ -117,9 +124,7 @@ export function useTextSession(editor: DocumentEditor) {
   const flush = useCallback(async () => {
     finishOpenEdit();
     await pendingCommit.current;
-    const failed = commitFailed.current;
-    commitFailed.current = false;
-    return !failed;
+    return !commitFailed.current;
   }, [finishOpenEdit]);
 
   // Open text counts as the latest edit, so undo acts on it, and redo can bring it back.
@@ -159,30 +164,36 @@ export function useTextSession(editor: DocumentEditor) {
     clearNotice();
   };
 
-  const openBlock = async (
-    block: TextBlock,
-    pageElement: HTMLElement,
-    scale: number,
-    page: PageSize,
-  ) => {
-    finishOpenEdit();
+  // Only the latest request opens, and never over an edit that failed and came back.
+  const openRequest = useRef(0);
+  const openWhenClear = async (make: () => TextDraft | Promise<TextDraft>) => {
+    openRequest.current += 1;
+    const request = openRequest.current;
     dismissNotice();
-    // Sampling an unfinished page would read blank pixels, and patch a coloured page in white.
-    const drawn = await whenPageDrawn(pageElement);
-    const next = draftForBlock(block, page, pageElement, scale);
-    setDraft(drawn ? next : { ...next, backgroundNotFlat: true });
+    if (!(await flush())) return;
+    try {
+      const next = await make();
+      if (request === openRequest.current) setDraft(next);
+    } catch (error) {
+      console.error(error);
+      reportProblem('That text couldn’t be opened for editing. Try again, or zoom out and retry.');
+    }
   };
 
+  const openBlock = (block: TextBlock, pageElement: HTMLElement, scale: number, page: PageSize) =>
+    openWhenClear(async () => {
+      // Sampling an unfinished page would read blank pixels, and patch a coloured page in white.
+      const drawn = await whenPageDrawn(pageElement);
+      const next = draftForBlock(block, page, pageElement, scale);
+      return drawn ? next : { ...next, backgroundNotFlat: true };
+    });
+
   const openBox = (box: TextBox) => {
-    finishOpenEdit();
-    dismissNotice();
-    setDraft(draftForBox(box));
+    void openWhenClear(() => draftForBox(box));
   };
 
   const addText = (pageNumber: number, x: number, y: number, page: PageSize) => {
-    finishOpenEdit();
-    dismissNotice();
-    setDraft(draftForNewText(pageNumber, x, y, page));
+    void openWhenClear(() => draftForNewText(pageNumber, x, y, page));
   };
 
   /** A click on the empty page ends the current edit, or if there isn't one, starts a new one. */
@@ -201,6 +212,7 @@ export function useTextSession(editor: DocumentEditor) {
     scale: number,
     page: PageSize,
   ) => {
+    finishOpenEdit();
     const target = draftForBlock(block, page, pageElement, scale);
     commitDraft(target, '', target.rect, target.style);
   };
@@ -210,6 +222,9 @@ export function useTextSession(editor: DocumentEditor) {
     editorHandleRef,
     commitDraft,
     cancelDraft: () => {
+      commitFailed.current = false;
+      reportProblem(null);
+      draftRef.current = null;
       setDraft(null);
     },
     finishOpenEdit,

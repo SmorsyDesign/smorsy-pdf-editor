@@ -99,8 +99,10 @@ test.describe('the unsaved count', () => {
     await page.evaluate(() => {
       (window as unknown as { finishWrite: () => void }).finishWrite();
     });
-    await expect(page.getByText('Copy saved')).toBeVisible();
+    await expect.poll(() => lastWrite(page)).not.toBeNull();
     await expect(page.getByText('1 unsaved change')).toBeVisible();
+    // The file has an older state than the screen, so it mustn't look fully saved.
+    await expect(page.getByText('Copy saved')).toHaveCount(0);
     const text = await savedText(page);
     expect(text).toContain('In the file');
     expect(text).not.toContain('After the save began');
@@ -220,6 +222,29 @@ test.describe('when things fail', () => {
     await expect(field(page)).toHaveValue('Precious words');
   });
 
+  test('retrying after that failure can’t lose the text', async ({ page }) => {
+    await page.route('**/LiberationMono-Regular.ttf', (route) => route.abort());
+    await openForEditing(page);
+    await page
+      .getByTestId('edit-layer')
+      .first()
+      .click({ position: { x: 96, y: 600 } });
+    await field(page).fill('Precious words');
+    await page.getByRole('combobox', { name: 'Font' }).selectOption('mono');
+    await page.keyboard.press('ControlOrMeta+Enter');
+    await expect(page.getByRole('alert')).toBeVisible();
+    await field(page).focus();
+    await page.keyboard.press('ControlOrMeta+Enter');
+    await expect(field(page)).toHaveValue('Precious words');
+
+    await page.getByRole('combobox', { name: 'Font' }).selectOption('sans');
+    await page.keyboard.press('ControlOrMeta+Enter');
+    await expect(editor(page)).toHaveCount(0);
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    await saveTo(page);
+    expect(await savedText(page)).toContain('Precious words');
+  });
+
   test('a font check that fails is shown, not hidden', async ({ page }) => {
     let requests = 0;
     await page.route('**/LiberationMono-Regular.ttf', (route) => {
@@ -265,6 +290,23 @@ test.describe('when things fail', () => {
 });
 
 test.describe('keyboard', () => {
+  test('deleting another block keeps the text being typed', async ({ page }) => {
+    await openForEditing(page);
+    await block(page, 'This agreement renews').click();
+    await field(page).fill('Kept while deleting');
+    await block(page, HEADING).focus();
+    await page.keyboard.press('Delete');
+    await expect(page.getByText('Kept while deleting')).toBeVisible();
+    await expect(page.getByText('2 unsaved changes')).toBeVisible();
+  });
+
+  test('a pasted tab becomes spaces rather than stopping the save', async ({ page }) => {
+    await openForEditing(page);
+    await addText(page, 'One\tTwo');
+    await saveTo(page);
+    expect(await savedText(page)).toContain('One');
+  });
+
   test('the Add Text shortcut starts typing on the current page', async ({ page }) => {
     await openForEditing(page);
     await page.getByRole('button', { name: 'Select', exact: true }).click();

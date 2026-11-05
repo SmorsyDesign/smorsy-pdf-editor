@@ -2,6 +2,8 @@
 
 **Current phase:** 2, in Part 7 review.
 
+**Next steps for Phase 2:** read the code reviewer's re-review if it finished (otherwise run it again on `git diff b7e42b6..HEAD`), fix critical and major findings, re-review, run `code-simplifier`, run every test suite, retake `design/screenshots/phase-2/` with the new signature wording, confirm CI on the latest commit, then check in. Ask the owner to try Quit from the Dock with unsaved edits.
+
 ## Phase 0: Plan and design
 
 - [x] Step 1: `PLAN.md`, `CLAUDE.md`, `PROGRESS.md`
@@ -118,6 +120,15 @@
 - [ ] Part 7 gates and final check-in
 
 ## Skipped minor findings
+
+- **Phase 2, a PDF built to lie about its own text can still mislead font reuse.** A glyph drawn on the page but labelled as another letter passes the checks, because the labels are all a PDF offers. Decoy fonts are refused. Fixing the rest needs real glyph comparison.
+- **Phase 2, encryption check misses unusual spellings such as `/Encr#79pt`.** It fails safely: the save stops and nothing is written, though the protected notice doesn't show.
+- **Phase 2, signature check misses escaped names and can be fooled by the text.** The wording now says "looks signed" and that it isn't checked. Phase 7 replaces it with real validation.
+- **Phase 2, no "Saving…" state or worker timeout.** A worker that never replies leaves Save unresponsive. Known hang sources are capped. Revisit with progress UI.
+- **Phase 2, a page whose text can't be read says so only in the log.** Search counts can be low for that page. The page itself still shows.
+- **Phase 2, replaced-font count can be off after undo and redo.** It's only the status bar count; saved output is unaffected.
+- **Phase 2, a failed font read in the worker stays failed for that document.** Saving fails with a clear dialog, and a new worker clears it only after the worker itself fails.
+- **Phase 2, the message after replacing the original compares paths as text.** The same file reached by a different path says "Copy saved".
 
 - **Phase 1, native menus aren't automated.** WebdriverIO can't click them. Menu permissions are covered, because the app won't start without them, and clicking them goes on the manual checklist.
 - **Phase 1, replacing a file keeps its permissions but not extended attributes or Windows ACLs.** Only saving over the original or an existing file is affected, and that needs confirmation. Revisit if anyone relies on them.

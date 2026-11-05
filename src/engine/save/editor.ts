@@ -20,7 +20,7 @@ import {
 } from '@cantoo/pdf-lib';
 import { displayToUser, userAngle, type PageBox } from '../coordinates';
 import type { Color, TextBox } from '../edits/model';
-import { UNSUPPORTED_TEXT } from '../errors';
+import { UNSUPPORTED_TEXT, nameCharacter } from '../errors';
 import { embeddingAllowed, findEmbeddedFont, type EmbeddedFont } from '../fonts/embedded';
 import {
   bundledFaceFile,
@@ -236,7 +236,7 @@ export class PdfEditor {
   ): Promise<DrawFont> {
     const outcome = await this.resolveFont(box);
     if (outcome.uncovered.length > 0) {
-      throw new Error(UNSUPPORTED_TEXT + outcome.uncovered.join(' '));
+      throw new Error(UNSUPPORTED_TEXT + outcome.uncovered.map(nameCharacter).join(' '));
     }
     const once = (key: string, make: () => Promise<PDFFont>) => {
       let font = embedded.get(key);
@@ -313,7 +313,7 @@ export class PdfEditor {
         return;
       }
       const hex = font.font.encode(line);
-      if (hex === null) return;
+      if (hex === null) throw new Error(`The file’s own font can’t draw this line: ${line}`);
       page.pushOperators(
         pushGraphicsState(),
         translate(origin.x, origin.y),

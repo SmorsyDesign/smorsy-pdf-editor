@@ -42,9 +42,9 @@ export function TextEditor({
   onCommit,
   onCancel,
 }: TextEditorProps) {
-  const [text, setText] = useState(draft.text);
-  const [rect, setRect] = useState(draft.rect);
-  const [style, setStyle] = useState(draft.style);
+  const [text, setText] = useState(draft.retry?.text ?? draft.text);
+  const [rect, setRect] = useState(draft.retry?.rect ?? draft.rect);
+  const [style, setStyle] = useState(draft.retry?.style ?? draft.style);
   const fieldRef = useRef<HTMLTextAreaElement>(null);
 
   // Several things can finish an edit at once, and it must only be recorded one time.

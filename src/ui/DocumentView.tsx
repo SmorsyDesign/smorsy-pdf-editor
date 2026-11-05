@@ -296,7 +296,7 @@ export function DocumentView({
         }
         fontsReplaced={editor.substitutedFonts}
         message={
-          announcement ||
+          (editor.changes === 0 && announcement) ||
           (signedLocked ? 'Signature unchanged' : 'Your original file stays unchanged')
         }
         percent={percent}

@@ -49,13 +49,14 @@ export function AppDialogs<LeaveAction>({
         />
       );
     case 'save-failed':
-      // Another location wouldn't help: the text itself has to change.
-      return dialog.failure === 'unsupported-text' ? (
+      // Another location wouldn't help with either of these, so it isn't offered.
+      return dialog.failure === 'unsupported-text' || dialog.failure === 'build-failed' ? (
         <AlertDialog
           icon="warn"
           title="Your copy wasn’t saved"
           message={explainSaveFailure(dialog.failure, dialog.detail)}
           detail="Your edits are still here, and your original file is unchanged."
+          {...(dialog.failure === 'build-failed' ? { technical: dialog.detail } : {})}
           cancelLabel="Keep editing"
           onCancel={onClose}
         />
