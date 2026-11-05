@@ -118,14 +118,22 @@ summary {
 .btn:hover {
   background: var(--chrome-sunken);
 }
+.btn:active {
+  background: var(--line);
+}
 .btn-primary {
   border-color: var(--accent);
   background: var(--accent);
   color: var(--accent-on);
   font-weight: 600;
 }
-.btn-primary:hover {
-  background: var(--accent);
+.btn-primary:hover:not(:disabled) {
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
+}
+.btn-primary:active:not(:disabled) {
+  border-color: var(--accent-pressed);
+  background: var(--accent-pressed);
 }
 .btn-danger {
   border-color: var(--danger);

@@ -20,6 +20,45 @@ test('shows shortcuts for the platform', async ({ page }) => {
   await expect(page.getByText(/^(⌘O|Ctrl\+O)$/)).toBeVisible();
 });
 
+for (const colorScheme of ['light', 'dark'] as const) {
+  test(`the main button responds to hover, press and focus in ${colorScheme} mode`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme });
+    await gotoApp(page);
+    const button = page.getByRole('button', { name: 'Choose a file' });
+    const colours = () =>
+      button.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return { background: style.backgroundColor, text: style.color };
+      });
+
+    await page.mouse.move(0, 0);
+    const normal = await colours();
+    await button.hover();
+    await expect.poll(async () => (await colours()).background).not.toBe(normal.background);
+    const hovered = await colours();
+
+    await page.mouse.down();
+    await expect.poll(async () => (await colours()).background).not.toBe(hovered.background);
+    const pressed = await colours();
+    await page.mouse.move(0, 0);
+    await page.mouse.up();
+
+    for (const state of [hovered, pressed]) {
+      expect(contrastRatio(state.background, state.text)).toBeGreaterThanOrEqual(4.5);
+    }
+
+    await page.evaluate(() => {
+      (document.activeElement as HTMLElement | null)?.blur();
+    });
+    await page.keyboard.press('Tab');
+    await expect(button).toBeFocused();
+    await expect(button).toHaveCSS('outline-style', 'solid');
+    await expect(button).toHaveCSS('outline-width', '2px');
+  });
+}
+
 test('cancelling the open dialog stays on the start screen', async ({ page }) => {
   await gotoApp(page);
   await page.getByRole('button', { name: 'Choose a file' }).click();
@@ -34,6 +73,19 @@ test('opens a PDF and draws it', async ({ page }) => {
   expect(await mockState(page, (mock) => mock.windowTitle)).toBe('Lease.pdf - Smorsy PDF Editor');
   expect(await mockState(page, (mock) => mock.documentOpen)).toBe(true);
 });
+
+function contrastRatio(first: string, second: string): number {
+  const luminance = (colour: string) => {
+    const channels = (colour.match(/[\d.]+/g) ?? []).slice(0, 3).map((value) => {
+      const channel = Number(value) / 255;
+      return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+    });
+    const [red = 0, green = 0, blue = 0] = channels;
+    return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+  };
+  const [lighter, darker] = [luminance(first), luminance(second)].sort((a, b) => b - a);
+  return ((lighter ?? 0) + 0.05) / ((darker ?? 0) + 0.05);
+}
 
 const everyFixture = readdirSync('test-pdfs').filter(
   (name) => name.endsWith('.pdf') && name !== '10-password-protected.pdf',

@@ -38,6 +38,8 @@
   --text: #17222b;
   --text-muted: #4d5b66;
   --accent: #0b66a0;
+  --accent-hover: #09588b;
+  --accent-pressed: #074a75;
   --accent-on: #ffffff;
   --accent-soft: #d8ebf7;
   --accent-soft-text: #084b76;
@@ -59,6 +61,8 @@
     --text: #e8edf0;
     --text-muted: #a9b5be;
     --accent: #7cc8f5;
+    --accent-hover: #a0d8f8;
+    --accent-pressed: #c0e6fb;
     --accent-on: #0a2231;
     --accent-soft: #173347;
     --accent-soft-text: #b5e0fa;

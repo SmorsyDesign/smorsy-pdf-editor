@@ -43,6 +43,8 @@
 
 ## Phase 2: Text editing
 
+- [ ] Mode bar from the approved design, showing modes as they become real (Select, Edit text)
+- [ ] Select mode: select and copy text, search
 - [ ] Immutable edit model; undo and redo
 - [ ] Add: place, move, resize, wrap
 - [ ] Add: font, size, colour, bold, italic, alignment
@@ -106,7 +108,6 @@
 - [ ] Open via dialog, drag and drop, app icon, "Open with", double-click
 - [ ] Second file opens in the running app (single instance)
 - [ ] Recent files; remember window size and position
-- [ ] Continuous scroll and search (if not already delivered)
 - [ ] Warn before closing with unsaved changes (if not already delivered)
 - [ ] Auto-updates via `latest.json`; prompt first, never restart mid-edit
 - [ ] Universal `.dmg`; NSIS `.exe` that installs WebView2 if missing
