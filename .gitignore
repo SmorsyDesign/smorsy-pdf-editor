@@ -1,0 +1,27 @@
+# Personal documents never go in this public repository
+test-pdfs/private/
+
+# Keys and secrets
+.env
+.env.*
+*.p12
+*.pfx
+*.key
+*.pem
+
+# Dependencies and build output
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/
+
+# Test and tool output
+coverage/
+playwright-report/
+test-results/
+.playwright-mcp/
+*.log
+
+# Machine files
+.DS_Store
+Thumbs.db
