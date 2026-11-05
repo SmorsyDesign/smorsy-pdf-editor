@@ -9,6 +9,8 @@ export type MenuCommand =
   | 'save'
   | 'save-copy'
   | 'close-document'
+  | 'quit'
+  | 'add-text'
   | 'undo'
   | 'redo'
   | 'find'
@@ -30,6 +32,7 @@ export const SAVE_FAILURE_KINDS = [
   'no-space',
   'read-only',
   'in-use',
+  'unsupported-text',
   'invalid-request',
   'other',
 ] as const;

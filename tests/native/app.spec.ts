@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { openDocument } from '../../src/engine/document';
 import { join } from 'node:path';
 import { $, browser, expect } from '@wdio/globals';
 
@@ -189,6 +190,10 @@ describe('the built app', () => {
     const saved = readFileSync(target);
     expect(saved.equals(readFileSync(plainText))).toBe(false);
     expect(saved.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+    const reopened = await openDocument(new Uint8Array(saved));
+    const { blocks } = await reopened.pageText(1);
+    await reopened.close();
+    expect(blocks.map((item) => item.text).join('\n')).toContain('Edited in the real app');
 
     const violations = await browser.execute(
       () => (window as unknown as { cspViolations: string[] }).cspViolations,

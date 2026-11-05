@@ -11,8 +11,8 @@ const CSS_FAMILY: Readonly<Record<Exclude<FontId, 'original' | 'times-new-roman'
 };
 
 /**
- * Previews always use a bundled font. The file's own fonts live in a worker, and Liberation Serif
- * matches Times New Roman's widths, so what's previewed lays out the same as what's saved.
+ * Previews use a bundled font, because the file's own fonts live in a worker. Lines break where
+ * the preview shows, so with an embedded font a saved line can end slightly sooner or later.
  */
 export function previewFamily(style: TextStyle, original: OriginalFont | null): string {
   if (style.font === 'times-new-roman') return CSS_FAMILY.serif;

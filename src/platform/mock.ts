@@ -14,6 +14,8 @@ interface MockControls {
   nextOpen: OpenedFile | 'read-failure' | null;
   nextSavePath: string | null;
   nextWriteFailure: SaveFailureKind | null;
+  /** Runs before a write finishes, so tests can act while a save is under way. */
+  beforeWrite: (() => Promise<void>) | null;
   lastWrite: { path: string; bytes: Uint8Array } | null;
   windowTitle: string;
   documentOpen: boolean;
@@ -33,6 +35,8 @@ const SHORTCUTS: Readonly<Record<string, MenuCommand>> = {
   s: 'save',
   S: 'save-copy',
   w: 'close-document',
+  q: 'quit',
+  T: 'add-text',
   z: 'undo',
   Z: 'redo',
   f: 'find',
@@ -48,6 +52,7 @@ export function createMockPlatform(): Platform {
     nextOpen: null,
     nextSavePath: null,
     nextWriteFailure: null,
+    beforeWrite: null,
     lastWrite: null,
     windowTitle: '',
     documentOpen: false,
@@ -85,12 +90,12 @@ export function createMockPlatform(): Platform {
     isSameFile(first, second) {
       return Promise.resolve(first === second);
     },
-    writeFile(path, bytes) {
+    async writeFile(path, bytes) {
+      await controls.beforeWrite?.();
       const failure = controls.nextWriteFailure;
       controls.nextWriteFailure = null;
-      if (failure) return Promise.reject(new SaveFailure(failure));
+      if (failure) throw new SaveFailure(failure);
       controls.lastWrite = { path, bytes };
-      return Promise.resolve();
     },
     setWindowTitle(title) {
       controls.windowTitle = title;

@@ -21,7 +21,8 @@ export interface TextDraft {
   readonly original: OriginalFont | null;
   /** True when a patch would show, because the background isn't one colour. */
   readonly backgroundNotFlat: boolean;
-  readonly substituted: boolean;
+  /** True when the text being replaced had several styles, and the edit will have one. */
+  readonly mixedStyles: boolean;
 }
 
 const DEFAULT_SIZE = 12;
@@ -61,7 +62,7 @@ export function draftForNewText(
     covers: [],
     original: null,
     backgroundNotFlat: false,
-    substituted: false,
+    mixedStyles: false,
   };
 }
 
@@ -111,10 +112,10 @@ export function draftForBlock(
     })),
     original: block.font,
     backgroundNotFlat: !flat,
-    substituted: false,
+    mixedStyles: block.mixedStyles,
   };
 }
 
 export function draftForBox(box: TextBox): TextDraft {
-  return { ...box, kind: 'update', backgroundNotFlat: false, substituted: false };
+  return { ...box, kind: 'update', backgroundNotFlat: false, mixedStyles: false };
 }

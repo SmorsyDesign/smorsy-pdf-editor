@@ -34,6 +34,7 @@ export function PdfCanvas({
       // Off-screen pages give their memory back; a long document would otherwise run out.
       canvas.width = 0;
       canvas.height = 0;
+      delete canvas.dataset.drawn;
       document.release(pageNumber);
       return;
     }
@@ -41,6 +42,8 @@ export function PdfCanvas({
     let task: RenderTask | null = null;
     const delay = canvas.width === 0 ? 0 : RENDER_DELAY_MS;
     const timer = window.setTimeout(() => {
+      // Colours are sampled from this canvas, which has nothing to offer until the draw finishes.
+      delete canvas.dataset.drawn;
       task = document.render({
         pageNumber,
         canvas,
@@ -49,6 +52,7 @@ export function PdfCanvas({
       });
       task.finished
         .then(() => {
+          canvas.dataset.drawn = 'true';
           setFailed(false);
         })
         .catch((error: unknown) => {

@@ -1,0 +1,185 @@
+/* Top bar and floating bars, from design/direction-a-blue-pencil/screens.css. */
+
+.bar-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+}
+.bar-end {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+.modes {
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: var(--radius-md);
+  background: var(--chrome-sunken);
+}
+.mode {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 32px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.mode:hover {
+  background: var(--chrome);
+  color: var(--text);
+}
+.mode:disabled {
+  background: transparent;
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.mode[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--accent-on);
+  font-weight: 600;
+}
+
+/* The stage holds the scrolling pages, with notices floating above them. */
+.stage {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+.signed-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 48px;
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--line);
+  background: var(--chrome);
+  box-shadow: inset 1px 0 0 var(--line);
+  color: var(--text-muted);
+}
+.signed-strip span {
+  flex: 1;
+  min-width: 0;
+}
+.signed-strip .icon {
+  color: var(--accent);
+}
+
+/* Floating bars */
+.float-bar,
+.format {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 40px;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-md);
+  background: var(--chrome-raised);
+  color: var(--text);
+  box-shadow:
+    0 0 0 1px var(--line),
+    0 4px 12px var(--bar-shadow);
+  font: 400 var(--text-md) / var(--line-md) var(--font-ui);
+  white-space: nowrap;
+  z-index: 3;
+}
+.float-bar .count {
+  min-width: 72px;
+  padding: 0 var(--space-2);
+  color: var(--text-muted);
+}
+.search-bar {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-6);
+}
+.search-input {
+  width: 160px;
+  height: 32px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--chrome);
+  color: var(--text);
+  font: inherit;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.format {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+}
+.format-below {
+  top: calc(100% + 8px);
+  bottom: auto;
+}
+.format .sep {
+  flex: none;
+  width: 1px;
+  height: 20px;
+  margin: 0 var(--space-1);
+  background: var(--line);
+}
+.fsel {
+  max-width: 160px;
+  height: 32px;
+  padding: 0 var(--space-1);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+}
+.fsel:hover {
+  background: var(--chrome-sunken);
+}
+.fsize {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-muted);
+}
+.fsize input {
+  width: 48px;
+  height: 32px;
+  padding: 0 var(--space-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+}
+.swatch-label {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+}
+.swatch-label input {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+}
+.icon-btn b {
+  font-weight: 700;
+}
+.icon-btn em {
+  font-family: Georgia, serif;
+  font-style: italic;
+  font-weight: 500;
+}
+button.icon-btn:disabled {
+  opacity: 0.45;
+}

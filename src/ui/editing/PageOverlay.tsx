@@ -16,6 +16,7 @@ interface PageOverlayProps {
   readonly mode: EditorMode;
   readonly boxes: readonly TextBox[];
   readonly editingId: string | null;
+  readonly flaggedId: string | null;
   readonly matches: readonly SearchMatch[];
   readonly currentMatch: SearchMatch | null;
   readonly pageText: (pageNumber: number) => Promise<PageText>;
@@ -35,6 +36,7 @@ export function PageOverlay({
   mode,
   boxes,
   editingId,
+  flaggedId,
   matches,
   currentMatch,
   pageText,
@@ -88,6 +90,7 @@ export function PageOverlay({
         boxes={boxes}
         scale={scale}
         hiddenId={editingId}
+        flaggedId={flaggedId}
         onOpen={mode === 'edit' ? onOpenBox : null}
       />
       {matches.map((match, index) => (

@@ -9,6 +9,8 @@ interface TopBarProps {
   readonly fileName: string;
   readonly fileState: string;
   readonly mode: EditorMode;
+  /** Why editing is unavailable, when it is. */
+  readonly editBlocked: string | null;
   readonly canUndo: boolean;
   readonly canRedo: boolean;
   readonly saveLabel: string;
@@ -29,6 +31,7 @@ export function TopBar({
   fileName,
   fileState,
   mode,
+  editBlocked,
   canUndo,
   canRedo,
   saveLabel,
@@ -56,6 +59,8 @@ export function TopBar({
             type="button"
             className="mode"
             aria-pressed={mode === id}
+            disabled={id === 'edit' && editBlocked !== null}
+            {...(id === 'edit' && editBlocked !== null ? { title: editBlocked } : {})}
             onClick={() => {
               onModeChange(id);
             }}

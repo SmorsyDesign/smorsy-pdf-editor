@@ -6,13 +6,14 @@ interface AlertDialogProps {
   readonly message: string;
   readonly detail?: string;
   readonly technical?: string;
-  readonly confirmLabel: string;
+  /** Left out when there's nothing to do but acknowledge. */
+  readonly confirmLabel?: string;
   readonly cancelLabel: string;
   readonly destructive?: boolean;
   readonly icon?: IconName;
   readonly alternativeLabel?: string;
   readonly onAlternative?: () => void;
-  readonly onConfirm: () => void;
+  readonly onConfirm?: () => void;
   readonly onCancel: () => void;
 }
 
@@ -80,9 +81,14 @@ export function AlertDialog({
             {alternativeLabel}
           </button>
         )}
-        <button className={destructive ? 'btn btn-danger' : 'btn btn-primary'} onClick={onConfirm}>
-          {confirmLabel}
-        </button>
+        {confirmLabel && (
+          <button
+            className={destructive ? 'btn btn-danger' : 'btn btn-primary'}
+            onClick={onConfirm}
+          >
+            {confirmLabel}
+          </button>
+        )}
       </div>
     </dialog>
   );

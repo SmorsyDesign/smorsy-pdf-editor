@@ -162,49 +162,61 @@ function readWidths(font: PDFDict, context: PDFContext): (code: number) => numbe
   };
 }
 
+function embeddedFontFrom(
+  resourceName: string,
+  codes: ReadonlyMap<string, CharacterCode>,
+  widthOfCode: (code: number) => number,
+): EmbeddedFont {
+  const missing = (text: string) => [
+    ...new Set(Array.from(text).filter((character) => !codes.has(character))),
+  ];
+  return {
+    resourceName,
+    missing,
+    encode(text) {
+      if (missing(text).length > 0) return null;
+      let hex = '';
+      for (const character of text) {
+        const entry = codes.get(character);
+        if (entry) hex += entry.code.toString(16).padStart(entry.bytes * 2, '0');
+      }
+      return hex;
+    },
+    widthOf(text, size) {
+      let total = 0;
+      for (const character of text) {
+        const entry = codes.get(character);
+        if (entry) total += widthOfCode(entry.code);
+      }
+      return (total / 1000) * size;
+    },
+  };
+}
+
 /**
- * Finds a font already in the page, for reuse. Fonts with no ToUnicode map return null: without
- * one there's no reliable way to know which code draws which letter.
+ * Finds a font already in the page, for reuse. A page can hold several subsets of one font, so
+ * the one covering the text wins. Fonts with no ToUnicode map are skipped: without one there's no
+ * reliable way to know which code draws which letter.
  */
 export function findEmbeddedFont(
   page: PDFPage,
   context: PDFContext,
   name: string,
+  text = '',
 ): EmbeddedFont | null {
   const fonts = page.node.normalizedEntries().Font;
   const wanted = cleanFontName(name);
+  let first: EmbeddedFont | null = null;
   for (const [key, value] of fonts.entries()) {
     const font = resolveDict(context, value);
     const baseFont = font?.get(PDFName.of('BaseFont'));
     if (!font || !(baseFont instanceof PDFName)) continue;
     if (cleanFontName(baseFont.decodeText()) !== wanted) continue;
     const codes = readToUnicode(font, context);
-    if (!codes) return null;
-    const widthOfCode = readWidths(font, context);
-    const missing = (text: string) => [
-      ...new Set(Array.from(text).filter((character) => !codes.has(character))),
-    ];
-    return {
-      resourceName: key.decodeText(),
-      missing,
-      encode(text) {
-        if (missing(text).length > 0) return null;
-        let hex = '';
-        for (const character of text) {
-          const entry = codes.get(character);
-          if (entry) hex += entry.code.toString(16).padStart(entry.bytes * 2, '0');
-        }
-        return hex;
-      },
-      widthOf(text, size) {
-        let total = 0;
-        for (const character of text) {
-          const entry = codes.get(character);
-          if (entry) total += widthOfCode(entry.code);
-        }
-        return (total / 1000) * size;
-      },
-    };
+    if (!codes) continue;
+    const candidate = embeddedFontFrom(key.decodeText(), codes, readWidths(font, context));
+    if (candidate.missing(text).length === 0) return candidate;
+    first ??= candidate;
   }
-  return null;
+  return first;
 }

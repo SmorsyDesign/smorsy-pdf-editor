@@ -25,6 +25,15 @@ describe('wrapText', () => {
     expect(wrapText('abc', 1, measure)).toEqual(['a', 'b', 'c']);
   });
 
+  it('keeps runs of spaces, which people use to line things up', () => {
+    expect(wrapText('a   b', 100, measure)).toEqual(['a   b']);
+    expect(wrapText('   indented', 200, measure)).toEqual(['   indented']);
+  });
+
+  it('drops spaces that land on a line break', () => {
+    expect(wrapText('aaaa   bbbb', 40, measure)).toEqual(['aaaa', 'bbbb']);
+  });
+
   it('gives no lines for empty text', () => {
     expect(wrapText('', 100, measure)).toEqual([]);
   });

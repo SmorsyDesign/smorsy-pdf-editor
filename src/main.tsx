@@ -6,7 +6,10 @@ import { ErrorBoundary, STARTUP_FAILURE } from './ui/ErrorBoundary';
 import './ui/styles/fonts.css';
 import './ui/styles/tokens.css';
 import './ui/styles/app.css';
-import './ui/styles/editing.css';
+import './ui/styles/document-fonts.css';
+import './ui/styles/editor-bars.css';
+import './ui/styles/page-overlay.css';
+import './ui/styles/notices.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('The page is missing its root element.');

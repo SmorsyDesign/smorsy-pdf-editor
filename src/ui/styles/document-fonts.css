@@ -1,0 +1,112 @@
+/* The bundled fonts text is previewed in. */
+
+@font-face {
+  font-family: 'Doc Sans';
+  font-weight: 400;
+  src: url('/fonts/liberation/LiberationSans-Regular.ttf');
+}
+@font-face {
+  font-family: 'Doc Sans';
+  font-weight: 700;
+  src: url('/fonts/liberation/LiberationSans-Bold.ttf');
+}
+@font-face {
+  font-family: 'Doc Sans';
+  font-weight: 400;
+  font-style: italic;
+  src: url('/fonts/liberation/LiberationSans-Italic.ttf');
+}
+@font-face {
+  font-family: 'Doc Sans';
+  font-weight: 700;
+  font-style: italic;
+  src: url('/fonts/liberation/LiberationSans-BoldItalic.ttf');
+}
+@font-face {
+  font-family: 'Doc Serif';
+  font-weight: 400;
+  src: url('/fonts/liberation/LiberationSerif-Regular.ttf');
+}
+@font-face {
+  font-family: 'Doc Serif';
+  font-weight: 700;
+  src: url('/fonts/liberation/LiberationSerif-Bold.ttf');
+}
+@font-face {
+  font-family: 'Doc Serif';
+  font-weight: 400;
+  font-style: italic;
+  src: url('/fonts/liberation/LiberationSerif-Italic.ttf');
+}
+@font-face {
+  font-family: 'Doc Serif';
+  font-weight: 700;
+  font-style: italic;
+  src: url('/fonts/liberation/LiberationSerif-BoldItalic.ttf');
+}
+@font-face {
+  font-family: 'Doc Mono';
+  font-weight: 400;
+  src: url('/fonts/liberation/LiberationMono-Regular.ttf');
+}
+@font-face {
+  font-family: 'Doc Mono';
+  font-weight: 700;
+  src: url('/fonts/liberation/LiberationMono-Bold.ttf');
+}
+@font-face {
+  font-family: 'Doc Mono';
+  font-weight: 400;
+  font-style: italic;
+  src: url('/fonts/liberation/LiberationMono-Italic.ttf');
+}
+@font-face {
+  font-family: 'Doc Mono';
+  font-weight: 700;
+  font-style: italic;
+  src: url('/fonts/liberation/LiberationMono-BoldItalic.ttf');
+}
+@font-face {
+  font-family: 'Doc Carlito';
+  font-weight: 400;
+  src: url('/fonts/carlito/Carlito-Regular.ttf');
+}
+@font-face {
+  font-family: 'Doc Carlito';
+  font-weight: 700;
+  src: url('/fonts/carlito/Carlito-Bold.ttf');
+}
+@font-face {
+  font-family: 'Doc Carlito';
+  font-weight: 400;
+  font-style: italic;
+  src: url('/fonts/carlito/Carlito-Italic.ttf');
+}
+@font-face {
+  font-family: 'Doc Carlito';
+  font-weight: 700;
+  font-style: italic;
+  src: url('/fonts/carlito/Carlito-BoldItalic.ttf');
+}
+@font-face {
+  font-family: 'Doc Caladea';
+  font-weight: 400;
+  src: url('/fonts/caladea/Caladea-Regular.ttf');
+}
+@font-face {
+  font-family: 'Doc Caladea';
+  font-weight: 700;
+  src: url('/fonts/caladea/Caladea-Bold.ttf');
+}
+@font-face {
+  font-family: 'Doc Caladea';
+  font-weight: 400;
+  font-style: italic;
+  src: url('/fonts/caladea/Caladea-Italic.ttf');
+}
+@font-face {
+  font-family: 'Doc Caladea';
+  font-weight: 700;
+  font-style: italic;
+  src: url('/fonts/caladea/Caladea-BoldItalic.ttf');
+}

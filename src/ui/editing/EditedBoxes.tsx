@@ -5,6 +5,8 @@ interface EditedBoxesProps {
   readonly boxes: readonly TextBox[];
   readonly scale: number;
   readonly hiddenId: string | null;
+  /** The box a notice is about, marked as the design shows. */
+  readonly flaggedId: string | null;
   readonly onOpen: ((box: TextBox) => void) | null;
 }
 
@@ -12,7 +14,7 @@ const cssColor = ({ r, g, b }: { r: number; g: number; b: number }) =>
   `rgb(${Math.round(r * 255)} ${Math.round(g * 255)} ${Math.round(b * 255)})`;
 
 /** Draws edits over the untouched page: the patches first, then the new text. */
-export function EditedBoxes({ boxes, scale, hiddenId, onOpen }: EditedBoxesProps) {
+export function EditedBoxes({ boxes, scale, hiddenId, flaggedId, onOpen }: EditedBoxesProps) {
   return (
     <>
       {boxes.flatMap((box) =>
@@ -35,6 +37,7 @@ export function EditedBoxes({ boxes, scale, hiddenId, onOpen }: EditedBoxesProps
         .filter((box) => box.id !== hiddenId && box.lines.length > 0)
         .map((box) => {
           const lineHeight = box.lineHeight * scale;
+          const flag = box.id === flaggedId ? ' edit-box-flagged' : '';
           const font = previewFont(box.style, box.original, box.style.size * scale);
           const shift = box.firstBaseline * scale - baselineWithinLine(font, lineHeight);
           const content = box.lines.map((line, index) => (
@@ -64,7 +67,7 @@ export function EditedBoxes({ boxes, scale, hiddenId, onOpen }: EditedBoxesProps
             <button
               key={box.id}
               type="button"
-              className="edit-box edit-box-open"
+              className={`edit-box edit-box-open${flag}`}
               style={style}
               aria-label={`Edit text: ${box.text.slice(0, 60)}`}
               onClick={(event) => {
@@ -75,7 +78,7 @@ export function EditedBoxes({ boxes, scale, hiddenId, onOpen }: EditedBoxesProps
               {content}
             </button>
           ) : (
-            <div key={box.id} className="edit-box was-changed" style={style}>
+            <div key={box.id} className={`edit-box${flag}`} style={style}>
               {content}
             </div>
           );

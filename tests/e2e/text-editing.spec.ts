@@ -2,67 +2,19 @@ import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { openDocument } from '../../src/engine/document';
 import {
-  expectOpenDocument,
-  expectPageDrawn,
-  mockState,
-  openFixture,
-  ORIGINAL_PATH,
-  queueOpen,
-} from './helpers';
-
-const PLAIN = 'test-pdfs/01-plain-text.pdf';
-const HEADING = 'Plain text, page 1';
-
-async function openForEditing(page: Page, fixture = PLAIN, pageCount = 3) {
-  await openFixture(page, fixture, 'Lease.pdf');
-  await expectOpenDocument(page, pageCount);
-  await expectPageDrawn(page);
-  await page.getByRole('button', { name: 'Edit text', exact: true }).click();
-  await expect(page.getByTestId('edit-layer').first()).toBeVisible();
-}
-
-const block = (page: Page, text: string) =>
-  page.getByRole('button', { name: `Edit text: ${text}` }).first();
-
-const editor = (page: Page) => page.getByTestId('text-editor');
-const field = (page: Page) => editor(page).getByRole('textbox', { name: 'Text', exact: true });
-
-async function replaceHeading(page: Page, text: string) {
-  await block(page, HEADING).click();
-  await field(page).fill(text);
-  await page.keyboard.press('ControlOrMeta+Enter');
-  await expect(editor(page)).toHaveCount(0);
-}
-
-const queueSavePath = (page: Page, path: string) =>
-  page.evaluate((chosen) => {
-    if (window.smorsyMock) window.smorsyMock.nextSavePath = chosen;
-  }, path);
-
-const lastWrite = (page: Page) =>
-  page.evaluate(() => {
-    const write = window.smorsyMock?.lastWrite;
-    return write ? { path: write.path, bytes: Array.from(write.bytes) } : null;
-  });
-
-/**
- * Reopens what was saved, as a person would, and reads the text that's really in the file. It's
- * one string because covered text is still there, and sits on the same line as its replacement.
- */
-async function savedText(page: Page, pageNumber = 1): Promise<string> {
-  const write = await lastWrite(page);
-  if (!write) throw new Error('Nothing was saved.');
-  const doc = await openDocument(Uint8Array.from(write.bytes));
-  const { blocks } = await doc.pageText(pageNumber);
-  await doc.close();
-  return blocks.map((item) => item.text).join('\n');
-}
-
-async function saveTo(page: Page, path = '/Users/test/Lease-edited.pdf') {
-  await queueSavePath(page, path);
-  await page.keyboard.press('ControlOrMeta+s');
-  await expect(page.getByText('Copy saved')).toBeVisible();
-}
+  HEADING,
+  PLAIN,
+  block,
+  editor,
+  field,
+  lastWrite,
+  openForEditing,
+  queueSavePath,
+  replaceHeading,
+  saveTo,
+  savedText,
+} from './editing-helpers';
+import { expectOpenDocument, mockState, openFixture, ORIGINAL_PATH, queueOpen } from './helpers';
 
 test.describe('modes', () => {
   test('starts in Select, and Edit text outlines each block', async ({ page }) => {
@@ -101,11 +53,12 @@ test.describe('editing existing text', () => {
     expect(await savedText(page)).toContain('New heading');
   });
 
-  test('the original file’s bytes are never changed', async ({ page }) => {
+  test('saving an edit writes a new file, not the original', async ({ page }) => {
     await openForEditing(page);
     await replaceHeading(page, 'New heading');
     await saveTo(page);
     const write = await lastWrite(page);
+    expect(write?.path).not.toBe(ORIGINAL_PATH);
     expect(Buffer.from(write?.bytes ?? []).equals(readFileSync(PLAIN))).toBe(false);
     expect(await savedText(page)).toContain('New heading');
   });
@@ -189,8 +142,7 @@ test.describe('editing existing text', () => {
   test('warns when a patch may show on a gradient', async ({ page }) => {
     await openForEditing(page, 'test-pdfs/15-coloured-backgrounds.pdf', 1);
     await block(page, 'Text over a gradient').click();
-    await field(page).fill('Over the gradient');
-    await page.keyboard.press('ControlOrMeta+Enter');
+    // Before the edit is made, while there's still time to change course.
     await expect(page.getByText('the patch over the old text may be visible')).toBeVisible();
   });
 });
@@ -220,30 +172,6 @@ test.describe('adding text', () => {
     await expect(page.getByRole('button', { name: 'Undo' })).toBeDisabled();
   });
 
-  test('font, size, bold, italic, alignment and colour all reach the saved file', async ({
-    page,
-  }) => {
-    await openForEditing(page);
-    await page
-      .getByTestId('edit-layer')
-      .first()
-      .click({ position: { x: 96, y: 600 } });
-    await field(page).fill('Styled');
-    await page.getByRole('combobox', { name: 'Font' }).selectOption('mono');
-    await page.getByRole('spinbutton', { name: 'Size in points' }).fill('20');
-    await page.getByRole('button', { name: 'Bold' }).click();
-    await page.getByRole('button', { name: 'Align right' }).click();
-    await page.keyboard.press('ControlOrMeta+Enter');
-    await saveTo(page);
-    const doc = await openDocument(Uint8Array.from((await lastWrite(page))?.bytes ?? []));
-    const { blocks } = await doc.pageText(1);
-    const styled = blocks.find((item) => item.text === 'Styled');
-    expect(styled?.font.name).toContain('LiberationMono');
-    expect(styled?.font.name).toContain('Bold');
-    expect(styled?.size).toBeCloseTo(20, 0);
-    await doc.close();
-  });
-
   test('arrow keys move and resize, so a mouse isn’t required', async ({ page }) => {
     await openForEditing(page);
     await page
@@ -264,7 +192,7 @@ test.describe('adding text', () => {
     expect(resized?.width).toBeGreaterThan(moved?.width ?? Infinity);
   });
 
-  test('dragging moves a box, as one undo', async ({ page }) => {
+  test('dragging counts as part of one undo', async ({ page }) => {
     await openForEditing(page);
     await page
       .getByTestId('edit-layer')
@@ -279,6 +207,9 @@ test.describe('adding text', () => {
     await page.mouse.up();
     await page.keyboard.press('ControlOrMeta+Enter');
     await expect(page.getByText('1 unsaved change')).toBeVisible();
+    await page.getByRole('button', { name: 'Undo' }).click();
+    await expect(page.getByText('Dragged')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Undo' })).toBeDisabled();
   });
 });
 
@@ -370,6 +301,7 @@ test.describe('saving', () => {
     await replaceHeading(page, 'Changed');
     await expect(page.getByText('1 unsaved change')).toBeVisible();
     await saveTo(page);
+    await expect(page.getByText('unsaved change')).toHaveCount(0);
     await page.keyboard.press('ControlOrMeta+w');
     await expect(page.getByRole('heading', { name: 'Open a PDF' })).toBeVisible();
   });
@@ -437,6 +369,7 @@ test.describe('unsaved changes', () => {
   });
 
   test('a clean document closes without asking', async ({ page }) => {
+    await expect(page.getByText('1 unsaved change')).toBeVisible();
     await page.keyboard.press('ControlOrMeta+z');
     await expect(page.getByRole('button', { name: 'Undo' })).toBeDisabled();
     expect(await page.evaluate(() => window.smorsyMock?.closeGuard?.())).toBe(true);

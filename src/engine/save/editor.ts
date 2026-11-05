@@ -20,6 +20,7 @@ import {
 } from '@cantoo/pdf-lib';
 import { displayToUser, userAngle, type PageBox } from '../coordinates';
 import type { Color, TextBox } from '../edits/model';
+import { UNSUPPORTED_TEXT } from '../errors';
 import { embeddingAllowed, findEmbeddedFont, type EmbeddedFont } from '../fonts/embedded';
 import {
   bundledFaceFile,
@@ -50,9 +51,6 @@ export interface FontBytes {
   bundled(file: string): Promise<Uint8Array>;
   system(style: SystemFontStyle): Promise<Uint8Array | null>;
 }
-
-/** Starts the error sent back when text can't be saved, followed by the characters. */
-export const UNSUPPORTED_TEXT = 'unsupported-text:';
 
 type DrawFont =
   | { readonly kind: 'pdf-font'; readonly font: PDFFont }
@@ -197,10 +195,11 @@ export class PdfEditor {
           return { used: 'standard', match: 'exact', missing, uncovered: [] };
         }
       } else if (!box.original.type3) {
-        missing = await this.missingFromEmbedded(box, text);
-        if (missing.length === 0) {
-          return { used: 'embedded', match: 'exact', missing, uncovered: [] };
+        const absent = await this.missingFromEmbedded(box, text);
+        if (absent?.length === 0) {
+          return { used: 'embedded', match: 'exact', missing: [], uncovered: [] };
         }
+        missing = absent ?? [];
       }
     }
 
@@ -216,16 +215,19 @@ export class PdfEditor {
    * Only characters visibly drawn with this font on the page count as available. A file could
    * label an unused glyph wrongly, and typing that character would paint something else.
    */
-  private async missingFromEmbedded(box: TextBox, text: string): Promise<readonly string[]> {
+  private async missingFromEmbedded(box: TextBox, text: string): Promise<readonly string[] | null> {
     const doc = await this.inspect();
     const font = findEmbeddedFont(
       doc.getPage(box.pageNumber - 1),
       doc.context,
       box.original?.name ?? '',
+      text,
     );
+    if (!font) return null;
     const known = new Set(Array.from(box.original?.knownCharacters ?? ''));
-    const unknown = uniqueCharacters(text).filter((character) => !known.has(character));
-    if (!font) return unknown.length > 0 ? unknown : uniqueCharacters(text);
+    const unknown = uniqueCharacters(text).filter(
+      (character) => character !== ' ' && !known.has(character),
+    );
     return [...new Set([...font.missing(text), ...unknown])];
   }
 
@@ -249,7 +251,12 @@ export class PdfEditor {
     };
 
     if (outcome.used === 'embedded') {
-      const font = findEmbeddedFont(page, doc.context, box.original?.name ?? '');
+      const font = findEmbeddedFont(
+        page,
+        doc.context,
+        box.original?.name ?? '',
+        box.lines.join(''),
+      );
       if (font) return { kind: 'embedded', font };
     }
     if (outcome.used === 'standard') {

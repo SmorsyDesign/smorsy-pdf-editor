@@ -1,8 +1,8 @@
-import type { TextBox } from '../../engine/edits/model';
 import { cleanFontName } from '../../engine/fonts/match';
-import type { FontOutcome } from '../../engine/save/editor';
+import { AlertDialog } from '../AlertDialog';
 import { Icon } from '../Icon';
 import { previewFamily } from './preview';
+import type { FontNoticeState } from './useDocumentEditor';
 
 const FAMILY_NAMES = {
   sans: 'Liberation Sans',
@@ -12,11 +12,25 @@ const FAMILY_NAMES = {
   caladea: 'Caladea',
 } as const;
 
-interface FontNoticeProps {
-  readonly box: TextBox;
-  readonly outcome: FontOutcome;
-  readonly showCovered: boolean;
-  readonly backgroundNotFlat: boolean;
+const familyNameOf = ({ outcome }: FontNoticeState) =>
+  outcome.family ? FAMILY_NAMES[outcome.family] : 'the closest match';
+
+/** A card sits by the text it's about. Anything else is a note that stays out of the way. */
+export function needsFontCard({ box, outcome }: FontNoticeState): boolean {
+  if (box.lines.length === 0) return false;
+  if (outcome.uncovered.length > 0) return true;
+  return box.original !== null && (outcome.match === 'closest' || outcome.missing.length > 0);
+}
+
+/** The font a same-widths note would be about, or null if there's no note to give. */
+export function sameWidthsFont(notice: FontNoticeState): string | null {
+  if (needsFontCard(notice) || notice.box.lines.length === 0) return null;
+  if (notice.outcome.match !== 'same-widths' || !notice.box.original) return null;
+  return cleanFontName(notice.box.original.name);
+}
+
+interface FontCardProps {
+  readonly notice: FontNoticeState;
   readonly scale: number;
   readonly pageHeight: number;
   readonly onKeep: () => void;
@@ -24,80 +38,100 @@ interface FontNoticeProps {
   readonly onUndo: () => void;
 }
 
-/** Says plainly when an edit couldn't be fully faithful. Shows nothing when it was. */
-export function FontNotice({
-  box,
-  outcome,
-  showCovered,
-  backgroundNotFlat,
+/** Says plainly when an edit couldn't be fully faithful. */
+export function FontCard({
+  notice,
   scale,
   pageHeight,
   onKeep,
   onChooseFont,
   onUndo,
-}: FontNoticeProps) {
-  const substituted =
-    box.original !== null && (outcome.match === 'closest' || outcome.missing.length > 0);
-  if (!substituted && !showCovered && !backgroundNotFlat) return null;
-
-  const originalName = cleanFontName(box.original?.name ?? '') || 'The original font';
-  const familyName = outcome.family ? FAMILY_NAMES[outcome.family] : 'the closest match';
+}: FontCardProps) {
+  const { box, outcome } = notice;
   const bottom = (box.rect.y + box.rect.height) * scale;
   const fitsBelow = bottom + 300 < pageHeight * scale;
   const left = Math.max(8, box.rect.x * scale);
+  const placement = fitsBelow
+    ? { left, top: bottom + 8 }
+    : { left, bottom: pageHeight * scale - box.rect.y * scale + 56 };
 
-  return (
-    <section
-      className={substituted ? 'notice notice-caution font-card' : 'notice notice-toast'}
-      role="status"
-      // A substitution sits by the text it's about. A general note stays out of the way of the page.
-      style={
-        substituted
-          ? fitsBelow
-            ? { left, top: bottom + 8 }
-            : { left, bottom: pageHeight * scale - box.rect.y * scale + 56 }
-          : undefined
-      }
-    >
-      {substituted && (
-        <>
-          <h3>
-            <Icon name="warn" />
-            {originalName} can’t show this text
-          </h3>
-          <p>
-            {outcome.missing.length > 0
-              ? `This file only stores the characters it used, and it’s missing ${outcome.missing.slice(0, 6).join(' ')}. `
-              : 'That font isn’t available to the app. '}
-            Your edit uses {familyName} instead, so it looks slightly different.
-          </p>
-          <div className="compare">
-            <div className="compare-row">
-              <span>Your edit</span>
-              <div style={{ fontFamily: `"${previewFamily(box.style, box.original)}"` }}>
-                {box.lines[0]?.slice(0, 48)}
-              </div>
-            </div>
-          </div>
-          <div className="notice-actions">
-            <button type="button" className="btn btn-primary" onClick={onKeep}>
-              Keep {familyName}
-            </button>
-            <button type="button" className="btn" onClick={onChooseFont}>
-              Choose another font
-            </button>
-            <button type="button" className="btn" onClick={onUndo}>
-              Undo edit
-            </button>
-          </div>
-        </>
-      )}
-      {backgroundNotFlat && (
-        <div className="covered">
+  if (outcome.uncovered.length > 0) {
+    return (
+      <section className="notice notice-caution font-card" role="status" style={placement}>
+        <h3>
           <Icon name="warn" />
+          These characters can’t be saved
+        </h3>
+        <p>
+          No font available to the app has {outcome.uncovered.slice(0, 6).join(' ')}. Change or
+          remove them before you save.
+        </p>
+        <div className="notice-actions">
+          <button type="button" className="btn btn-primary" onClick={onChooseFont}>
+            Edit text
+          </button>
+          <button type="button" className="btn" onClick={onUndo}>
+            Undo edit
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  const originalName = cleanFontName(box.original?.name ?? '') || 'The original font';
+  const familyName = familyNameOf(notice);
+  return (
+    <section className="notice notice-caution font-card" role="status" style={placement}>
+      <h3>
+        <Icon name="warn" />
+        {originalName} can’t show this text
+      </h3>
+      <p>
+        {outcome.missing.length > 0
+          ? `This file only stores the characters it used, and it’s missing ${outcome.missing.slice(0, 6).join(' ')}. `
+          : 'That font isn’t available to the app. '}
+        Your edit uses {familyName} instead, so it looks slightly different.
+      </p>
+      <div className="compare">
+        <div className="compare-row">
+          <span>Your edit</span>
+          <div style={{ fontFamily: `"${previewFamily(box.style, box.original)}"` }}>
+            {box.lines[0]?.slice(0, 48)}
+          </div>
+        </div>
+      </div>
+      <div className="notice-actions">
+        <button type="button" className="btn btn-primary" onClick={onKeep}>
+          Keep {familyName}
+        </button>
+        <button type="button" className="btn" onClick={onChooseFont}>
+          Choose another font
+        </button>
+        <button type="button" className="btn" onClick={onUndo}>
+          Undo edit
+        </button>
+      </div>
+    </section>
+  );
+}
+
+interface EditNoteProps {
+  readonly notice: FontNoticeState;
+  readonly showCovered: boolean;
+  readonly showSameWidths: boolean;
+  readonly onDismiss: () => void;
+}
+
+export function EditNote({ notice, showCovered, showSameWidths, onDismiss }: EditNoteProps) {
+  if (!showCovered && !showSameWidths) return null;
+  return (
+    <section className="notice notice-toast" role="status">
+      {showSameWidths && (
+        <div className="covered">
+          <Icon name="info" />
           <span>
-            The background here isn’t a single colour, so the patch over the old text may be
-            visible.
+            {sameWidthsFont(notice)} can’t be used for this edit, so it uses {familyNameOf(notice)}.
+            It has the same letter widths, so the layout holds.
           </span>
         </div>
       )}
@@ -110,13 +144,27 @@ export function FontNotice({
           </span>
         </div>
       )}
-      {!substituted && (
-        <div className="notice-actions">
-          <button type="button" className="btn" onClick={onKeep}>
-            Got it
-          </button>
-        </div>
-      )}
+      <div className="notice-actions">
+        <button type="button" className="btn" onClick={onDismiss}>
+          Got it
+        </button>
+      </div>
+    </section>
+  );
+}
+
+export function ProblemNote({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  return (
+    <section className="notice notice-toast" role="alert">
+      <div className="covered">
+        <Icon name="warn" />
+        <span>{message}</span>
+      </div>
+      <div className="notice-actions">
+        <button type="button" className="btn" onClick={onDismiss}>
+          Got it
+        </button>
+      </div>
     </section>
   );
 }
@@ -145,12 +193,42 @@ export function SignedStrip({ onEditAnyway }: { onEditAnyway: () => void }) {
   return (
     <div className="signed-strip" role="status">
       <Icon name="lock" />
-      <span>
-        This PDF has a digital signature. You’re viewing it, so the signature stays valid.
-      </span>
+      <span>This PDF has a digital signature. You’re only viewing it, so nothing has changed.</span>
       <button type="button" className="btn" onClick={onEditAnyway}>
         Edit anyway
       </button>
+    </div>
+  );
+}
+
+export function SignedWarning({
+  onKeepViewing,
+  onEdit,
+}: {
+  onKeepViewing: () => void;
+  onEdit: () => void;
+}) {
+  return (
+    <AlertDialog
+      icon="warn"
+      title="Editing will break the signature"
+      message="This PDF has a digital signature. If you edit it, your copy’s signature will show as invalid in other PDF apps."
+      detail="Your original file and its signature stay as they are."
+      cancelLabel="Keep viewing"
+      confirmLabel="Edit anyway"
+      onCancel={onKeepViewing}
+      onConfirm={onEdit}
+    />
+  );
+}
+
+export function ProtectedStrip() {
+  return (
+    <div className="signed-strip" role="status">
+      <Icon name="lock" />
+      <span>
+        This PDF is protected against changes. You can read it and save a copy, but not edit it.
+      </span>
     </div>
   );
 }

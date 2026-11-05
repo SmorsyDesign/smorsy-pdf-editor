@@ -58,8 +58,10 @@ export function explainOpenFailure(error: unknown): OpenProblem {
   return { ...UNEXPECTED_OPEN_FAILURE, technical: String(error) };
 }
 
-export function explainSaveFailure(kind: SaveFailureKind): string {
+export function explainSaveFailure(kind: SaveFailureKind, detail = ''): string {
   switch (kind) {
+    case 'unsupported-text':
+      return `No font available to the app has these characters: ${detail}. Change or remove them, then save again.`;
     case 'no-space':
       return 'The disk is full. Free up some space, or choose another location.';
     case 'read-only':

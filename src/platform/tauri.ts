@@ -65,12 +65,19 @@ async function buildMenu(
     false,
   );
   const findItem = await item('find', 'Find…', 'CmdOrCtrl+F', false);
+  const addTextItem = await item('add-text', 'Add Text', 'CmdOrCtrl+Shift+T', false);
   const closeItem = await item('close-document', 'Close Document', 'CmdOrCtrl+W', false);
   const zoomInItem = await item('zoom-in', 'Zoom In', 'CmdOrCtrl+=', false);
   const zoomOutItem = await item('zoom-out', 'Zoom Out', 'CmdOrCtrl+-', false);
   const actualItem = await item('zoom-actual', 'Actual Size', 'CmdOrCtrl+0', false);
   const fitItem = await item('zoom-fit', 'Fit to Width', 'CmdOrCtrl+9', false);
   const separator = () => PredefinedMenuItem.new({ item: 'Separator' });
+  // The operating system's own Quit item ends the app at once, skipping the unsaved changes prompt.
+  const quitItem = await item(
+    'quit',
+    os === 'mac' ? 'Quit Smorsy PDF Editor' : 'Exit',
+    'CmdOrCtrl+Q',
+  );
 
   const file = await Submenu.new({
     text: 'File',
@@ -81,7 +88,7 @@ async function buildMenu(
       saveCopyItem,
       await separator(),
       closeItem,
-      ...(os === 'mac' ? [] : [await PredefinedMenuItem.new({ item: 'Quit', text: 'Exit' })]),
+      ...(os === 'mac' ? [] : [quitItem]),
     ],
   });
   const edit = await Submenu.new({
@@ -89,6 +96,8 @@ async function buildMenu(
     items: [
       undoItem,
       redoItem,
+      await separator(),
+      addTextItem,
       await separator(),
       await PredefinedMenuItem.new({ item: 'Cut' }),
       await PredefinedMenuItem.new({ item: 'Copy' }),
@@ -115,7 +124,7 @@ async function buildMenu(
         await PredefinedMenuItem.new({ item: 'HideOthers' }),
         await PredefinedMenuItem.new({ item: 'ShowAll' }),
         await separator(),
-        await PredefinedMenuItem.new({ item: 'Quit' }),
+        quitItem,
       ],
     });
     const window = await Submenu.new({
@@ -142,6 +151,7 @@ async function buildMenu(
     undoItem,
     redoItem,
     findItem,
+    addTextItem,
     zoomInItem,
     zoomOutItem,
     actualItem,

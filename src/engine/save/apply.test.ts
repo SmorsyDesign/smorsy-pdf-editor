@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PDFDocument, PDFName, StandardFonts, pushGraphicsState, scale } from '@cantoo/pdf-lib';
+import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { describe, expect, it } from 'vitest';
 import { openDocument } from '../document';
 import type { Cover, TextBox, TextStyle } from '../edits/model';
@@ -410,12 +411,45 @@ describe('unusual page boxes', () => {
 });
 
 describe('what else survives', () => {
-  it('keeps form fields, links and bookmarks', async () => {
-    for (const name of ['08-fillable-form.pdf', '11-annotations-links.pdf', '12-bookmarks.pdf']) {
-      const before = await PDFDocument.load(original(name));
-      const after = await PDFDocument.load(await saved(name, [box()]));
-      expect(after.getPageCount()).toBe(before.getPageCount());
-      expect(after.getForm().getFields().length).toBe(before.getForm().getFields().length);
-    }
+  const load = async (name: string) => ({
+    before: await PDFDocument.load(original(name)),
+    after: await PDFDocument.load(await saved(name, [box()])),
+  });
+
+  it('keeps form fields', async () => {
+    const { before, after } = await load('08-fillable-form.pdf');
+    expect(before.getForm().getFields().length).toBeGreaterThan(0);
+    expect(
+      after
+        .getForm()
+        .getFields()
+        .map((field) => field.getName()),
+    ).toEqual(
+      before
+        .getForm()
+        .getFields()
+        .map((field) => field.getName()),
+    );
+  });
+
+  it('keeps links and annotations', async () => {
+    const annotations = (doc: PDFDocument) => doc.getPage(0).node.Annots()?.size() ?? 0;
+    const { before, after } = await load('11-annotations-links.pdf');
+    expect(annotations(before)).toBeGreaterThan(0);
+    expect(annotations(after)).toBe(annotations(before));
+  });
+
+  it('keeps bookmarks', async () => {
+    const titles = async (bytes: Uint8Array) => {
+      const task = getDocument({ data: bytes.slice() });
+      const doc = await task.promise;
+      const outline = await doc.getOutline();
+      await task.destroy();
+      return outline.map((item) => item.title);
+    };
+    const name = '12-bookmarks.pdf';
+    const before = await titles(original(name));
+    expect(before.length).toBeGreaterThan(0);
+    expect(await titles(await saved(name, [box()]))).toEqual(before);
   });
 });

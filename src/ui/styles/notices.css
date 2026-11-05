@@ -1,0 +1,113 @@
+/* Notices */
+.notice {
+  position: absolute;
+  z-index: 4;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--chrome-raised);
+  color: var(--text);
+  box-shadow:
+    0 0 0 1px var(--line),
+    0 8px 24px var(--bar-shadow);
+  font: 400 var(--text-md) / var(--line-md) var(--font-ui);
+}
+.overlay .notice {
+  color-scheme: light dark;
+}
+.notice h3 {
+  display: flex;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-md);
+  font-weight: 600;
+  line-height: var(--line-md);
+}
+.notice p {
+  margin: var(--space-1) 0 0;
+  color: var(--text-muted);
+}
+.notice .icon {
+  margin-top: 2px;
+}
+.notice-caution h3 .icon,
+.covered .icon {
+  color: var(--caution);
+}
+.notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.font-card {
+  width: 480px;
+}
+.notice-toast {
+  right: 0;
+  bottom: var(--space-4);
+  left: 0;
+  width: 480px;
+  margin: 0 auto;
+}
+.notice-toast > .covered:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+.scan-card {
+  top: var(--space-6);
+  right: 0;
+  left: 0;
+  width: 480px;
+  margin: 0 auto;
+}
+.compare {
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: #ffffff;
+  color: #1a1a1a;
+}
+.compare-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+.compare-row span {
+  color: #4d5b66;
+  font: 400 var(--text-sm) / var(--line-sm) var(--font-ui);
+}
+.compare-row div {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.covered {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--line-sm);
+}
+.covered .icon {
+  margin-top: 0;
+}
+.font-card > .covered:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+.status-caution {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--caution);
+  font-weight: 500;
+}
+.alert-icon-warn {
+  color: var(--caution);
+}

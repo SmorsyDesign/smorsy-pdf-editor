@@ -18,22 +18,26 @@ function breakLongWord(word: string, maxWidth: number, measure: MeasureText): st
 function wrapParagraph(paragraph: string, maxWidth: number, measure: MeasureText): string[] {
   const lines: string[] = [];
   let line = '';
-  for (const word of paragraph.split(/ +/)) {
-    const candidate = line ? `${line} ${word}` : word;
+  // Spaces are kept as typed, because people use runs of them to line things up.
+  for (const piece of paragraph.match(/ +|[^ ]+/g) ?? []) {
+    const candidate = line + piece;
     if (measure(candidate) <= maxWidth) {
       line = candidate;
       continue;
     }
-    if (line) lines.push(line);
-    if (measure(word) <= maxWidth) {
-      line = word;
+    if (line.trimEnd()) lines.push(line.trimEnd());
+    if (piece.startsWith(' ')) {
+      // Spaces that fall at a line break disappear, as they do in any text editor.
+      line = '';
+    } else if (measure(piece) <= maxWidth) {
+      line = piece;
     } else {
-      const pieces = breakLongWord(word, maxWidth, measure);
-      line = pieces.pop() ?? '';
-      lines.push(...pieces);
+      const parts = breakLongWord(piece, maxWidth, measure);
+      line = parts.pop() ?? '';
+      lines.push(...parts);
     }
   }
-  lines.push(line);
+  if (line || lines.length === 0) lines.push(line);
   return lines;
 }
 

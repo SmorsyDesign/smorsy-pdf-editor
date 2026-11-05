@@ -1,6 +1,7 @@
 import type { Alignment, Color, FontId, OriginalFont, TextStyle } from '../../engine/edits/model';
 import { cleanFontName } from '../../engine/fonts/match';
 import { Icon, type IconName } from '../Icon';
+import { SizeInput } from './SizeInput';
 
 interface FormatBarProps {
   readonly style: TextStyle;
@@ -80,20 +81,12 @@ export function FormatBar({
         ))}
         {timesAvailable && <option value="times-new-roman">Times New Roman</option>}
       </select>
-      <label className="fsize">
-        <input
-          type="number"
-          aria-label="Size in points"
-          min={4}
-          max={144}
-          value={Math.round(style.size * 10) / 10}
-          onChange={(event) => {
-            const size = Number(event.target.value);
-            if (size >= 4 && size <= 144) onChange({ ...style, size });
-          }}
-        />
-        <span aria-hidden="true">pt</span>
-      </label>
+      <SizeInput
+        size={style.size}
+        onChange={(size) => {
+          onChange({ ...style, size });
+        }}
+      />
       <span className="sep" />
       <button
         type="button"

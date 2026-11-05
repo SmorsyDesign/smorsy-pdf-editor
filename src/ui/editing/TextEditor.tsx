@@ -47,9 +47,17 @@ export function TextEditor({
   const [style, setStyle] = useState(draft.style);
   const fieldRef = useRef<HTMLTextAreaElement>(null);
 
+  // Several things can finish an edit at once, and it must only be recorded one time.
+  const finished = useRef(false);
+  const finish = (finalText: string) => {
+    if (finished.current) return;
+    finished.current = true;
+    onCommit(finalText, rect, style);
+  };
+
   useImperativeHandle(handleRef, () => ({
     commit: () => {
-      onCommit(text, rect, style);
+      finish(text);
     },
   }));
 
@@ -68,13 +76,14 @@ export function TextEditor({
     field.style.height = `${field.scrollHeight}px`;
   }, [text, style, rect.width, scale]);
 
-  const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'Escape') {
       event.preventDefault();
+      finished.current = true;
       onCancel();
     } else if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
       event.preventDefault();
-      onCommit(text, rect, style);
+      finish(text);
     }
   };
 
@@ -123,10 +132,21 @@ export function TextEditor({
     setRect((current) => (resizing ? resized : moved)(step[0], step[1], current));
   };
 
+  const placeBelow = rect.y < BAR_ROOM_POINTS;
+  const notes = [
+    ...(draft.backgroundNotFlat
+      ? [
+          'The background here isn’t a single colour, so the patch over the old text may be visible.',
+        ]
+      : []),
+    ...(draft.mixedStyles ? ['This text mixes styles. Your edit gives it all one style.'] : []),
+  ];
+
   return (
     <div
-      className={draft.substituted ? 'edit-open substituted' : 'edit-open'}
+      className="edit-open"
       data-testid="text-editor"
+      onKeyDown={onKeyDown}
       style={{
         left: rect.x * scale,
         top: rect.y * scale,
@@ -144,10 +164,10 @@ export function TextEditor({
         style={style}
         original={draft.original}
         timesAvailable={timesAvailable}
-        placeBelow={rect.y < BAR_ROOM_POINTS}
+        placeBelow={placeBelow}
         onChange={setStyle}
         onDelete={() => {
-          onCommit('', rect, style);
+          finish('');
         }}
       />
       <textarea
@@ -162,14 +182,23 @@ export function TextEditor({
           fontSize: style.size * scale,
           fontWeight: style.bold ? 700 : 400,
           fontStyle: style.italic ? 'italic' : 'normal',
-          lineHeight: `${draft.lineHeight * scale}px`,
+          lineHeight: `${draft.lineHeight * (style.size / draft.style.size) * scale}px`,
           textAlign: style.align,
         }}
         onChange={(event) => {
           setText(event.target.value);
         }}
-        onKeyDown={onKeyDown}
       />
+      {notes.length > 0 && (
+        <div className={placeBelow ? 'edit-notes edit-notes-below' : 'edit-notes'} role="status">
+          {notes.map((note) => (
+            <p key={note}>
+              <Icon name="warn" />
+              {note}
+            </p>
+          ))}
+        </div>
+      )}
       <button
         type="button"
         className="edit-grip edit-move"

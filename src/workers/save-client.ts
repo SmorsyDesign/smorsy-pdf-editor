@@ -9,6 +9,8 @@ export class SaveClient {
   private readonly worker: Worker;
   private readonly pending = new Map<number, Pending>();
   private nextId = 1;
+  /** Once set, the worker is gone, and waiting for its reply would wait forever. */
+  private failure: string | null = null;
 
   constructor(bytes: Uint8Array, systemFonts: Partial<Record<SystemFontStyle, Uint8Array>>) {
     this.worker = new Worker(new URL('./save-worker.ts', import.meta.url), { type: 'module' });
@@ -18,8 +20,8 @@ export class SaveClient {
       this.pending.delete(id);
     };
     this.worker.onerror = (event) => {
-      const failure = event.message || 'The save worker stopped.';
-      for (const [id, reply] of this.pending) reply({ id, ok: false, error: failure });
+      this.failure = event.message || 'The save worker stopped.';
+      for (const [id, reply] of this.pending) reply({ id, ok: false, error: this.failure });
       this.pending.clear();
     };
     const init: SaveRequest = { type: 'init', bytes: bytes.slice(), systemFonts };
@@ -27,6 +29,7 @@ export class SaveClient {
   }
 
   private request(build: (id: number) => SaveRequest): Promise<SaveResponse> {
+    if (this.failure !== null) return Promise.reject(new Error(this.failure));
     const id = this.nextId;
     this.nextId += 1;
     return new Promise((resolve, reject) => {

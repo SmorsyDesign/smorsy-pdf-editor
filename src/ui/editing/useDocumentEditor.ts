@@ -4,12 +4,14 @@ import {
   activeEdits,
   canRedo,
   canUndo,
-  changeCount,
+  changesSince,
+  currentEntry,
   deriveTextBoxes,
   record,
   redo,
   undo,
   type Edit,
+  type EditEntry,
   type EditLog,
   type TextBox,
 } from '../../engine/edits/model';
@@ -26,6 +28,13 @@ export interface FontNoticeState {
   readonly outcome: FontOutcome;
 }
 
+/** What a save produced, and the exact state it contains. */
+export interface BuiltFile {
+  readonly bytes: Uint8Array;
+  readonly edited: boolean;
+  readonly entry: EditEntry | undefined;
+}
+
 export interface DocumentEditor {
   readonly boxes: readonly TextBox[];
   readonly changes: number;
@@ -35,14 +44,16 @@ export interface DocumentEditor {
   readonly canRedo: boolean;
   readonly timesAvailable: boolean;
   readonly notice: FontNoticeState | null;
+  readonly problem: string | null;
   readonly substitutedFonts: number;
   readonly dismissNotice: () => void;
-  readonly apply: (edit: Edit, group?: string) => void;
+  readonly reportProblem: (problem: string | null) => void;
+  readonly apply: (edit: Edit) => void;
   readonly undo: () => void;
   readonly redo: () => void;
   /** The bytes to write: the original exactly, unless there are edits. */
-  readonly buildBytes: () => Promise<Uint8Array>;
-  readonly markSaved: () => void;
+  readonly buildBytes: () => Promise<BuiltFile>;
+  readonly markSaved: (entry: EditEntry | undefined) => void;
 }
 
 function changedBox(edit: Edit, boxes: readonly TextBox[]): TextBox | undefined {
@@ -53,19 +64,26 @@ function changedBox(edit: Edit, boxes: readonly TextBox[]): TextBox | undefined 
 
 export function useDocumentEditor(file: OpenedFile | null, platform: Platform): DocumentEditor {
   const [log, setLog] = useState<EditLog>(EMPTY_LOG);
-  const savedEntryRef = useRef<unknown>(undefined);
+  const [savedEntry, setSavedEntry] = useState<EditEntry | undefined>(undefined);
   const [timesAvailable, setTimesAvailable] = useState(false);
   const [notice, setNotice] = useState<FontNoticeState | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
   const [outcomes, setOutcomes] = useState<ReadonlyMap<string, FontOutcome>>(() => new Map());
   // Kept in step with the state, because saving straight after an edit must include that edit.
   const logRef = useRef(log);
+  const savedRef = useRef(savedEntry);
   const clientRef = useRef<Promise<SaveClient> | null>(null);
+  // A font check answers later, by which time the edit it's about may have been undone.
+  const latestChange = useRef(0);
 
   useEffect(() => {
     logRef.current = EMPTY_LOG;
+    savedRef.current = undefined;
+    latestChange.current += 1;
     setLog(EMPTY_LOG);
-    savedEntryRef.current = undefined;
+    setSavedEntry(undefined);
     setNotice(null);
+    setProblem(null);
     setOutcomes(new Map());
     if (!file) return;
 
@@ -94,56 +112,63 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
 
   const boxes = useMemo(() => deriveTextBoxes(activeEdits(log)), [log]);
 
-  const apply = useCallback((edit: Edit, group?: string) => {
-    const next = record(logRef.current, edit, group);
+  const moveTo = useCallback((next: EditLog) => {
     logRef.current = next;
-    setLog(next);
-
-    const box = changedBox(edit, deriveTextBoxes(activeEdits(next)));
-    const client = clientRef.current;
-    // A drag doesn't change what the text needs from its font.
-    if (!box || !client || group !== undefined) return;
-    void client
-      .then((opened) => opened.resolveFont(box))
-      .then((outcome) => {
-        setOutcomes((current) => new Map(current).set(box.id, outcome));
-        setNotice(box.lines.length > 0 ? { box, outcome } : null);
-      })
-      .catch((error: unknown) => {
-        console.error(error);
-      });
-  }, []);
-
-  const undoEdit = useCallback(() => {
-    const next = undo(logRef.current);
-    logRef.current = next;
+    latestChange.current += 1;
     setLog(next);
     setNotice(null);
   }, []);
 
-  const redoEdit = useCallback(() => {
-    const next = redo(logRef.current);
-    logRef.current = next;
-    setLog(next);
-  }, []);
+  const apply = useCallback(
+    (edit: Edit) => {
+      const next = record(logRef.current, edit);
+      moveTo(next);
+      const box = changedBox(edit, deriveTextBoxes(activeEdits(next)));
+      const client = clientRef.current;
+      if (!box || !client) return;
+      const change = latestChange.current;
+      client
+        .then((opened) => opened.resolveFont(box))
+        .then((outcome) => {
+          setOutcomes((current) => new Map(current).set(box.id, outcome));
+          if (change === latestChange.current) setNotice({ box, outcome });
+        })
+        .catch((error: unknown) => {
+          console.error(error);
+          setProblem(
+            'The app couldn’t check the font for this edit, so it may not save correctly. Check the text after saving, or undo the edit.',
+          );
+        });
+    },
+    [moveTo],
+  );
 
-  const buildBytes = useCallback(async () => {
-    const active = deriveTextBoxes(activeEdits(logRef.current));
-    if (active.length === 0) return unchangedCopy(file?.bytes ?? new Uint8Array());
+  const undoEdit = useCallback(() => {
+    moveTo(undo(logRef.current));
+  }, [moveTo]);
+
+  const redoEdit = useCallback(() => {
+    moveTo(redo(logRef.current));
+  }, [moveTo]);
+
+  const buildBytes = useCallback(async (): Promise<BuiltFile> => {
+    const current = logRef.current;
+    const entry = currentEntry(current);
+    const active = deriveTextBoxes(activeEdits(current));
+    if (active.length === 0) {
+      return { bytes: unchangedCopy(file?.bytes ?? new Uint8Array()), edited: false, entry };
+    }
     const client = await clientRef.current;
     if (!client) throw new Error('The document closed before it could be saved.');
-    return client.save(active);
+    return { bytes: await client.save(active), edited: true, entry };
   }, [file]);
 
-  const markSaved = useCallback(() => {
-    const current = logRef.current;
-    savedEntryRef.current = current.entries[current.cursor - 1];
+  const markSaved = useCallback((entry: EditEntry | undefined) => {
+    savedRef.current = entry;
+    setSavedEntry(entry);
   }, []);
 
-  const isDirty = useCallback(() => {
-    const current = logRef.current;
-    return current.entries[current.cursor - 1] !== savedEntryRef.current;
-  }, []);
+  const isDirty = useCallback(() => currentEntry(logRef.current) !== savedRef.current, []);
 
   const dismissNotice = useCallback(() => {
     setNotice(null);
@@ -156,14 +181,16 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
 
   return {
     boxes,
-    changes: changeCount(log),
+    changes: changesSince(log, savedEntry),
     isDirty,
     canUndo: canUndo(log),
     canRedo: canRedo(log),
     timesAvailable,
     notice,
+    problem,
     substitutedFonts,
     dismissNotice,
+    reportProblem: setProblem,
     apply,
     undo: undoEdit,
     redo: redoEdit,

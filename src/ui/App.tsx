@@ -1,21 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { openDocument, type PdfDocument } from '../engine/document';
-import { copyFileName } from '../engine/copy';
-import {
-  ReadFailure,
-  SaveFailure,
-  type MenuCommand,
-  type OpenedFile,
-  type Platform,
-  type SaveFailureKind,
-} from '../platform';
+import { ReadFailure, type MenuCommand, type OpenedFile, type Platform } from '../platform';
 import { pdfAssets } from '../workers/pdf-setup';
-import { AlertDialog } from './AlertDialog';
+import { AppDialogs, type Dialog } from './AppDialogs';
 import { DocumentView, type DocumentViewHandle } from './DocumentView';
 import { useDocumentEditor } from './editing/useDocumentEditor';
-import { explainOpenFailure, explainSaveFailure, type OpenProblem } from './messages';
+import { explainOpenFailure, type OpenProblem } from './messages';
 import { StartScreen } from './StartScreen';
 import { installTabFocus } from './tabFocus';
+import { useSaveFlow } from './useSaveFlow';
 
 type Session =
   | { readonly status: 'empty' }
@@ -30,13 +23,6 @@ type Session =
 /** What was asked for when unsaved changes got in the way. */
 type LeaveAction = 'close' | 'open' | 'quit';
 
-// Each dialog keeps the file it's about, so it can't act on a different document.
-type Dialog =
-  | { readonly kind: 'confirm-replace'; readonly file: OpenedFile; readonly path: string }
-  | { readonly kind: 'save-failed'; readonly failure: SaveFailureKind; readonly detail: string }
-  | { readonly kind: 'open-failed'; readonly fileName: string; readonly problem: OpenProblem }
-  | { readonly kind: 'unsaved'; readonly fileName: string; readonly then: LeaveAction };
-
 const APP_NAME = 'Smorsy PDF Editor';
 
 const logProblem = (error: unknown) => {
@@ -45,18 +31,16 @@ const logProblem = (error: unknown) => {
 
 export function App({ platform }: { platform: Platform }) {
   const [session, setSession] = useState<Session>({ status: 'empty' });
-  const [dialog, setDialog] = useState<Dialog | null>(null);
+  const [dialog, setDialog] = useState<Dialog<LeaveAction> | null>(null);
   const [opening, setOpening] = useState(false);
-  const [announcement, setAnnouncement] = useState('');
-  // The first save makes a new file, and later saves update that copy.
-  const [savedPath, setSavedPath] = useState<string | null>(null);
   const viewRef = useRef<DocumentViewHandle | null>(null);
   // Only one native dialog or file open at a time, however fast the menu is used.
   const busyRef = useRef(false);
-  const afterSaveRef = useRef<(() => void) | null>(null);
   const sessionCounter = useRef(0);
   const hasDocumentRef = useRef(false);
   hasDocumentRef.current = session.status === 'open';
+  const dialogOpenRef = useRef(false);
+  dialogOpenRef.current = dialog !== null;
 
   const openFile = session.status === 'open' ? session.file : null;
   const editor = useDocumentEditor(openFile, platform);
@@ -65,15 +49,28 @@ export function App({ platform }: { platform: Platform }) {
   const fileNameRef = useRef('');
   fileNameRef.current = openFile?.name ?? '';
 
-  const exclusively = useCallback(async (task: () => Promise<void>) => {
-    if (busyRef.current) return;
+  const exclusively = useCallback(async <Result,>(task: () => Promise<Result>) => {
+    if (busyRef.current) return undefined;
     busyRef.current = true;
     try {
-      await task();
+      return await task();
     } finally {
       busyRef.current = false;
     }
   }, []);
+
+  /** Finishes any typing. False means it couldn't be applied, and the person has been told. */
+  const flush = useCallback(async () => (await viewRef.current?.flush()) ?? true, []);
+
+  const saving = useSaveFlow({
+    platform,
+    file: openFile,
+    editor,
+    flush,
+    exclusively,
+    showDialog: setDialog,
+  });
+  const { save, saveCopy, saveThen, replaceOriginal, keepOriginal } = saving;
 
   const chooseAndOpen = useCallback(
     () =>
@@ -84,10 +81,8 @@ export function App({ platform }: { platform: Platform }) {
           if (!file) return;
           chosenName = file.name;
           setOpening(true);
-          setAnnouncement('');
           const document = await openDocument(file.bytes, pdfAssets);
           sessionCounter.current += 1;
-          setSavedPath(null);
           setSession({ status: 'open', id: sessionCounter.current, file, document });
         } catch (error) {
           const fileName =
@@ -103,100 +98,28 @@ export function App({ platform }: { platform: Platform }) {
     [exclusively, platform],
   );
 
-  const closeDocument = useCallback(() => {
-    setSession({ status: 'empty' });
-    setSavedPath(null);
-    setAnnouncement('');
-  }, []);
-
   const carryOut = useCallback(
     (action: LeaveAction) => {
-      if (action === 'close') closeDocument();
+      if (action === 'close') setSession({ status: 'empty' });
       if (action === 'open') void chooseAndOpen();
       if (action === 'quit') platform.closeWindow().catch(logProblem);
     },
-    [chooseAndOpen, closeDocument, platform],
+    [chooseAndOpen, platform],
   );
 
   /** Asks about unsaved changes first, then does what was asked. */
   const leaveDocument = useCallback(
     async (action: LeaveAction) => {
       // Anything still being typed counts, so it can't be lost by acting quickly.
-      await viewRef.current?.flush();
+      if (!(await flush())) return;
       if (isDirtyRef.current()) {
         setDialog({ kind: 'unsaved', fileName: fileNameRef.current, then: action });
         return;
       }
       carryOut(action);
     },
-    [carryOut],
+    [carryOut, flush],
   );
-
-  const writeTo = useCallback(
-    async (file: OpenedFile, path: string) => {
-      try {
-        const bytes = await editor.buildBytes();
-        if (editor.isDirty()) {
-          // Proves the result opens, before it can replace anything on disk.
-          const check = await openDocument(bytes);
-          await check.close();
-        }
-        await platform.writeFile(path, bytes);
-        setSavedPath(path);
-        editor.markSaved();
-        setAnnouncement(path === file.path ? 'Original file updated' : 'Copy saved');
-        const next = afterSaveRef.current;
-        afterSaveRef.current = null;
-        next?.();
-      } catch (error) {
-        afterSaveRef.current = null;
-        setDialog(
-          error instanceof SaveFailure
-            ? { kind: 'save-failed', failure: error.kind, detail: error.message }
-            : { kind: 'save-failed', failure: 'other', detail: String(error) },
-        );
-      }
-    },
-    [editor, platform],
-  );
-
-  const saveCopy = useCallback(
-    () =>
-      exclusively(async () => {
-        if (session.status !== 'open') return;
-        const { file } = session;
-        setAnnouncement('');
-        try {
-          await viewRef.current?.flush();
-          const path = await platform.chooseSaveLocation(copyFileName(file.name));
-          if (path === null) {
-            afterSaveRef.current = null;
-            return;
-          }
-          if (await platform.isSameFile(file.path, path)) {
-            setDialog({ kind: 'confirm-replace', file, path });
-            return;
-          }
-          await writeTo(file, path);
-        } catch (error) {
-          afterSaveRef.current = null;
-          setDialog({ kind: 'save-failed', failure: 'other', detail: String(error) });
-        }
-      }),
-    [exclusively, platform, session, writeTo],
-  );
-
-  const save = useCallback(async () => {
-    if (session.status !== 'open') return;
-    if (savedPath === null) {
-      await saveCopy();
-      return;
-    }
-    await exclusively(async () => {
-      await viewRef.current?.flush();
-      await writeTo(session.file, savedPath);
-    });
-  }, [exclusively, savedPath, saveCopy, session, writeTo]);
 
   const openDocumentInUse = session.status === 'open' ? session.document : null;
 
@@ -213,13 +136,10 @@ export function App({ platform }: { platform: Platform }) {
   useEffect(() => {
     platform.setCloseGuard(() => {
       if (!isDirtyRef.current() && !viewRef.current?.hasUnfinishedEdit()) return true;
-      void (async () => {
-        await viewRef.current?.flush();
-        setDialog({ kind: 'unsaved', fileName: fileNameRef.current, then: 'quit' });
-      })();
+      if (!dialogOpenRef.current) void leaveDocument('quit');
       return false;
     });
-  }, [platform]);
+  }, [leaveDocument, platform]);
 
   useEffect(() => {
     const title = session.status === 'open' ? `${session.file.name} - ${APP_NAME}` : APP_NAME;
@@ -246,6 +166,9 @@ export function App({ platform }: { platform: Platform }) {
         case 'close-document':
           if (!busyRef.current) void leaveDocument('close');
           break;
+        case 'quit':
+          if (!busyRef.current) void leaveDocument('quit');
+          break;
         default:
           viewRef.current?.command(command);
           break;
@@ -261,10 +184,6 @@ export function App({ platform }: { platform: Platform }) {
     };
   }, [dialogIsOpen, leaveDocument, platform, save, saveCopy]);
 
-  const closeDialog = () => {
-    setDialog(null);
-  };
-
   return (
     <>
       {session.status === 'open' ? (
@@ -273,9 +192,9 @@ export function App({ platform }: { platform: Platform }) {
           file={session.file}
           document={session.document}
           os={platform.os}
-          announcement={announcement}
+          announcement={saving.announcement}
           editor={editor}
-          saveLabel={savedPath === null ? 'Save a copy' : 'Save'}
+          saveLabel={saving.saveLabel}
           onSave={() => {
             void save();
           }}
@@ -291,81 +210,28 @@ export function App({ platform }: { platform: Platform }) {
           }}
         />
       )}
-
-      {dialog?.kind === 'confirm-replace' && (
-        <AlertDialog
-          title="Replace your original file?"
-          message={`This saves over ${dialog.file.name}. You can’t undo this.`}
-          confirmLabel="Replace original"
-          cancelLabel="Cancel"
-          destructive
-          onConfirm={() => {
-            closeDialog();
-            void writeTo(dialog.file, dialog.path);
-          }}
-          onCancel={() => {
-            afterSaveRef.current = null;
-            closeDialog();
-          }}
-        />
-      )}
-
-      {dialog?.kind === 'save-failed' && (
-        <AlertDialog
-          title="Your copy wasn’t saved"
-          message={explainSaveFailure(dialog.failure)}
-          detail="Your edits are still here, and your original file is unchanged."
-          technical={dialog.detail}
-          confirmLabel="Save somewhere else"
-          cancelLabel="Keep editing"
-          onConfirm={() => {
-            closeDialog();
-            void saveCopy();
-          }}
-          onCancel={closeDialog}
-        />
-      )}
-
-      {dialog?.kind === 'open-failed' && (
-        <AlertDialog
-          title={`${dialog.fileName} can’t be opened`}
-          message={dialog.problem.reason}
-          detail={dialog.problem.advice}
-          technical={dialog.problem.technical}
-          confirmLabel="Choose another file"
-          cancelLabel="Keep current file"
-          onConfirm={() => {
-            closeDialog();
-            void chooseAndOpen();
-          }}
-          onCancel={closeDialog}
-        />
-      )}
-
-      {dialog?.kind === 'unsaved' && (
-        <AlertDialog
-          icon="warn"
-          title={`Save your changes to ${dialog.fileName}?`}
-          message="If you don’t save, your changes will be lost. Your original file stays as it is."
-          cancelLabel="Cancel"
-          alternativeLabel="Don’t save"
-          confirmLabel="Save"
-          onConfirm={() => {
-            const { then } = dialog;
-            closeDialog();
-            afterSaveRef.current = () => {
-              carryOut(then);
-            };
-            void save();
-          }}
-          onAlternative={() => {
-            const { then } = dialog;
-            closeDialog();
+      <AppDialogs
+        dialog={dialog}
+        onClose={() => {
+          setDialog(null);
+        }}
+        onReplaceOriginal={({ file, path }) => {
+          void replaceOriginal(file, path);
+        }}
+        onKeepOriginal={keepOriginal}
+        onSaveElsewhere={() => {
+          void saveCopy();
+        }}
+        onChooseAnother={() => {
+          void chooseAndOpen();
+        }}
+        onSaveAndLeave={(then) => {
+          void saveThen(() => {
             carryOut(then);
-          }}
-          onCancel={closeDialog}
-        />
-      )}
+          });
+        }}
+        onLeaveWithoutSaving={carryOut}
+      />
     </>
   );
 }

@@ -26,6 +26,27 @@ function boundsOf(rect: Rect, angle: number): Rect {
   };
 }
 
+/** Resolves true once the page has been drawn, or false if that hasn't happened in time. */
+export function whenPageDrawn(pageElement: HTMLElement, timeoutMs = 3000): Promise<boolean> {
+  const canvas = pageElement.querySelector('canvas');
+  if (!canvas) return Promise.resolve(false);
+  if (canvas.dataset.drawn === 'true') return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const finish = (drawn: boolean) => {
+      observer.disconnect();
+      window.clearTimeout(timer);
+      resolve(drawn);
+    };
+    const observer = new MutationObserver(() => {
+      if (canvas.dataset.drawn === 'true') finish(true);
+    });
+    const timer = window.setTimeout(() => {
+      finish(false);
+    }, timeoutMs);
+    observer.observe(canvas, { attributes: true, attributeFilter: ['data-drawn'] });
+  });
+}
+
 /** Reads colours from the page as drawn, so the patch matches what the person actually sees. */
 export function samplePageColours(
   pageElement: HTMLElement,
