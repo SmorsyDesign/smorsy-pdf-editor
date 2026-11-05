@@ -14,6 +14,7 @@ Answered by the owner on 2026-11-05. The Blue Pencil screen set is approved.
 | 4   | Minimum OS                       | macOS 14 Sonoma and Windows 10 22H2 x64 (see section 3).                                                                                                                                                                                    |
 | 5   | PDFs with a digital signature    | **Open in View mode first.** You can read, search and copy. The first attempt to edit shows a warning that editing breaks the signature, and you choose whether to continue.                                                                |
 | 6   | Replace and delete               | The patch covers the old text. The interface says so the first time and points to Redact for anything sensitive (Phase 6).                                                                                                                  |
+| 7   | Toolbar                          | **Keep the approved Blue Pencil layout:** one row of modes and a floating format bar, after comparing it with Preview's second row.                                                                                                         |
 
 ### What follows from a public repository
 
