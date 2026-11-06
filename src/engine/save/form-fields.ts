@@ -162,20 +162,25 @@ function retireField(doc: PDFDocument, widget: PDFDict): boolean {
   }
 }
 
-function isPushButton(context: PDFContext, widget: PDFDict): boolean {
+/** Field settings can be held by the widget or inherited from any field above it. */
+function inherited(context: PDFContext, widget: PDFDict, key: string): PDFObject | undefined {
   let current: PDFDict | undefined = widget;
   for (let depth = 0; current && depth < MAX_FIELD_DEPTH; depth += 1) {
-    const flags = context.lookup(current.get(name('Ff')));
-    if (flags instanceof PDFNumber) {
-      return (
-        (flags.asNumber() & PUSH_BUTTON) !== 0 &&
-        context.lookup(current.get(name('FT'))) === name('Btn')
-      );
-    }
+    const value: PDFObject | undefined = context.lookup(current.get(name(key)));
+    if (value) return value;
     const parent: PDFObject | undefined = context.lookup(current.get(name('Parent')));
     current = parent instanceof PDFDict ? parent : undefined;
   }
-  return false;
+  return undefined;
+}
+
+function isPushButton(context: PDFContext, widget: PDFDict): boolean {
+  const flags = inherited(context, widget, 'Ff');
+  return (
+    inherited(context, widget, 'FT') === name('Btn') &&
+    flags instanceof PDFNumber &&
+    (flags.asNumber() & PUSH_BUTTON) !== 0
+  );
 }
 
 function hasBackground(context: PDFContext, widget: PDFDict): boolean {

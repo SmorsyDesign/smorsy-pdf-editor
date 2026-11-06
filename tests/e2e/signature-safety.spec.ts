@@ -168,6 +168,19 @@ test.describe('a filled-in field under a signature', () => {
     await expect(page.getByRole('alert')).toContainText('now part of the page');
     await expectSavedToMatchScreenAfterSave(page, 1, 1);
   });
+
+  test('the note goes once it no longer applies', async ({ page }) => {
+    await openForSigning(page, 'test-pdfs/22-form-filled-value.pdf', 1);
+    await createTyped(page);
+    const sheet = await pageElement(page, 1).boundingBox();
+    const scale = (sheet?.width ?? 612) / 612;
+    await signLayer(page).click({ position: { x: 200 * scale, y: 220 * scale } });
+    await saveTo(page);
+    await expect(page.getByRole('alert')).toContainText('now part of the page');
+    await page.getByRole('button', { name: 'Undo' }).click();
+    await page.keyboard.press('ControlOrMeta+s');
+    await expect(page.getByRole('alert')).toHaveCount(0);
+  });
 });
 
 test.describe('leaving after saving over a filled-in field', () => {

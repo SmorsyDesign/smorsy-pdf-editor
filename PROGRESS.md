@@ -1,6 +1,6 @@
 # Progress
 
-**Current phase:** 3, in Part 7 review.
+**Current phase:** 3 finished, waiting for the owner's "continue" before Phase 4.
 
 ## Phase 0: Plan and design
 
@@ -70,7 +70,7 @@
 - [x] Optional date stamp
 - [x] Single-click move and resize, as an alternative to dragging
 - [x] Signatures stay visible over form fields
-- [ ] Part 7 gates and check-in
+- [x] Part 7 gates and check-in
 
 ## Phase 4: Annotations and forms
 
@@ -128,6 +128,9 @@
 - **Phase 3, moving a signature to another page leaves its date stamp behind.** The date is its own text box, which can be moved in Edit text.
 - **Phase 3, a solid print-only field stays on top of a signature in print.** It has the No View flag, so it paints nothing on screen, and it's rare enough not to move it.
 - **Phase 3, retiring a field a form's script reads could break that script in Acrobat.** There's no copy here to test with. It only applies to filled-in solid fields under an edit, and the app says when it happens.
+- **Phase 3, a filled-in field that can't be removed from a malformed form stays editable, with only a console message.** Its old text would show under any new text. It takes a malformed file and a later change in another app.
+- **Phase 3, a form note is replaced by the "you kept editing" message if you type during a save-and-leave.** The save worked either way, and the document stays open.
+- **Phase 3, a filled checkbox style with no background entry can partly cover a signature, with no warning.** Checkboxes are small, and a signature rarely sits on one.
 - **Phase 3, a save warning about a field on top doesn't say which field.** The message gives what to do, and most forms have few.
 - **Phase 3, a date stamp can overlap on a page narrower than 120 points.** Nothing that small needs signing in practice.
 - **Phase 3, not checked in Adobe Reader or macOS Preview.** Signatures over form fields are verified with the pdf.js renderer only, and there's no copy of the others here. It's on the Phase 8 manual checklist.

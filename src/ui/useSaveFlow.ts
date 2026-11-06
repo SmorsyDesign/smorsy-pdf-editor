@@ -49,7 +49,7 @@ export function useSaveFlow({
   showDialog,
   hasUnfinishedEdit,
 }: SaveFlowOptions) {
-  const { buildBytes, markSaved, isDirty, reportProblem } = editor;
+  const { buildBytes, markSaved, isDirty, problem, reportProblem } = editor;
   const [saved, setSaved] = useState<{
     readonly file: OpenedFile;
     readonly path: string;
@@ -61,6 +61,7 @@ export function useSaveFlow({
   } | null>(null);
   const afterSave = useRef<(() => void) | null>(null);
   const saveNote = useRef<string | null>(null);
+  const shownNote = useRef<string | null>(null);
   const current = saved?.file === file ? saved : null;
   const savedPath = current?.path ?? null;
 
@@ -79,7 +80,9 @@ export function useSaveFlow({
       saveNote.current = null;
       if (outcome !== 'saved') return;
       if (!next) {
-        if (note) reportProblem(note);
+        // A note about the last save shouldn't still be up after a save it no longer applies to.
+        if (note || problem === shownNote.current) reportProblem(note);
+        shownNote.current = note;
       } else if (isDirty() || hasUnfinishedEdit()) {
         // Anything added while saving isn't in the file, so carrying on would lose it.
         reportProblem('You kept editing during the save, so nothing was closed. Save again first.');
@@ -90,7 +93,7 @@ export function useSaveFlow({
         next();
       }
     },
-    [hasUnfinishedEdit, isDirty, reportProblem, showDialog],
+    [hasUnfinishedEdit, isDirty, problem, reportProblem, showDialog],
   );
 
   const writeTo = useCallback(
@@ -118,7 +121,7 @@ export function useSaveFlow({
         return 'stopped';
       }
     },
-    [buildBytes, markSaved, platform, reportProblem, showDialog],
+    [buildBytes, markSaved, platform, showDialog],
   );
 
   const saveCopy = useCallback(

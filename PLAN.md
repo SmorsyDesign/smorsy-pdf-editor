@@ -111,6 +111,8 @@ Editing PDF text isn't like editing a Word document. A PDF stores positioned gly
 - **Quit is a custom menu item,** because the operating system's own one ends the app without asking. macOS can also quit from the Dock or at logout, so `src-tauri/src/quit.rs` answers that request: straight through with nothing unsaved, otherwise it brings the window forward and asks.
 - **Saved signatures were dropped (owner's decision).** See decision 8.
 - **A signature over a solid form field moves that field's looks into the page.** Viewers always paint fields last, so nothing can sit on top of a solid one. The field stays and stays fillable, but becomes see-through. Over other annotations, whose order viewers do respect, the signature becomes a stamp annotation.
+- **A filled-in field under an edit becomes part of the page, and the app says so.** Leaving it as a field would mean changing it later showed the old text underneath. A form's own buttons stay on top, also with a note.
+- **The date stamp starts off,** though the design mockup shows it ticked, so nothing is added that wasn't asked for.
 - **Signatures can't go past the page's edge.** A PDF cuts off anything outside its page, so moving, resizing and turning all stay inside it, and the screen always matches the file.
 - **A PDF protected against changes opens read-only.** The save library can't write these, so editing would only fail at the end.
 
