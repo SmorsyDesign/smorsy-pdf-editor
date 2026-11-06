@@ -38,9 +38,10 @@ Node is pinned to 26 LTS in `.nvmrc`. Use terse test reporters and show only fai
 - `src/engine/`: all PDF logic behind a typed API. No React or Tauri imports. Fully unit-tested.
 - `src/platform/`: the only code that calls Tauri, behind an interface with a browser mock.
 - Rendering, OCR, signing and saving run in Web Workers. `pdf.js` parses and paints in its own two, set up in `src/workers/`, and `save-worker.ts` applies edits.
-- `src-tauri/`: minimal Rust, only what the web layer can't do well.
+- `src-tauri/`: minimal Rust, only what the web layer can't do well. `quit.rs` holds off a macOS quit while `setUnsavedWork` says there's unsaved work.
 - Every change is an entry in the immutable edit log. The canvas renders from it, undo and redo walk it, and saving applies it to the original bytes in one pass.
 - Least-privilege Tauri capabilities: only files the user picks or opens via the OS. Strict CSP; never load remote content.
+- Saved output is checked by reopening it and reading rendered pixels (`tests/e2e/saved-output.spec.ts`), since text can read correctly while a patch sits elsewhere.
 - The webview has no network route. The update check runs in Rust.
 
 ## Conventions

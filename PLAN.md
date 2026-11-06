@@ -107,7 +107,8 @@ Editing PDF text isn't like editing a Word document. A PDF stores positioned gly
 
 - **Embedded fonts are reused only for characters the page visibly draws with them.** A file can label an unused glyph wrongly, and typing that character would paint something else.
 - **IRS forms count as digitally signed.** They carry an Adobe usage-rights signature, which editing does break, so they open in View mode like any signed PDF.
-- **Quit is a custom menu item,** because the operating system's own one ends the app without asking. Quitting from the macOS Dock or at logout can't be intercepted by the windowing library yet, so those skip the prompt. The original file stays safe either way.
+- **Quit is a custom menu item,** because the operating system's own one ends the app without asking. macOS can also quit from the Dock or at logout, so `src-tauri/src/quit.rs` answers that request: straight through with nothing unsaved, otherwise it brings the window forward and asks.
+- **A PDF protected against changes opens read-only.** The save library can't write these, so editing would only fail at the end.
 
 ### Limits the interface will state
 

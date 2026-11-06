@@ -1,8 +1,6 @@
 # Progress
 
-**Current phase:** 2, in Part 7 review.
-
-**Next steps for Phase 2:** read the code reviewer's re-review if it finished (otherwise run it again on `git diff b7e42b6..HEAD`), fix critical and major findings, re-review, run `code-simplifier`, run every test suite, retake `design/screenshots/phase-2/` with the new signature wording, confirm CI on the latest commit, then check in. Ask the owner to try Quit from the Dock with unsaved edits.
+**Current phase:** 2 finished, waiting for the owner's "continue" before Phase 3.
 
 ## Phase 0: Plan and design
 
@@ -60,7 +58,7 @@
 - [x] Saving runs in a Web Worker
 - [x] Scanned pages: detect and explain, with new text allowed on top. The OCR offer comes with OCR itself in Phase 6
 - [x] Stretch decision: removing original letters moves to Phase 6, built with safe redaction, which needs the same content-stream rewriting. Replaced text stays patched, and the interface says so.
-- [ ] Part 7 gates and check-in
+- [x] Part 7 gates and check-in
 
 ## Phase 3: Signatures
 
@@ -127,8 +125,9 @@
 - **Phase 2, no "Saving…" state or worker timeout.** A worker that never replies leaves Save unresponsive. Known hang sources are capped. Revisit with progress UI.
 - **Phase 2, a page whose text can't be read says so only in the log.** Search counts can be low for that page. The page itself still shows.
 - **Phase 2, replaced-font count can be off after undo and redo.** It's only the status bar count; saved output is unaffected.
-- **Phase 2, a failed font read in the worker stays failed for that document.** Saving fails with a clear dialog, and a new worker clears it only after the worker itself fails.
-- **Phase 2, the message after replacing the original compares paths as text.** The same file reached by a different path says "Copy saved".
+- **Phase 2, the covered note's timing with a hidden notice has no automated test.** It needs a font check to land while other text is open, which can't be timed reliably. The check itself is one condition.
+- **Phase 2, thumbnails don't show edits.** They draw the original pages. Pages themselves show edits as an overlay.
+- **Phase 2, Windows logout isn't intercepted.** Closing the window asks first, as does Exit. macOS is covered by `src-tauri/src/quit.rs`.
 
 - **Phase 1, native menus aren't automated.** WebdriverIO can't click them. Menu permissions are covered, because the app won't start without them, and clicking them goes on the manual checklist.
 - **Phase 1, replacing a file keeps its permissions but not extended attributes or Windows ACLs.** Only saving over the original or an existing file is affected, and that needs confirmation. Revisit if anyone relies on them.
