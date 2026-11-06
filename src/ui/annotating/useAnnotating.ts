@@ -15,7 +15,7 @@ import { focusPages } from '../signing/useSigning';
 
 export type AnnotationTool = Annotation['kind'];
 
-export interface Swatch {
+interface Swatch {
   readonly name: string;
   /** Pale enough to read text through. */
   readonly marker: Color;

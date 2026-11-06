@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { placedOnPage } from '../editing/preview';
 import type { FormField } from '../../engine/forms/fields';
 import { hasAnswer, isFillable } from '../../engine/forms/fields';
 import { Icon } from '../Icon';
+import { useFocusOnRequest } from '../useFocusOnRequest';
 import type { FormFields } from './useFormFields';
 
 const MAX_TEXT_SIZE = 14;
@@ -19,13 +20,8 @@ interface FieldInputProps {
 function FieldInput({ field, form, scale, interactive, onSign }: FieldInputProps) {
   const ref = useRef<HTMLElement | null>(null);
   const value = form.valueOf(field);
-  const { focusFieldId, fieldFocusedDone } = form;
 
-  useEffect(() => {
-    if (focusFieldId !== field.id) return;
-    ref.current?.focus();
-    fieldFocusedDone();
-  }, [field.id, fieldFocusedDone, focusFieldId]);
+  useFocusOnRequest(ref, field.id, form.focusFieldId, form.fieldFocusedDone);
 
   const label = field.label;
   const style = {

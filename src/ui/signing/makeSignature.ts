@@ -21,7 +21,7 @@ export class SignatureError extends Error {
 export const cssInk = ({ r, g, b }: Color) =>
   `rgb(${Math.round(r * 255)} ${Math.round(g * 255)} ${Math.round(b * 255)})`;
 
-export function contextOf(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
+function contextOf(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
   const context = canvas.getContext('2d', { willReadFrequently: true });
   if (!context) throw new SignatureError('This computer couldn’t set up a drawing surface.');
   return context;

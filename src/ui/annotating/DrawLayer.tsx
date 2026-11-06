@@ -1,4 +1,4 @@
-import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useRef, useState, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import type { Point } from '../../engine/coordinates';
 import {
   LINE_WIDTH,
@@ -93,13 +93,13 @@ export function DrawLayer({ annotating, pageNumber, page, scale, onEmptyClick }:
     }
   };
 
-  const onClick = (event: React.MouseEvent<HTMLDivElement>) => {
+  const onClick = (event: MouseEvent<HTMLDivElement>) => {
     const point = pointIn(event, event.currentTarget);
     if (moving) {
       annotating.change(annotationMovedTo(moving, pageNumber, point, page));
       annotating.moveFinished(moving.id);
     } else if (tool === 'note') {
-      annotating.placeAt('note', pageNumber, point, true);
+      annotating.placeAt('note', pageNumber, point);
     } else if (!tool) {
       annotating.select(null);
       onEmptyClick();

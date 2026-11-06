@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useRef, useState, type RefObject } from 'react';
 import type { PdfDocument } from '../engine/document';
 import { hasDigitalSignature, isEncrypted } from '../engine/extract';
 import { LETTER_PAGE, zoomIn, zoomOut } from '../engine/zoom';
 import type { OpenedFile, OsFamily, Platform } from '../platform';
-import { ProtectedStrip, ScanCard, SignedStrip, SignedWarning } from './editing/Notices';
+import { DocumentStrip, ScanCard, SignedWarning } from './editing/Notices';
 import { EditToasts } from './editing/EditToasts';
 import { PageEditing } from './editing/PageEditing';
 import type { DocumentEditor } from './editing/useDocumentEditor';
@@ -15,7 +15,7 @@ import { useSigning } from './signing/useSigning';
 import { AnnotateBar } from './annotating/AnnotateBar';
 import { useAnnotating } from './annotating/useAnnotating';
 import { useFormFields } from './forms/useFormFields';
-import { modeHint } from './modeHint';
+import { fileStateLabel, modeHint } from './statusText';
 import { PageStack } from './PageStack';
 import { SidePanel } from './SidePanel';
 import { SearchBar } from './SearchBar';
@@ -25,6 +25,7 @@ import { TopBar, type EditorMode } from './TopBar';
 import { useDocumentCommands, type DocumentViewHandle } from './useDocumentCommands';
 import { usePageSizes } from './usePageSizes';
 import { usePageText } from './usePageText';
+import { useReportUnsavedWork } from './useReportUnsavedWork';
 import { useDocumentSearch } from './useSearch';
 import { useZoom } from './useZoom';
 
@@ -75,6 +76,7 @@ export function DocumentView({
   const pageText = usePageText(pdf);
   const scan = useScanCheck(mode, currentPage, pageText);
   const search = useDocumentSearch(pdf, scrollToPageRef);
+  const currentPageSize = pageSizes[currentPage - 1] ?? LETTER_PAGE;
 
   const changeMode = useCallback(
     (next: EditorMode) => {
@@ -94,12 +96,7 @@ export function DocumentView({
       return;
     }
     setMode('edit');
-    session.addText(
-      currentPage,
-      NEW_TEXT_INSET,
-      NEW_TEXT_INSET,
-      pageSizes[currentPage - 1] ?? LETTER_PAGE,
-    );
+    session.addText(currentPage, NEW_TEXT_INSET, NEW_TEXT_INSET, currentPageSize);
   };
 
   useDocumentCommands({
@@ -115,16 +112,9 @@ export function DocumentView({
     },
   });
 
-  const hasUnsavedWork = draft !== null || session.recording || editor.changes > 0;
-  useEffect(() => {
-    onUnsavedWorkChange(hasUnsavedWork);
-  }, [hasUnsavedWork, onUnsavedWorkChange]);
-  // Closing the document, or a crash, leaves nothing to protect.
-  useEffect(
-    () => () => {
-      onUnsavedWorkChange(false);
-    },
-    [onUnsavedWorkChange],
+  useReportUnsavedWork(
+    draft !== null || session.recording || editor.changes > 0,
+    onUnsavedWorkChange,
   );
 
   const chooseImage = async () => {
@@ -140,26 +130,21 @@ export function DocumentView({
     }
   };
 
-  const stateLabel = () => {
-    if (editor.changes > 0) {
-      return editor.changes === 1 ? '1 unsaved change' : `${editor.changes} unsaved changes`;
-    }
-    if (isProtected) return 'Protected';
-    if (signedLocked) return 'Looks signed';
-    return pdf.pageCount === 1 ? '1 page' : `${pdf.pageCount} pages`;
-  };
-
   const canFillForm = !isProtected && !signedLocked;
   const showsFormPanel = mode === 'select' && canFillForm && form.total > 0;
   const hasPanel = mode === 'sign' || mode === 'note' || showsFormPanel;
-  const pageForTools = pageSizes[currentPage - 1] ?? LETTER_PAGE;
 
   return (
     <div className="window" data-os={os}>
       <TopBar
         os={os}
         fileName={file.name}
-        fileState={stateLabel()}
+        fileState={fileStateLabel({
+          changes: editor.changes,
+          isProtected,
+          signedLocked,
+          pageCount: pdf.pageCount,
+        })}
         mode={mode}
         editBlocked={isProtected ? 'This PDF is protected against changes.' : null}
         canUndo={editor.canUndo}
@@ -180,17 +165,13 @@ export function DocumentView({
           onSelect={(pageNumber) => scrollToPageRef.current?.(pageNumber)}
         />
         <div className="stage">
-          {isProtected ? (
-            <ProtectedStrip />
-          ) : signedLocked ? (
-            <SignedStrip
-              onEditAnyway={() => {
-                setSignedWarning('edit');
-              }}
-            />
-          ) : (
-            <span />
-          )}
+          <DocumentStrip
+            isProtected={isProtected}
+            signedLocked={signedLocked}
+            onEditAnyway={() => {
+              setSignedWarning('edit');
+            }}
+          />
           <PageStack
             document={pdf}
             pageSizes={pageSizes}
@@ -230,7 +211,7 @@ export function DocumentView({
             <AnnotateBar
               annotating={annotating}
               currentPage={currentPage}
-              centre={{ x: pageForTools.width / 2, y: pageForTools.height / 2 }}
+              centre={{ x: currentPageSize.width / 2, y: currentPageSize.height / 2 }}
               onChooseImage={() => {
                 void chooseImage();
               }}

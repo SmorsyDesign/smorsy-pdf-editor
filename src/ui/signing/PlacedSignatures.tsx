@@ -1,9 +1,4 @@
-import {
-  useEffect,
-  useRef,
-  type KeyboardEvent,
-  type PointerEvent as ReactPointerEvent,
-} from 'react';
+import { useRef, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import type { PlacedSignature } from '../../engine/edits/model';
 import {
   MIN_SIGNATURE_WIDTH,
@@ -15,12 +10,12 @@ import {
   type Corner,
 } from '../../engine/signatures/placement';
 import type { PageSize } from '../../engine/zoom';
+import { ARROWS, FINE_KEY_STEP, KEY_STEP } from '../nudgeKeys';
+import { useFocusOnRequest } from '../useFocusOnRequest';
 import { PlacedToolbar } from './PlacedToolbar';
 import { useDragPreview } from './useDragPreview';
 import type { Signing } from './useSigning';
 
-const KEY_STEP = 4;
-const FINE_KEY_STEP = 1;
 const TURN_STEP = 5;
 // The handle stands this far above the signature, which needs room on the page.
 const HANDLE_ROOM = 44;
@@ -31,13 +26,6 @@ const CORNERS: readonly (readonly [Corner, string, string])[] = [
   ['bottom-left', 'h-bl', 'Resize from bottom left'],
   ['bottom-right', 'h-br', 'Resize from bottom right'],
 ];
-
-const ARROWS: Readonly<Record<string, readonly [number, number]>> = {
-  ArrowLeft: [-1, 0],
-  ArrowRight: [1, 0],
-  ArrowUp: [0, -1],
-  ArrowDown: [0, 1],
-};
 
 type Shape = Pick<PlacedSignature, 'rect' | 'angle'>;
 
@@ -54,12 +42,7 @@ function Placed({ placement, signing, scale, page, interactive, selected }: Plac
   const rootRef = useRef<HTMLDivElement>(null);
   const { id } = placement;
 
-  const { focusPlacedId, placedFocused } = signing;
-  useEffect(() => {
-    if (focusPlacedId !== id) return;
-    rootRef.current?.focus();
-    placedFocused();
-  }, [focusPlacedId, id, placedFocused]);
+  useFocusOnRequest(rootRef, id, signing.focusPlacedId, signing.placedFocused);
 
   const { preview, trackPointer } = useDragPreview<Shape>(selected, scale, (shape) => {
     signing.change(id, shape);

@@ -192,7 +192,7 @@ export function ScanCard({ onAddText, onClose }: { onAddText: () => void; onClos
   );
 }
 
-export function SignedStrip({ onEditAnyway }: { onEditAnyway: () => void }) {
+function SignedStrip({ onEditAnyway }: { onEditAnyway: () => void }) {
   return (
     <div className="signed-strip" role="status">
       <Icon name="lock" />
@@ -228,7 +228,7 @@ export function SignedWarning({
   );
 }
 
-export function ProtectedStrip() {
+function ProtectedStrip() {
   return (
     <div className="signed-strip" role="status">
       <Icon name="lock" />
@@ -237,4 +237,17 @@ export function ProtectedStrip() {
       </span>
     </div>
   );
+}
+
+interface DocumentStripProps {
+  readonly isProtected: boolean;
+  readonly signedLocked: boolean;
+  readonly onEditAnyway: () => void;
+}
+
+/** Says why a document can't be changed. With nothing to say, it still holds its row in the stage. */
+export function DocumentStrip({ isProtected, signedLocked, onEditAnyway }: DocumentStripProps) {
+  if (isProtected) return <ProtectedStrip />;
+  if (signedLocked) return <SignedStrip onEditAnyway={onEditAnyway} />;
+  return <span />;
 }

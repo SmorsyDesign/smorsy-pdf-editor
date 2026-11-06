@@ -1,9 +1,9 @@
+import { rectFromCorners } from '../coordinates';
 import type { Rect } from '../edits/model';
 
 export type FieldValue = string | boolean | readonly string[];
 
-export type FieldKind =
-  'text' | 'checkbox' | 'radio' | 'dropdown' | 'list' | 'signature' | 'button';
+type FieldKind = 'text' | 'checkbox' | 'radio' | 'dropdown' | 'list' | 'signature' | 'button';
 
 export interface FormField {
   /** Unique to this spot on the page: a radio group has one name and several spots. */
@@ -108,26 +108,21 @@ function valueOf(widget: WidgetData, kind: FieldKind): FieldValue {
 export function fieldFromWidget(
   widget: WidgetData,
   pageNumber: number,
-  toScreen: (rect: readonly number[]) => readonly number[],
+  toDisplay: (rect: readonly number[]) => readonly number[],
 ): FormField | null {
   if (widget.subtype !== 'Widget' || widget.hidden || !widget.fieldName || !widget.rect) {
     return null;
   }
   const kind = kindOf(widget);
   if (!kind) return null;
-  const [x1 = 0, y1 = 0, x2 = 0, y2 = 0] = toScreen(widget.rect);
+  const [x1 = 0, y1 = 0, x2 = 0, y2 = 0] = toDisplay(widget.rect);
   return {
     id: widget.id ?? `${widget.fieldName}-${pageNumber}-${x1}-${y1}`,
     name: widget.fieldName,
     label: widget.alternativeText?.trim() || friendlyName(widget.fieldName),
     kind,
     pageNumber,
-    rect: {
-      x: Math.min(x1, x2),
-      y: Math.min(y1, y2),
-      width: Math.abs(x2 - x1),
-      height: Math.abs(y2 - y1),
-    },
+    rect: rectFromCorners(x1, y1, x2, y2),
     value: valueOf(widget, kind),
     onValue: widget.buttonValue ?? widget.exportValue ?? '',
     options: (widget.options ?? []).map(

@@ -64,6 +64,11 @@ function setChoices(
   }
 }
 
+function choicesIn(value: string | readonly string[]): readonly string[] {
+  if (typeof value !== 'string') return value;
+  return value === '' ? [] : [value];
+}
+
 function fillOne(field: unknown, value: FieldValue, font: PDFFont): boolean {
   if (field instanceof PDFTextField && typeof value === 'string') {
     checkCharacters(value, font);
@@ -77,9 +82,9 @@ function fillOne(field: unknown, value: FieldValue, font: PDFFont): boolean {
     if (value === '') field.clear();
     else field.select(value);
   } else if (field instanceof PDFDropdown && typeof value === 'string') {
-    setChoices(field, value === '' ? [] : [value], font);
+    setChoices(field, choicesIn(value), font);
   } else if (field instanceof PDFOptionList && typeof value !== 'boolean') {
-    setChoices(field, typeof value === 'string' ? (value === '' ? [] : [value]) : value, font);
+    setChoices(field, choicesIn(value), font);
   } else {
     return false;
   }

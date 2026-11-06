@@ -8,13 +8,9 @@ import {
   type PDFPageProxy,
 } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { EngineError } from './errors';
-import {
-  fieldFromWidget,
-  type FormField,
-  type WidgetData,
-  withBoxGroupsAsChoices,
-} from './forms/fields';
-import { noteFromAnnotation, type ExistingNote, type NoteData } from './notes';
+import type { FormField } from './forms/fields';
+import type { ExistingNote } from './notes';
+import { readExistingNotes, readFormFields } from './pdf-annotations';
 import {
   groupTextItems,
   type FontFacts,
@@ -287,42 +283,11 @@ class PdfJsDocument implements PdfDocument {
   }
 
   async existingNotes(pageNumber: number): Promise<readonly ExistingNote[]> {
-    const page = await this.page(pageNumber);
-    const viewport = page.getViewport({ scale: 1 });
-    const annotations = (await page.getAnnotations()) as readonly NoteData[];
-    return annotations.flatMap(
-      (data) =>
-        noteFromAnnotation(data, ([x1 = 0, y1 = 0, x2 = 0, y2 = 0]) => [
-          ...(viewport.convertToViewportPoint(x1, y1) as readonly number[]),
-          ...(viewport.convertToViewportPoint(x2, y2) as readonly number[]),
-        ]) ?? [],
-    );
+    return readExistingNotes(await this.page(pageNumber));
   }
 
-  async formFields(): Promise<readonly FormField[]> {
-    const objects = await this.proxy.getFieldObjects();
-    if (!objects) return [];
-    const pageNumbers = new Set<number>();
-    for (const entries of objects.values()) {
-      for (const entry of entries as readonly { page?: number }[]) {
-        // A field that only groups others isn't on any page, which it reports as page -1.
-        if (typeof entry.page === 'number' && entry.page >= 0) pageNumbers.add(entry.page + 1);
-      }
-    }
-    const fields: FormField[] = [];
-    for (const pageNumber of [...pageNumbers].sort((one, two) => one - two)) {
-      const page = await this.page(pageNumber);
-      const viewport = page.getViewport({ scale: 1 });
-      const widgets = (await page.getAnnotations()) as readonly WidgetData[];
-      for (const widget of widgets) {
-        const field = fieldFromWidget(widget, pageNumber, ([x1 = 0, y1 = 0, x2 = 0, y2 = 0]) => [
-          ...(viewport.convertToViewportPoint(x1, y1) as readonly number[]),
-          ...(viewport.convertToViewportPoint(x2, y2) as readonly number[]),
-        ]);
-        if (field) fields.push(field);
-      }
-    }
-    return withBoxGroupsAsChoices(fields);
+  formFields(): Promise<readonly FormField[]> {
+    return readFormFields(this.proxy, (pageNumber) => this.page(pageNumber));
   }
 
   close(): Promise<void> {

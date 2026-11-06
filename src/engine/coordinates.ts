@@ -1,3 +1,5 @@
+import type { Rect } from './edits/model';
+
 export interface PageBox {
   /** The page's visible box in PDF space, before rotation. */
   readonly x: number;
@@ -13,6 +15,16 @@ export interface PageBox {
 export interface Point {
   readonly x: number;
   readonly y: number;
+}
+
+/** The box between two opposite corners, which can come in either order on a turned page. */
+export function rectFromCorners(x1: number, y1: number, x2: number, y2: number): Rect {
+  return {
+    x: Math.min(x1, x2),
+    y: Math.min(y1, y2),
+    width: Math.abs(x2 - x1),
+    height: Math.abs(y2 - y1),
+  };
 }
 
 /** Converts from the page as displayed (y down) to PDF space (y up, unrotated). */

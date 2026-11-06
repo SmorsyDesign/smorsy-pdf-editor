@@ -12,7 +12,8 @@ import {
 import { FIELD_PROBLEM } from '../errors';
 import { friendlyName } from '../forms/fields';
 import { checkCharacters } from './field-filling';
-import { currentLook, drawLooksIntoPage, hasValue } from './form-fields';
+import { currentLook, drawLooksIntoPage } from './field-looks';
+import { hasValue } from './form-fields';
 import { isShown, name, rectOf } from './page-annotations';
 
 function pageOfWidget(doc: PDFDocument, field: PDFField, index: number): PDFPage | undefined {

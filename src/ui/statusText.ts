@@ -29,3 +29,23 @@ export function modeHint(
   if (signing.selected) return 'Drag the corners to resize, or the top handle to rotate';
   return 'Create a signature to place it';
 }
+
+interface FileFacts {
+  readonly changes: number;
+  readonly isProtected: boolean;
+  readonly signedLocked: boolean;
+  readonly pageCount: number;
+}
+
+/** What the top bar says about the file beside its name. */
+export function fileStateLabel({
+  changes,
+  isProtected,
+  signedLocked,
+  pageCount,
+}: FileFacts): string {
+  if (changes > 0) return changes === 1 ? '1 unsaved change' : `${changes} unsaved changes`;
+  if (isProtected) return 'Protected';
+  if (signedLocked) return 'Looks signed';
+  return pageCount === 1 ? '1 page' : `${pageCount} pages`;
+}

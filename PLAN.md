@@ -110,6 +110,12 @@ Editing PDF text isn't like editing a Word document. A PDF stores positioned gly
 - **IRS forms count as digitally signed.** They carry an Adobe usage-rights signature, which editing does break, so they open in View mode like any signed PDF.
 - **Quit is a custom menu item,** because the operating system's own one ends the app without asking. macOS can also quit from the Dock or at logout, so `src-tauri/src/quit.rs` answers that request: straight through with nothing unsaved, otherwise it brings the window forward and asks.
 - **Saved signatures were dropped (owner's decision).** See decision 8.
+- **Annotations are real PDF annotations; whiteout and images go in the page.** Other PDF apps can then edit or remove annotations. Text can go on top of a whiteout, which an annotation wouldn't allow.
+- **Whiteout moves what viewers paint on top down into the page first.** Otherwise a see-through field or an existing annotation would show through in the saved file, while looking hidden on screen.
+- **Locking answers has its own code rather than the library's `flatten`.** That paints hidden fields, ignores how a drawing fits its box, and removes a field even after failing to paint it. Signature fields stay; a form's own buttons go.
+- **Same-named checkboxes with different meanings behave as radio buttons.** They share one value in the file, so only one can be on.
+- **A new note stays out of the edit log until it has words.** Leaving one empty then changes nothing about the file. Words are recorded as they're typed, because a shortcut can save without leaving the box.
+- **Notes already in a file can be read, not changed.** The page shows only a pin, so a saved note's words would otherwise be unreachable here.
 - **A signature over a solid form field moves that field's looks into the page.** Viewers always paint fields last, so nothing can sit on top of a solid one. The field stays and stays fillable, but becomes see-through. Over other annotations, whose order viewers do respect, the signature becomes a stamp annotation.
 - **A filled-in field under an edit becomes part of the page, and the app says so.** Leaving it as a field would mean changing it later showed the old text underneath. A form's own buttons stay on top, also with a note.
 - **The date stamp starts off,** though the design mockup shows it ticked, so nothing is added that wasn't asked for.

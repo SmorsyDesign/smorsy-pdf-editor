@@ -1,43 +1,25 @@
+import { useRef, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import {
-  useEffect,
-  useMemo,
-  useRef,
-  type KeyboardEvent,
-  type PointerEvent as ReactPointerEvent,
-  useState,
-} from 'react';
-import {
+  annotationLabel,
   boundsOfAnnotation,
   canMove,
-  canResize,
   movedAnnotation,
-  scaledAnnotation,
   type Annotation,
-  annotationLabel,
 } from '../../engine/edits/annotations';
 import type { Rect } from '../../engine/edits/model';
 import type { PageSize } from '../../engine/zoom';
 import { Icon } from '../Icon';
+import { ARROWS, FINE_KEY_STEP, KEY_STEP } from '../nudgeKeys';
 import { useDragPreview } from '../signing/useDragPreview';
-import { noteColor, noteCardPlace } from './AnnotationArt';
+import { useFocusOnRequest } from '../useFocusOnRequest';
+import { noteColor } from './AnnotationArt';
+import { AnnotationToolbar } from './AnnotationToolbar';
+import { NoteCard } from './NoteCard';
 import type { Annotating } from './useAnnotating';
 
 /** How far a press can move and still be a click rather than a drag. */
 const CLICK_SLOP = 4;
 const MIN_TARGET = 24;
-const KEY_STEP = 4;
-const FINE_KEY_STEP = 1;
-const STEP = 1.1;
-const BAR_HEIGHT = 40;
-const GAP = 8;
-const EDGE = 8;
-
-const ARROWS: Readonly<Record<string, readonly [number, number]>> = {
-  ArrowLeft: [-1, 0],
-  ArrowRight: [1, 0],
-  ArrowUp: [0, -1],
-  ArrowDown: [0, 1],
-};
 
 interface ControlProps {
   readonly annotation: Annotation;
@@ -45,131 +27,6 @@ interface ControlProps {
   readonly scale: number;
   readonly page: PageSize;
   readonly interactive: boolean;
-}
-
-function Toolbar({ annotation, annotating, scale, page }: Omit<ControlProps, 'interactive'>) {
-  const { id } = annotation;
-  const bounds = boundsOfAnnotation(annotation);
-  const above = bounds.y * scale - BAR_HEIGHT - GAP;
-  const width = 40 + (canResize(annotation) ? 64 : 0) + (canMove(annotation) ? 32 : 0);
-  const left = Math.max(EDGE, Math.min(bounds.x * scale, page.width * scale - width - EDGE));
-  const position = {
-    left: Math.round(left),
-    top: Math.round(above >= EDGE ? above : (bounds.y + bounds.height) * scale + GAP),
-  };
-  return (
-    <div
-      className="float-bar placed-bar"
-      role="toolbar"
-      aria-label="Annotation actions"
-      style={position}
-      onClick={(event) => {
-        event.stopPropagation();
-      }}
-    >
-      {canResize(annotation) && (
-        <>
-          <button
-            type="button"
-            className="icon-btn"
-            aria-label="Make smaller"
-            onClick={() => {
-              annotating.change(scaledAnnotation(annotation, 1 / STEP, page), `resize-${id}`);
-            }}
-          >
-            <Icon name="minus" />
-          </button>
-          <button
-            type="button"
-            className="icon-btn"
-            aria-label="Make larger"
-            onClick={() => {
-              annotating.change(scaledAnnotation(annotation, STEP, page), `resize-${id}`);
-            }}
-          >
-            <Icon name="plus" />
-          </button>
-        </>
-      )}
-      {canMove(annotation) && (
-        <button
-          type="button"
-          className="icon-btn"
-          aria-label="Move: click where it should go"
-          aria-pressed={annotating.moving?.id === id}
-          onClick={() => {
-            annotating.toggleMoving(id);
-          }}
-        >
-          <Icon name="move" />
-        </button>
-      )}
-      <button
-        type="button"
-        className="icon-btn"
-        aria-label="Delete"
-        onClick={() => {
-          annotating.remove(id);
-        }}
-      >
-        <Icon name="trash" />
-      </button>
-    </div>
-  );
-}
-
-function NoteCard({ annotation, annotating, scale, page }: Omit<ControlProps, 'interactive'>) {
-  // Mounted once per opening, so all the typing in one visit is one undo.
-  const [typing] = useState(() => `note-${crypto.randomUUID()}`);
-  if (annotation.kind !== 'note') return null;
-  return (
-    <div
-      className="note-card"
-      data-testid="note-card"
-      style={{
-        ...noteCardPlace(boundsOfAnnotation(annotation), scale, page),
-        background: noteColor(annotation.color),
-      }}
-      onClick={(event) => {
-        event.stopPropagation();
-      }}
-      onPointerDown={(event) => {
-        event.stopPropagation();
-      }}
-    >
-      <textarea
-        aria-label="Note"
-        // A note is opened to be typed in, so it should be ready straight away.
-        ref={(field) => {
-          if (field && !annotation.text) field.focus();
-        }}
-        defaultValue={annotation.text}
-        rows={4}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') {
-            event.stopPropagation();
-            const empty = event.currentTarget.value.trim() === '';
-            event.currentTarget.blur();
-            // An empty note has gone by now, and removing it has already moved focus on.
-            if (!empty) annotating.focus(annotation.id);
-          }
-        }}
-        // As it's typed rather than on leaving, because a shortcut can save without leaving the box.
-        onChange={(event) => {
-          annotating.change({ ...annotation, text: event.target.value }, typing);
-        }}
-        onBlur={(event) => {
-          // A note with nothing in it would just be a stray mark on the page.
-          // Part of the same undo as the typing, so undoing can't bring back a note with no words.
-          // Focus only needs rescuing when it isn't already on its way somewhere else.
-          if (event.target.value.trim() === '') {
-            annotating.remove(annotation.id, { group: typing, focusPages: !event.relatedTarget });
-          }
-          annotating.closeNote();
-        }}
-      />
-    </div>
-  );
 }
 
 /** A flat arrow or a thin line has almost no area of its own, so this keeps it easy to pick up. */
@@ -189,21 +46,12 @@ function Control({ annotation, annotating, scale, page, interactive }: ControlPr
   const rootRef = useRef<HTMLDivElement>(null);
   const pressedAt = useRef({ x: 0, y: 0 });
   const { id } = annotation;
-  const onDone = useMemo(
-    () => (finished: Annotation) => {
-      annotating.change(finished);
-    },
-    [annotating],
-  );
-  const { preview, trackPointer } = useDragPreview<Annotation>(selected, scale, onDone);
+  const { preview, trackPointer } = useDragPreview<Annotation>(selected, scale, (finished) => {
+    annotating.change(finished);
+  });
   const shown = preview ?? annotation;
 
-  const { focusId, focused } = annotating;
-  useEffect(() => {
-    if (focusId !== id) return;
-    rootRef.current?.focus();
-    focused();
-  }, [focusId, focused, id]);
+  useFocusOnRequest(rootRef, id, annotating.focusId, annotating.focused);
 
   const startDrag = (event: ReactPointerEvent<HTMLElement>) => {
     if (event.button !== 0 || !interactive) return;
@@ -285,11 +133,11 @@ function Control({ annotation, annotating, scale, page, interactive }: ControlPr
           </span>
         )}
       </div>
-      {annotating.openNoteId === id && (
-        <NoteCard annotation={annotation} annotating={annotating} scale={scale} page={page} />
+      {annotation.kind === 'note' && annotating.openNoteId === id && (
+        <NoteCard note={annotation} annotating={annotating} scale={scale} page={page} />
       )}
       {selected && interactive && (
-        <Toolbar annotation={shown} annotating={annotating} scale={scale} page={page} />
+        <AnnotationToolbar annotation={shown} annotating={annotating} scale={scale} page={page} />
       )}
     </>
   );

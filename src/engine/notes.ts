@@ -1,3 +1,4 @@
+import { rectFromCorners } from './coordinates';
 import type { Rect } from './edits/model';
 
 /** A sticky note already saved in the file, which can be read but not changed. */
@@ -31,12 +32,7 @@ export function noteFromAnnotation(
   const [x1 = 0, y1 = 0, x2 = 0, y2 = 0] = toDisplay(data.rect);
   return {
     id: data.id,
-    rect: {
-      x: Math.min(x1, x2),
-      y: Math.min(y1, y2),
-      width: Math.abs(x2 - x1),
-      height: Math.abs(y2 - y1),
-    },
+    rect: rectFromCorners(x1, y1, x2, y2),
     text,
     author: data.titleObj?.str?.trim() ?? '',
   };
