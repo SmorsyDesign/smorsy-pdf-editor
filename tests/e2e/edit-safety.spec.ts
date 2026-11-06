@@ -351,6 +351,24 @@ test.describe('when things fail', () => {
     expect(await savedText(page)).toContain('Precious words');
   });
 
+  test('a font that never arrives can’t leave an edit stuck', async ({ page }) => {
+    await page.route('**/LiberationMono-Regular.ttf', () => {
+      // Never answers, which is what a stalled load looks like.
+    });
+    await openForEditing(page);
+    await page
+      .getByTestId('edit-layer')
+      .first()
+      .click({ position: { x: 96, y: 600 } });
+    await field(page).fill('Precious words');
+    await page.getByRole('combobox', { name: 'Font' }).selectOption('mono');
+    await page.keyboard.press('ControlOrMeta+Enter');
+    await expect(page.getByRole('alert')).toContainText('Your text is still here', {
+      timeout: 12_000,
+    });
+    await expect(field(page)).toHaveValue('Precious words');
+  });
+
   test('a font check that fails is shown, not hidden', async ({ page }) => {
     let requests = 0;
     await page.route('**/LiberationMono-Regular.ttf', (route) => {
@@ -387,6 +405,8 @@ test.describe('when things fail', () => {
   test('a font missing at save time stops the save, and writes nothing', async ({ page }) => {
     await openForEditing(page);
     await addText(page, 'Needs its font');
+    // The edit has to be recorded first, because this is about what happens at save time.
+    await expect(page.getByText('1 unsaved change')).toBeVisible();
     await page.route('**/fonts/**', (route) => route.abort());
     await queueSavePath(page, '/Users/test/NoFont.pdf');
     await page.getByRole('button', { name: 'Save a copy' }).click();
