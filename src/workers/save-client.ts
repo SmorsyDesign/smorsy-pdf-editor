@@ -60,5 +60,8 @@ export class SaveClient {
 
   close(): void {
     this.worker.terminate();
+    this.failure ??= 'The document was closed.';
+    for (const [id, reply] of this.pending) reply({ id, ok: false, error: this.failure });
+    this.pending.clear();
   }
 }

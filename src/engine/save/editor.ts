@@ -21,44 +21,15 @@ import {
 import { displayToUser, userAngle, type PageBox } from '../coordinates';
 import type { Color, TextBox } from '../edits/model';
 import { UNSUPPORTED_TEXT, nameCharacter } from '../errors';
-import { embeddingAllowed, findEmbeddedFont, type EmbeddedFont } from '../fonts/embedded';
-import {
-  bundledFaceFile,
-  closestBundled,
-  isTimesNewRoman,
-  standardFontFor,
-  styleFromName,
-  type BundledFamily,
-} from '../fonts/match';
+import { findEmbeddedFont, type EmbeddedFont } from '../fonts/embedded';
+import { bundledFaceFile } from '../fonts/match';
+import { FontChooser, type FontBytes, type FontOutcome, type SystemFontStyle } from './choose-font';
 
-export type FontUsed = 'embedded' | 'standard' | 'system' | 'bundled';
-export type FontMatch = 'exact' | 'same-widths' | 'closest';
-
-export interface FontOutcome {
-  readonly used: FontUsed;
-  readonly match: FontMatch;
-  readonly family?: BundledFamily;
-  /** Characters that sent it past the file's own font. */
-  readonly missing: readonly string[];
-  /** Characters no available font can draw, so they can't be saved. */
-  readonly uncovered: readonly string[];
-}
-
-export type SystemFontStyle = 'regular' | 'bold' | 'italic' | 'bold-italic';
-
-/** Supplies font files, so the engine needs no knowledge of where they live. */
-export interface FontBytes {
-  bundled(file: string): Promise<Uint8Array>;
-  system(style: SystemFontStyle): Promise<Uint8Array | null>;
-}
+export type { FontBytes, FontOutcome, SystemFontStyle } from './choose-font';
 
 type DrawFont =
   | { readonly kind: 'pdf-font'; readonly font: PDFFont }
   | { readonly kind: 'embedded'; readonly font: EmbeddedFont };
-
-interface ParsedFont {
-  hasGlyphForCodePoint(codePoint: number): boolean;
-}
 
 /** The visible page is where the crop box and media box overlap, which is what pdf.js shows. */
 function pageBoxOf(page: PDFPage): PageBox {
@@ -66,28 +37,24 @@ function pageBoxOf(page: PDFPage): PageBox {
   const media = page.getMediaBox();
   const x = Math.max(crop.x, media.x);
   const y = Math.max(crop.y, media.y);
-  const unit = page.node.get(PDFName.of('UserUnit'));
+  const width = Math.min(crop.x + crop.width, media.x + media.width) - x;
+  const height = Math.min(crop.y + crop.height, media.y + media.height) - y;
+  const unit = page.node.lookup(PDFName.of('UserUnit'));
+  const rotation = ((page.getRotation().angle % 360) + 360) % 360;
+  // A crop box that shows nothing is ignored, which is what pdf.js does when it draws the page.
+  const visible = width > 0 && height > 0 ? { x, y, width, height } : media;
   return {
-    x,
-    y,
-    width: Math.min(crop.x + crop.width, media.x + media.width) - x,
-    height: Math.min(crop.y + crop.height, media.y + media.height) - y,
-    rotation: ((page.getRotation().angle % 360) + 360) % 360,
-    unit: unit instanceof PDFNumber ? unit.asNumber() : 1,
+    x: visible.x,
+    y: visible.y,
+    width: visible.width,
+    height: visible.height,
+    rotation,
+    unit: unit instanceof PDFNumber && unit.asNumber() > 0 ? unit.asNumber() : 1,
   };
 }
 
 function toRgb({ r, g, b }: Color) {
   return rgb(r, g, b);
-}
-
-function usesOriginalFace(box: TextBox): boolean {
-  if (!box.original) return false;
-  const named = styleFromName(box.original.name);
-  return (
-    box.style.bold === (named.bold || box.original.bold) &&
-    box.style.italic === (named.italic || box.original.italic)
-  );
 }
 
 function systemStyle(bold: boolean, italic: boolean): SystemFontStyle {
@@ -96,18 +63,16 @@ function systemStyle(bold: boolean, italic: boolean): SystemFontStyle {
   return italic ? 'italic' : 'regular';
 }
 
-const uniqueCharacters = (text: string) => [...new Set(Array.from(text))];
-
 /** Applies text edits to the original bytes. Every save starts again from those bytes. */
 export class PdfEditor {
   private readonly original: Uint8Array;
   private readonly fonts: FontBytes;
-  private inspection: Promise<PDFDocument> | null = null;
-  private readonly parsed = new Map<string, Promise<ParsedFont>>();
+  private readonly chooser: FontChooser;
 
   constructor(original: Uint8Array, fonts: FontBytes) {
     this.original = original;
     this.fonts = fonts;
+    this.chooser = new FontChooser(() => this.load(), fonts);
   }
 
   private async load(): Promise<PDFDocument> {
@@ -116,116 +81,9 @@ export class PdfEditor {
     return doc;
   }
 
-  private inspect(): Promise<PDFDocument> {
-    this.inspection ??= this.load();
-    return this.inspection;
-  }
-
-  private async systemFontBytes(box: TextBox): Promise<Uint8Array | null> {
-    const bytes = await this.fonts.system(systemStyle(box.style.bold, box.style.italic));
-    return bytes && embeddingAllowed(bytes) ? bytes : null;
-  }
-
-  private parse(key: string, read: () => Promise<Uint8Array>): Promise<ParsedFont> {
-    let font = this.parsed.get(key);
-    if (!font) {
-      font = read().then((bytes) => fontkit.create(bytes) as unknown as ParsedFont);
-      this.parsed.set(key, font);
-    }
-    return font;
-  }
-
-  private async uncoveredBy(
-    text: string,
-    key: string,
-    read: () => Promise<Uint8Array>,
-  ): Promise<readonly string[]> {
-    const font = await this.parse(key, read);
-    return uniqueCharacters(text).filter(
-      (character) => !font.hasGlyphForCodePoint(character.codePointAt(0) ?? 0),
-    );
-  }
-
-  private async bundledOutcome(
-    box: TextBox,
-    family: BundledFamily,
-    match: FontMatch,
-    missing: readonly string[],
-  ): Promise<FontOutcome> {
-    const file = bundledFaceFile(family, box.style.bold, box.style.italic);
-    const uncovered = await this.uncoveredBy(box.lines.join(''), file, () =>
-      this.fonts.bundled(file),
-    );
-    return { used: 'bundled', match, family, missing, uncovered };
-  }
-
-  private async systemOutcome(
-    box: TextBox,
-    bytes: Uint8Array,
-    missing: readonly string[],
-  ): Promise<FontOutcome> {
-    const key = `system-${systemStyle(box.style.bold, box.style.italic)}`;
-    const uncovered = await this.uncoveredBy(box.lines.join(''), key, () => Promise.resolve(bytes));
-    return { used: 'system', match: 'exact', missing, uncovered };
-  }
-
-  /** Follows the order in PLAN.md: the file's own font, then Times New Roman, then bundled. */
-  async resolveFont(box: TextBox): Promise<FontOutcome> {
-    const { font: chosen } = box.style;
-    const text = box.lines.join('');
-    if (chosen === 'times-new-roman') {
-      const bytes = await this.systemFontBytes(box);
-      return bytes
-        ? this.systemOutcome(box, bytes, [])
-        : this.bundledOutcome(box, 'serif', 'same-widths', []);
-    }
-    if (chosen !== 'original') return this.bundledOutcome(box, chosen, 'exact', []);
-    if (!box.original) return this.bundledOutcome(box, 'sans', 'exact', []);
-
-    let missing: readonly string[] = [];
-    if (usesOriginalFace(box)) {
-      const standard = standardFontFor(box.original.name);
-      if (standard) {
-        const doc = await this.inspect();
-        const supported = new Set((await doc.embedFont(standard)).getCharacterSet());
-        missing = uniqueCharacters(text).filter(
-          (character) => !supported.has(character.codePointAt(0) ?? 0),
-        );
-        if (missing.length === 0) {
-          return { used: 'standard', match: 'exact', missing, uncovered: [] };
-        }
-      } else if (!box.original.type3) {
-        const absent = await this.missingFromEmbedded(box, text);
-        if (absent?.length === 0) {
-          return { used: 'embedded', match: 'exact', missing: [], uncovered: [] };
-        }
-        missing = absent ?? [];
-      }
-    }
-
-    if (isTimesNewRoman(box.original.name)) {
-      const bytes = await this.systemFontBytes(box);
-      if (bytes) return this.systemOutcome(box, bytes, missing);
-    }
-    const { family, sameWidths } = closestBundled(box.original);
-    return this.bundledOutcome(box, family, sameWidths ? 'same-widths' : 'closest', missing);
-  }
-
-  /**
-   * Only characters visibly drawn with this font on the page count as available. A file could
-   * label an unused glyph wrongly, and typing that character would paint something else.
-   */
-  private async missingFromEmbedded(box: TextBox, text: string): Promise<readonly string[] | null> {
-    const doc = await this.inspect();
-    const font = findEmbeddedFont(
-      doc.getPage(box.pageNumber - 1),
-      doc.context,
-      box.original?.name ?? '',
-    );
-    if (!font) return null;
-    const known = new Set(Array.from(box.original?.knownCharacters ?? ''));
-    const unknown = uniqueCharacters(text).filter((character) => !known.has(character));
-    return [...new Set([...font.missing(text), ...unknown])];
+  /** Which font an edit will use, and any characters that have no font. */
+  resolveFont(box: TextBox): Promise<FontOutcome> {
+    return this.chooser.resolve(box);
   }
 
   private async drawFont(
@@ -234,7 +92,7 @@ export class PdfEditor {
     box: TextBox,
     embedded: Map<string, Promise<PDFFont>>,
   ): Promise<DrawFont> {
-    const outcome = await this.resolveFont(box);
+    const outcome = await this.chooser.resolve(box);
     if (outcome.uncovered.length > 0) {
       throw new Error(UNSUPPORTED_TEXT + outcome.uncovered.map(nameCharacter).join(' '));
     }
@@ -256,7 +114,7 @@ export class PdfEditor {
       return { kind: 'pdf-font', font: await once(name, () => doc.embedFont(name)) };
     }
     if (outcome.used === 'system') {
-      const bytes = await this.systemFontBytes(box);
+      const bytes = await this.chooser.systemFontBytes(box);
       if (bytes) {
         const key = `system-${systemStyle(box.style.bold, box.style.italic)}`;
         const font = await once(key, () => doc.embedFont(bytes, { subset: true }));

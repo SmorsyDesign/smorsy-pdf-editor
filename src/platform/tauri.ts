@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { Menu, MenuItem, PredefinedMenuItem, Submenu } from '@tauri-apps/api/menu';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { open, save } from '@tauri-apps/plugin-dialog';
@@ -162,10 +163,15 @@ async function buildMenu(
 export async function createTauriPlatform(): Promise<Platform> {
   const os = detectOs();
   const listeners = new Set<(command: MenuCommand) => void>();
-  const documentItems = await buildMenu(os, (command) => {
+  const send = (command: MenuCommand) => {
     listeners.forEach((listener) => {
       listener(command);
     });
+  };
+  const documentItems = await buildMenu(os, send);
+  // macOS can quit from the Dock or at logout. It's held off in Rust, and asks here instead.
+  await listen('quit-requested', () => {
+    send('quit');
   });
 
   return {

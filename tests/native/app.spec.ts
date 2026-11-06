@@ -201,6 +201,27 @@ describe('the built app', () => {
     expect(violations).toEqual([]);
   });
 
+  it('asks before quitting the way the macOS Dock does', async function () {
+    if (process.platform !== 'darwin') this.skip();
+    await openFromStartScreen(plainText);
+    await waitForPageDrawn();
+    await $('button=Edit text').click();
+    await $('[aria-label^="Edit text: Plain text, page 1"]').click();
+    await $('[data-testid="text-editor"] textarea').setValue('Unsaved in the real app');
+    await browser.keys(['Meta', 'Enter']);
+    await browser.execute(() =>
+      (
+        window as unknown as {
+          __TAURI_INTERNALS__: { invoke: (command: string) => Promise<void> };
+        }
+      ).__TAURI_INTERNALS__.invoke('e2e_request_terminate'),
+    );
+    const prompt = $('[role="alertdialog"]');
+    await expect(prompt).toBeDisplayed();
+    await prompt.$('button=Cancel').click();
+    await expect($('span*=unsaved change')).toBeDisplayed();
+  });
+
   it('offers the computer’s Times New Roman when it has one', async () => {
     await openFromStartScreen(plainText);
     await expect(pageIndicator()).toHaveText('Page 1 of 3');

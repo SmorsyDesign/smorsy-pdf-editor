@@ -10,15 +10,8 @@ import type { PdfDocument } from '../engine/document';
 import { hasDigitalSignature, isEncrypted } from '../engine/extract';
 import { LETTER_PAGE, zoomIn, zoomOut } from '../engine/zoom';
 import type { MenuCommand, OpenedFile, OsFamily } from '../platform';
-import {
-  EditNote,
-  ProblemNote,
-  ProtectedStrip,
-  ScanCard,
-  SignedStrip,
-  SignedWarning,
-  needsFontCard,
-} from './editing/Notices';
+import { ProtectedStrip, ScanCard, SignedStrip, SignedWarning } from './editing/Notices';
+import { EditToasts } from './editing/EditToasts';
 import { PageEditing } from './editing/PageEditing';
 import type { DocumentEditor } from './editing/useDocumentEditor';
 import { useScanCheck } from './editing/useScanCheck';
@@ -46,6 +39,7 @@ interface DocumentViewProps {
   readonly document: PdfDocument;
   readonly os: OsFamily;
   readonly announcement: string;
+  readonly originalNote: string | null;
   readonly editor: DocumentEditor;
   readonly saveLabel: string;
   readonly onSave: () => void;
@@ -54,13 +48,21 @@ interface DocumentViewProps {
 
 const NEW_TEXT_INSET = 72;
 
-const isTyping = () => document.activeElement instanceof HTMLTextAreaElement;
+/** Fields have their own undo, which comes first. A colour picker has none. */
+const isTyping = () => {
+  const active = document.activeElement;
+  return (
+    active instanceof HTMLTextAreaElement ||
+    (active instanceof HTMLInputElement && active.type !== 'color')
+  );
+};
 
 export function DocumentView({
   file,
   document: pdf,
   os,
   announcement,
+  originalNote,
   editor,
   saveLabel,
   onSave,
@@ -172,8 +174,6 @@ export function DocumentView({
     return pdf.pageCount === 1 ? '1 page' : `${pdf.pageCount} pages`;
   };
 
-  const { notice } = editor;
-
   return (
     <div className="window" data-os={os}>
       <TopBar
@@ -202,15 +202,17 @@ export function DocumentView({
           onSelect={(pageNumber) => scrollToPageRef.current?.(pageNumber)}
         />
         <div className="stage">
-          {isProtected && <ProtectedStrip />}
-          {!isProtected && signedLocked && (
+          {isProtected ? (
+            <ProtectedStrip />
+          ) : signedLocked ? (
             <SignedStrip
               onEditAnyway={() => {
                 setSignedWarning(true);
               }}
             />
+          ) : (
+            <span />
           )}
-          {!isProtected && !signedLocked && <span />}
           <PageStack
             document={pdf}
             pageSizes={pageSizes}
@@ -258,22 +260,7 @@ export function DocumentView({
               }}
             />
           )}
-          {notice && !needsFontCard(notice) && !draft && (
-            <EditNote
-              notice={notice}
-              showCovered={session.showCovered}
-              showSameWidths={session.showSameWidths}
-              onDismiss={session.dismissNotice}
-            />
-          )}
-          {editor.problem && (
-            <ProblemNote
-              message={editor.problem}
-              onDismiss={() => {
-                editor.reportProblem(null);
-              }}
-            />
-          )}
+          <EditToasts editor={editor} session={session} />
           {scan.showScanCard && !draft && (
             <ScanCard
               onAddText={() => {
@@ -296,7 +283,7 @@ export function DocumentView({
         }
         fontsReplaced={editor.substitutedFonts}
         message={
-          (editor.changes === 0 && announcement) ||
+          ((editor.changes === 0 && announcement) || originalNote) ??
           (signedLocked ? 'Signature unchanged' : 'Your original file stays unchanged')
         }
         percent={percent}

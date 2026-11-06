@@ -33,6 +33,7 @@ interface SaveFlowOptions {
   readonly flush: () => Promise<boolean>;
   readonly exclusively: (task: () => Promise<Outcome>) => Promise<Outcome | undefined>;
   readonly showDialog: (dialog: SaveDialog) => void;
+  readonly hasUnfinishedEdit: () => boolean;
 }
 
 /** The first save makes a new file, and later saves update that copy. */
@@ -43,12 +44,17 @@ export function useSaveFlow({
   flush,
   exclusively,
   showDialog,
+  hasUnfinishedEdit,
 }: SaveFlowOptions) {
-  const { buildBytes, markSaved, isDirty } = editor;
+  const { buildBytes, markSaved, isDirty, reportProblem } = editor;
   const [saved, setSaved] = useState<{
     readonly file: OpenedFile;
     readonly path: string;
     readonly message: string;
+    /** Saving again writes over the original, which was confirmed once already. */
+    readonly overOriginal: boolean;
+    /** The original has been replaced at some point, so it can't be called unchanged. */
+    readonly originalChanged: boolean;
   } | null>(null);
   const afterSave = useRef<(() => void) | null>(null);
   const current = saved?.file === file ? saved : null;
@@ -57,17 +63,26 @@ export function useSaveFlow({
   /** Runs once the save has let go of the app, because what's next may need a turn of its own. */
   const settle = useCallback(
     (outcome: Outcome | undefined) => {
-      if (outcome === 'asking' || outcome === undefined) return;
+      if (outcome === undefined) {
+        reportProblem('The app is still busy with another file. Try again in a moment.');
+        return;
+      }
+      if (outcome === 'asking') return;
       const next = afterSave.current;
       afterSave.current = null;
-      // An edit made while saving isn't in the file, so it's not safe to carry on and lose it.
-      if (outcome === 'saved' && !isDirty()) next?.();
+      if (outcome !== 'saved' || !next) return;
+      // Anything added while saving isn't in the file, so carrying on would lose it.
+      if (isDirty() || hasUnfinishedEdit()) {
+        reportProblem('You kept editing during the save, so nothing was closed. Save again first.');
+      } else {
+        next();
+      }
     },
-    [isDirty],
+    [hasUnfinishedEdit, isDirty, reportProblem],
   );
 
   const writeTo = useCallback(
-    async (target: OpenedFile, path: string): Promise<Outcome> => {
+    async (target: OpenedFile, path: string, overOriginal: boolean): Promise<Outcome> => {
       try {
         const { bytes, edited, entry } = await buildBytes();
         if (edited) {
@@ -77,11 +92,13 @@ export function useSaveFlow({
         }
         await platform.writeFile(path, bytes);
         markSaved(entry);
-        setSaved({
+        setSaved((previous) => ({
           file: target,
           path,
-          message: path === target.path ? 'Original file updated' : 'Copy saved',
-        });
+          overOriginal,
+          originalChanged: overOriginal || (previous?.file === target && previous.originalChanged),
+          message: overOriginal ? 'Original file updated' : 'Copy saved',
+        }));
         return 'saved';
       } catch (error) {
         showDialog(failureDialog(error, 'build-failed'));
@@ -91,42 +108,52 @@ export function useSaveFlow({
     [buildBytes, markSaved, platform, showDialog],
   );
 
-  const saveCopy = useCallback(async () => {
-    const outcome = await exclusively(async () => {
-      if (!file) return 'stopped';
-      setSaved((previous) => previous && { ...previous, message: '' });
-      try {
-        if (!(await flush())) return 'stopped';
-        const path = await platform.chooseSaveLocation(copyFileName(file.name));
-        if (path === null) return 'stopped';
-        if (await platform.isSameFile(file.path, path)) {
-          showDialog({ kind: 'confirm-replace', file, path });
-          return 'asking';
+  const saveCopy = useCallback(
+    async (next?: () => void) => {
+      const outcome = await exclusively(async () => {
+        if (!file) return 'stopped';
+        afterSave.current = next ?? null;
+        setSaved((previous) => previous && { ...previous, message: '' });
+        try {
+          if (!(await flush())) return 'stopped';
+          const path = await platform.chooseSaveLocation(copyFileName(file.name));
+          if (path === null) return 'stopped';
+          if (await platform.isSameFile(file.path, path)) {
+            showDialog({ kind: 'confirm-replace', file, path });
+            return 'asking';
+          }
+          return await writeTo(file, path, false);
+        } catch (error) {
+          showDialog(failureDialog(error, 'other'));
+          return 'stopped';
         }
-        return await writeTo(file, path);
-      } catch (error) {
-        showDialog(failureDialog(error, 'other'));
-        return 'stopped';
-      }
-    });
-    settle(outcome);
-  }, [exclusively, file, flush, platform, settle, showDialog, writeTo]);
+      });
+      settle(outcome);
+    },
+    [exclusively, file, flush, platform, settle, showDialog, writeTo],
+  );
 
-  const save = useCallback(async () => {
-    if (!file) return;
-    if (savedPath === null) {
-      await saveCopy();
-      return;
-    }
-    const outcome = await exclusively(async () =>
-      (await flush()) ? writeTo(file, savedPath) : 'stopped',
-    );
-    settle(outcome);
-  }, [exclusively, file, flush, savedPath, saveCopy, settle, writeTo]);
+  const save = useCallback(
+    async (next?: () => void) => {
+      if (!file) return;
+      if (savedPath === null) {
+        await saveCopy(next);
+        return;
+      }
+      const overOriginal = current?.overOriginal ?? false;
+      const outcome = await exclusively(async () => {
+        afterSave.current = next ?? null;
+        return (await flush()) ? writeTo(file, savedPath, overOriginal) : 'stopped';
+      });
+      settle(outcome);
+    },
+    [current?.overOriginal, exclusively, file, flush, savedPath, saveCopy, settle, writeTo],
+  );
 
   const replaceOriginal = useCallback(
     async (target: OpenedFile, path: string) => {
-      settle(await exclusively(() => writeTo(target, path)));
+      const outcome = await exclusively(() => writeTo(target, path, true));
+      settle(outcome);
     },
     [exclusively, settle, writeTo],
   );
@@ -135,20 +162,17 @@ export function useSaveFlow({
     settle('stopped');
   }, [settle]);
 
-  const saveThen = useCallback(
-    (next: () => void) => {
-      afterSave.current = next;
-      return save();
-    },
-    [save],
-  );
-
   return {
     announcement: current?.message ?? '',
+    /** What to say about the original, once saying it's unchanged would be untrue. */
+    originalNote: current?.originalChanged
+      ? current.overOriginal
+        ? 'Saving updates your original file'
+        : 'Your original file was replaced'
+      : null,
     saveLabel: savedPath === null ? 'Save a copy' : 'Save',
     save,
     saveCopy,
-    saveThen,
     replaceOriginal,
     keepOriginal,
   };

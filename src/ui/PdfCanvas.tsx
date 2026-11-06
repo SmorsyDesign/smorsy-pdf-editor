@@ -40,6 +40,8 @@ export function PdfCanvas({
     }
 
     let task: RenderTask | null = null;
+    // A cancelled draw still finishes, and leaves a canvas that mustn't count as drawn.
+    let cancelled = false;
     const delay = canvas.width === 0 ? 0 : RENDER_DELAY_MS;
     const timer = window.setTimeout(() => {
       // Colours are sampled from this canvas, which has nothing to offer until the draw finishes.
@@ -52,6 +54,7 @@ export function PdfCanvas({
       });
       task.finished
         .then(() => {
+          if (cancelled) return;
           canvas.dataset.drawn = 'true';
           setFailed(false);
         })
@@ -62,6 +65,7 @@ export function PdfCanvas({
     }, delay);
 
     return () => {
+      cancelled = true;
       window.clearTimeout(timer);
       task?.cancel();
     };

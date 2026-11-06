@@ -69,8 +69,9 @@ export function App({ platform }: { platform: Platform }) {
     flush,
     exclusively,
     showDialog: setDialog,
+    hasUnfinishedEdit: () => viewRef.current?.hasUnfinishedEdit() ?? false,
   });
-  const { save, saveCopy, saveThen, replaceOriginal, keepOriginal } = saving;
+  const { save, saveCopy, replaceOriginal, keepOriginal } = saving;
 
   const chooseAndOpen = useCallback(
     () =>
@@ -193,6 +194,7 @@ export function App({ platform }: { platform: Platform }) {
           document={session.document}
           os={platform.os}
           announcement={saving.announcement}
+          originalNote={saving.originalNote}
           editor={editor}
           saveLabel={saving.saveLabel}
           onSave={() => {
@@ -226,7 +228,7 @@ export function App({ platform }: { platform: Platform }) {
           void chooseAndOpen();
         }}
         onSaveAndLeave={(then) => {
-          void saveThen(() => {
+          void save(() => {
             carryOut(then);
           });
         }}

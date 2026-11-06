@@ -98,8 +98,10 @@ export function useTextSession(editor: DocumentEditor) {
       pendingCommit.current = pendingCommit.current
         .then(async () => {
           apply(await editFromDraft(current, text, rect, style));
-          commitFailed.current = false;
-          reportProblem(null);
+          if (commitFailed.current) {
+            commitFailed.current = false;
+            reportProblem(null);
+          }
         })
         .catch((error: unknown) => {
           console.error(error);
@@ -140,8 +142,14 @@ export function useTextSession(editor: DocumentEditor) {
   }, [flush, redoLog]);
 
   const widthsFont = notice ? sameWidthsFont(notice) : null;
-  const showCovered = notice !== null && notice.box.covers.length > 0 && !coveredSeen;
-  const showSameWidths = widthsFont !== null && !widthsNoted.has(widthsFont);
+  // Only when it can really be seen, because dismissing it means never showing it again.
+  const showCovered =
+    notice !== null &&
+    notice.box.covers.length > 0 &&
+    notice.outcome.uncovered.length === 0 &&
+    !coveredSeen &&
+    draft === null;
+  const showSameWidths = widthsFont !== null && !widthsNoted.has(widthsFont) && draft === null;
 
   // Finishing an edit removes what had focus, and keyboard users shouldn't lose their place.
   const settled = useRef(false);
@@ -206,15 +214,26 @@ export function useTextSession(editor: DocumentEditor) {
     }
   };
 
-  const deleteBlock = (
+  const deleteBlock = async (
     block: TextBlock,
     pageElement: HTMLElement,
     scale: number,
     page: PageSize,
   ) => {
     finishOpenEdit();
-    const target = draftForBlock(block, page, pageElement, scale);
-    commitDraft(target, '', target.rect, target.style);
+    try {
+      const drawn = await whenPageDrawn(pageElement);
+      const target = draftForBlock(block, page, pageElement, scale);
+      commitDraft(target, '', target.rect, target.style);
+      if (!drawn || target.backgroundNotFlat) {
+        reportProblem(
+          'The background here isn’t a single colour, so the patch over the deleted text may be visible. You can undo this.',
+        );
+      }
+    } catch (error) {
+      console.error(error);
+      reportProblem('That text couldn’t be deleted. Try again, or zoom out and retry.');
+    }
   };
 
   return {

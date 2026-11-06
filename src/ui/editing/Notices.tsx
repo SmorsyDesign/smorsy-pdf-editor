@@ -33,8 +33,21 @@ export function sameWidthsFont(notice: FontNoticeState): string | null {
   return cleanFontName(notice.box.original.name);
 }
 
+function CoveredNote() {
+  return (
+    <div className="covered">
+      <Icon name="info" />
+      <span>
+        The old text is covered, not removed, so search and copy can still find it. Don’t rely on
+        this to hide anything sensitive.
+      </span>
+    </div>
+  );
+}
+
 interface FontCardProps {
   readonly notice: FontNoticeState;
+  readonly showCovered: boolean;
   readonly scale: number;
   readonly pageHeight: number;
   readonly onKeep: () => void;
@@ -45,6 +58,7 @@ interface FontCardProps {
 /** Says plainly when an edit couldn't be fully faithful. */
 export function FontCard({
   notice,
+  showCovered,
   scale,
   pageHeight,
   onKeep,
@@ -115,6 +129,7 @@ export function FontCard({
           Undo edit
         </button>
       </div>
+      {showCovered && <CoveredNote />}
     </section>
   );
 }
@@ -139,15 +154,7 @@ export function EditNote({ notice, showCovered, showSameWidths, onDismiss }: Edi
           </span>
         </div>
       )}
-      {showCovered && (
-        <div className="covered">
-          <Icon name="info" />
-          <span>
-            The old text is covered, not removed, so search and copy can still find it. Don’t rely
-            on this to hide anything sensitive.
-          </span>
-        </div>
-      )}
+      {showCovered && <CoveredNote />}
       <div className="notice-actions">
         <button type="button" className="btn" onClick={onDismiss}>
           Got it

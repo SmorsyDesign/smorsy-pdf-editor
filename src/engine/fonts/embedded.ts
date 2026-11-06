@@ -103,7 +103,7 @@ export function parseToUnicode(cmap: string): Map<string, CharacterCode> {
       const end = parseInt(endHex, 16);
       const bytes = startHex.length / 2;
       // Bounds come from the file, and an enormous range would keep the worker busy for good.
-      if (bytes > MAX_CODE_BYTES || end - start >= MAX_RANGE) continue;
+      if (bytes > MAX_CODE_BYTES || end < start || end - start >= MAX_RANGE) continue;
       codesSeen += end - start + 1;
       if (codesSeen > MAX_CODES) return new Map();
       if (targets !== undefined) {

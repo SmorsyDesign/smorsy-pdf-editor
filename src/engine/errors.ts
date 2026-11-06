@@ -17,7 +17,12 @@ export function nameCharacter(character: string): string {
   if (character === '\t') return 'tab';
   const code = character.codePointAt(0) ?? 0;
   const invisible =
-    code < 0x20 || code === 0xad || (code >= 0x200b && code <= 0x200f) || code === 0xfeff;
+    (code >= 0x7f && code <= 0x9f) ||
+    (code >= 0x2028 && code <= 0x202f) ||
+    code < 0x20 ||
+    code === 0xad ||
+    (code >= 0x200b && code <= 0x200f) ||
+    code === 0xfeff;
   return invisible ? `U+${code.toString(16).toUpperCase().padStart(4, '0')}` : character;
 }
 

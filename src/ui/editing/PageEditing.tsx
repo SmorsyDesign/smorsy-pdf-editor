@@ -56,7 +56,7 @@ export function PageEditing({
         void session.openBlock(block, element, scale, page);
       }}
       onDeleteBlock={(block, element) => {
-        session.deleteBlock(block, element, scale, page);
+        void session.deleteBlock(block, element, scale, page);
       }}
       onOpenBox={session.openBox}
       onAddAt={(number, x, y) => {
@@ -80,6 +80,7 @@ export function PageEditing({
       {fontCard?.box.pageNumber === pageNumber && (
         <FontCard
           notice={fontCard}
+          showCovered={session.showCovered}
           scale={scale}
           pageHeight={page.height}
           onKeep={session.dismissNotice}

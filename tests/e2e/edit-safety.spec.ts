@@ -14,7 +14,7 @@ import {
   savedBlocks,
   savedText,
 } from './editing-helpers';
-import { expectOpenDocument, mockState, openFixture, queueOpen } from './helpers';
+import { ORIGINAL_PATH, expectOpenDocument, mockState, openFixture, queueOpen } from './helpers';
 
 const unsavedDialog = (page: Page) =>
   page.getByRole('alertdialog', { name: 'Save your changes to Lease.pdf?' });
@@ -117,6 +117,87 @@ test.describe('the unsaved count', () => {
     await expect(page.getByText('1 unsaved change')).toBeVisible();
     await page.getByRole('button', { name: 'Redo' }).click();
     await expect(page.getByText('unsaved change')).toHaveCount(0);
+  });
+});
+
+test.describe('replacing the original', () => {
+  async function replaceOriginal(page: Page) {
+    await replaceHeading(page, 'Replaced');
+    await queueSavePath(page, ORIGINAL_PATH);
+    await page.keyboard.press('ControlOrMeta+s');
+    await page.getByRole('button', { name: 'Replace original' }).click();
+    await expect(page.getByText('Original file updated')).toBeVisible();
+  }
+
+  test('the status never claims the original is unchanged afterwards', async ({ page }) => {
+    await openForEditing(page);
+    await replaceOriginal(page);
+    await addText(page, 'One more');
+    await expect(page.getByText('Saving updates your original file')).toBeVisible();
+    await expect(page.getByText('Your original file stays unchanged')).toHaveCount(0);
+  });
+
+  test('a later save to a new copy still doesn’t claim it', async ({ page }) => {
+    await openForEditing(page);
+    await replaceOriginal(page);
+    await queueSavePath(page, '/Users/test/Copy.pdf');
+    await page.keyboard.press('ControlOrMeta+Shift+s');
+    await expect(page.getByText('Copy saved')).toBeVisible();
+    await addText(page, 'One more');
+    await expect(page.getByText('Your original file was replaced')).toBeVisible();
+  });
+});
+
+test.describe('the covered note', () => {
+  test('dismissing a font card shows it there, so it’s really been seen', async ({ page }) => {
+    await openForEditing(page, 'test-pdfs/03-subset-embedded.pdf', 1);
+    await block(page, 'This agreement').click();
+    await field(page).fill('QXZ payment terms');
+    await page.keyboard.press('ControlOrMeta+Enter');
+    await expect(page.locator('.font-card').getByText('covered, not removed')).toBeVisible();
+  });
+});
+
+test.describe('fields have their own undo', () => {
+  test('undo in the search field leaves the document alone', async ({ page }) => {
+    await openForEditing(page);
+    await replaceHeading(page, 'Kept edit');
+    await expect(page.getByText('1 unsaved change')).toBeVisible();
+    await page.keyboard.press('ControlOrMeta+f');
+    await page.getByRole('searchbox').fill('rent');
+    await page.keyboard.press('ControlOrMeta+z');
+    await expect(page.getByText('Kept edit')).toBeVisible();
+    await expect(page.getByText('1 unsaved change')).toBeVisible();
+  });
+});
+
+test.describe('keeping text typed during a save', () => {
+  test('Save then close stays open if text was typed meanwhile', async ({ page }) => {
+    await openForEditing(page);
+    await replaceHeading(page, 'In the file');
+    await page.evaluate(() => {
+      const mock = window.smorsyMock;
+      if (!mock) throw new Error('The mock platform is not running.');
+      mock.beforeWrite = () =>
+        new Promise((resolve) => {
+          (window as unknown as { finishWrite: () => void }).finishWrite = resolve;
+        });
+    });
+    await page.keyboard.press('ControlOrMeta+w');
+    await queueSavePath(page, '/Users/test/During.pdf');
+    await unsavedDialog(page).getByRole('button', { name: 'Save', exact: true }).click();
+    await page.waitForFunction(() => 'finishWrite' in window);
+
+    await page
+      .getByTestId('edit-layer')
+      .first()
+      .click({ position: { x: 96, y: 600 } });
+    await field(page).fill('Typed during the save');
+    await page.evaluate(() => {
+      (window as unknown as { finishWrite: () => void }).finishWrite();
+    });
+    await expect(page.getByRole('alert')).toContainText('You kept editing during the save');
+    await expect(field(page)).toHaveValue('Typed during the save');
   });
 });
 

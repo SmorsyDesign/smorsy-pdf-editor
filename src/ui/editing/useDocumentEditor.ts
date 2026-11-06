@@ -160,12 +160,14 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
     const entry = currentEntry(current);
     const active = deriveTextBoxes(activeEdits(current));
     if (active.length === 0) {
-      return { bytes: unchangedCopy(file?.bytes ?? new Uint8Array()), edited: false, entry };
+      if (!file) throw new Error('The document closed before it could be saved.');
+      return { bytes: unchangedCopy(file.bytes), edited: false, entry };
     }
     let client = await clientRef.current;
     if (!client) throw new Error('The document closed before it could be saved.');
     // The edits are safe on this side, so a worker that died only needs replacing.
     if (client.failed && createClientRef.current) {
+      client.close();
       clientRef.current = createClientRef.current();
       client = await clientRef.current;
     }

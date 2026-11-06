@@ -111,6 +111,13 @@ describe('hostile ToUnicode maps', () => {
     expect(parseToUnicode(`beginbfrange ${range.repeat(20)} endbfrange`).size).toBe(0);
   });
 
+  it('isn’t fooled by backwards ranges into working past the limit', () => {
+    const started = Date.now();
+    const ranges = '<0000> <FFFF> <0000>\n<FFFF> <0000> <0000>\n'.repeat(5000);
+    expect(parseToUnicode(`beginbfrange ${ranges} endbfrange`).size).toBe(0);
+    expect(Date.now() - started).toBeLessThan(2000);
+  });
+
   it('copes with sections that never close', () => {
     const started = Date.now();
     expect(parseToUnicode('beginbfchar '.repeat(200000)).size).toBe(0);

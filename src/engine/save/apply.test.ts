@@ -398,6 +398,33 @@ describe('unusual page boxes', () => {
     expect((added?.rect.y ?? 0) + (added?.firstBaseline ?? 0)).toBeCloseTo(212, 0);
   });
 
+  it('ignores a crop box that doesn’t overlap the page, as the screen does', async () => {
+    const bytes = await pageWith((doc) => {
+      doc.getPage(0).setCropBox(5000, 5000, 100, 100);
+    });
+    const added = (await textOf(await new PdfEditor(bytes, fontBytes).save([box()]))).find(
+      (block) => block.text === 'Added text',
+    );
+    expect(added?.rect.x).toBeCloseTo(100, 0);
+  });
+
+  it('reads a unit stored indirectly, and ignores an impossible one', async () => {
+    const indirect = await pageWith((doc) => {
+      doc.getPage(0).node.set(PDFName.of('UserUnit'), doc.context.register(doc.context.obj(2)));
+    });
+    const scaled = (await textOf(await new PdfEditor(indirect, fontBytes).save([box()]))).find(
+      (block) => block.text === 'Added text',
+    );
+    expect(scaled?.size).toBeCloseTo(14, 0);
+
+    const impossible = await pageWith((doc) => {
+      doc.getPage(0).node.set(PDFName.of('UserUnit'), doc.context.obj(0));
+    });
+    await expect(new PdfEditor(impossible, fontBytes).save([box()])).resolves.toBeInstanceOf(
+      Uint8Array,
+    );
+  });
+
   it('keeps size and position on a page with a larger unit', async () => {
     const bytes = await pageWith((doc) => {
       doc.getPage(0).node.set(PDFName.of('UserUnit'), doc.context.obj(2));
