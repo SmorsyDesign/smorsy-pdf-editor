@@ -122,13 +122,22 @@ const placed = (rect: { x: number; y: number; width: number; height: number }, s
 export function WhiteoutBoxes({
   annotations,
   scale,
+  outlined = false,
 }: {
   annotations: readonly Annotation[];
   scale: number;
+  /** Shows where one is on blank paper, while annotating. It isn't part of the file. */
+  outlined?: boolean;
 }) {
   return annotations.flatMap((annotation) =>
     annotation.kind === 'whiteout'
-      ? [<div key={annotation.id} className="whiteout" style={placed(annotation.rect, scale)} />]
+      ? [
+          <div
+            key={annotation.id}
+            className={outlined ? 'whiteout is-outlined' : 'whiteout'}
+            style={placed(annotation.rect, scale)}
+          />,
+        ]
       : [],
   );
 }
@@ -165,7 +174,9 @@ export function noteCardPlace(pin: Rect, scale: number, page: PageSize) {
   const below = (pin.y + pin.height) * scale + NOTE_CARD_GAP;
   const fitsBelow = below + NOTE_CARD_HEIGHT <= page.height * scale;
   return {
-    left: Math.max(0, Math.min(left, page.width * scale - NOTE_CARD_WIDTH)),
-    top: fitsBelow ? below : Math.max(0, pin.y * scale - NOTE_CARD_GAP - NOTE_CARD_HEIGHT),
+    left: Math.round(Math.max(0, Math.min(left, page.width * scale - NOTE_CARD_WIDTH))),
+    top: Math.round(
+      fitsBelow ? below : Math.max(0, pin.y * scale - NOTE_CARD_GAP - NOTE_CARD_HEIGHT),
+    ),
   };
 }

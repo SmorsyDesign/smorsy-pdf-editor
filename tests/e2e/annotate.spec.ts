@@ -6,6 +6,7 @@ import {
   rememberPage,
   reopenSaved,
   saveTo,
+  waitForRedraw,
   whatChanged,
 } from './editing-helpers';
 import { expectOpenDocument, expectPageDrawn, openFixture } from './helpers';
@@ -23,8 +24,8 @@ async function openForAnnotating(page: Page, fixture = PLAIN, pageCount = 3) {
   await expectPageDrawn(page);
   await page.getByRole('button', { name: 'Annotate', exact: true }).click();
   await expect(bar(page)).toBeVisible();
-  // The side panel changes the page's size, and the canvas takes a moment to redraw to match.
-  await page.waitForTimeout(300);
+  // The side panel changes the page's size, and the canvas redraws to match.
+  await waitForRedraw(page, 1);
 }
 
 async function dragOnPage(
@@ -268,6 +269,9 @@ test.describe('changing what’s drawn', () => {
     const before = await box(page);
     await page.getByRole('button', { name: 'Make larger' }).click();
     expect((await box(page)).width).toBeGreaterThan(before.width);
+    await page.getByRole('button', { name: 'Make smaller' }).click();
+    await page.getByRole('button', { name: 'Make smaller' }).click();
+    expect((await box(page)).width).toBeLessThan(before.width);
   });
 
   test('the Move button moves it with a single click', async ({ page }) => {
@@ -313,7 +317,7 @@ test.describe('changing what’s drawn', () => {
     await expect(page.getByText('0 annotations')).toBeVisible();
   });
 
-  test('undo and redo walk it, and all undone saves nothing new', async ({ page }) => {
+  test('undo and redo walk it', async ({ page }) => {
     await page.getByRole('button', { name: 'Undo' }).click();
     await expect(shape(page)).toHaveCount(0);
     await page.getByRole('button', { name: 'Redo' }).click();
@@ -346,7 +350,9 @@ test.describe('sticky notes', () => {
     await expect(page.locator('.row-sub')).toContainText('Ask about the late fee');
     await saveTo(page);
     const doc = await openDocument(Uint8Array.from((await lastWrite(page))?.bytes ?? []));
+    const notes = await doc.existingNotes(1);
     await doc.close();
+    expect(notes.map((note) => note.text)).toEqual(['Ask about the late fee']);
   });
 
   test('typing spaces doesn’t scroll the page', async ({ page }) => {

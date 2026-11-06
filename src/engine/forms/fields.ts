@@ -50,7 +50,7 @@ export interface WidgetData {
 }
 
 /** A field's name is written for software, so this makes one like "student.name" read better. */
-function friendlyName(name: string): string {
+export function friendlyName(name: string): string {
   const words = name
     .replace(/\[\d+\]/g, '')
     .replace(/[._-]+/g, ' ')
@@ -138,6 +138,27 @@ export function fieldFromWidget(
     readOnly: widget.readOnly === true,
     required: widget.required === true,
   };
+}
+
+/**
+ * Same-named boxes that stand for different things share one value, so only one can be ticked at a
+ * time. That's how radio buttons behave, and treating them as boxes would save the wrong answer.
+ */
+export function withBoxGroupsAsChoices(fields: readonly FormField[]): readonly FormField[] {
+  const meanings = new Map<string, Set<string>>();
+  for (const field of fields) {
+    if (field.kind !== 'checkbox') continue;
+    const known = meanings.get(field.name) ?? new Set();
+    meanings.set(field.name, known.add(field.onValue));
+  }
+  const ticked = new Map(
+    fields.filter((field) => field.value === true).map((field) => [field.name, field.onValue]),
+  );
+  return fields.map((field) =>
+    field.kind === 'checkbox' && (meanings.get(field.name)?.size ?? 0) > 1
+      ? { ...field, kind: 'radio', value: ticked.get(field.name) ?? '' }
+      : field,
+  );
 }
 
 /** Whether a field has been answered, for the count of what's still needed. */

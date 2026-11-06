@@ -113,7 +113,8 @@ export type Edit =
   | { readonly kind: 'add-annotation'; readonly annotation: Annotation }
   | { readonly kind: 'change-annotation'; readonly annotation: Annotation }
   | { readonly kind: 'remove-annotation'; readonly id: string }
-  | { readonly kind: 'fill-field'; readonly name: string; readonly value: FieldValue };
+  | { readonly kind: 'fill-field'; readonly name: string; readonly value: FieldValue }
+  | { readonly kind: 'lock-answers'; readonly lock: boolean };
 
 export interface EditEntry {
   readonly edit: Edit;
@@ -243,6 +244,11 @@ export function deriveAnnotations(edits: readonly Edit[]): readonly Annotation[]
 }
 
 /** The latest answer for each field that's been changed. */
+/** Whether answers become part of the page when saving. */
+export function deriveLock(edits: readonly Edit[]): boolean {
+  return edits.reduce((lock, edit) => (edit.kind === 'lock-answers' ? edit.lock : lock), false);
+}
+
 export function deriveFieldAnswers(edits: readonly Edit[]): ReadonlyMap<string, FieldValue> {
   const answers = new Map<string, FieldValue>();
   for (const edit of edits) {

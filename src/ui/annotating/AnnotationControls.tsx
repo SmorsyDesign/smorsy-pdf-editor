@@ -13,13 +13,18 @@ import {
   movedAnnotation,
   scaledAnnotation,
   type Annotation,
+  annotationLabel,
 } from '../../engine/edits/annotations';
+import type { Rect } from '../../engine/edits/model';
 import type { PageSize } from '../../engine/zoom';
 import { Icon } from '../Icon';
 import { useDragPreview } from '../signing/useDragPreview';
 import { noteColor, noteCardPlace } from './AnnotationArt';
 import type { Annotating } from './useAnnotating';
 
+/** How far a press can move and still be a click rather than a drag. */
+const CLICK_SLOP = 4;
+const MIN_TARGET = 24;
 const KEY_STEP = 4;
 const FINE_KEY_STEP = 1;
 const STEP = 1.1;
@@ -143,12 +148,18 @@ function NoteCard({ annotation, annotating, scale, page }: Omit<ControlProps, 'i
         onKeyDown={(event) => {
           if (event.key === 'Escape') {
             event.stopPropagation();
+            const empty = event.currentTarget.value.trim() === '';
             event.currentTarget.blur();
+            // An empty note has gone by now, and removing it has already moved focus on.
+            if (!empty) annotating.focus(annotation.id);
           }
         }}
         // As it's typed rather than on leaving, because a shortcut can save without leaving the box.
         onChange={(event) => {
-          annotating.change({ ...annotation, text: event.target.value }, typing);
+          // Clearing it is handled on leaving, so one undo can't bring back a note with no words.
+          if (event.target.value.trim() !== '') {
+            annotating.change({ ...annotation, text: event.target.value }, typing);
+          }
         }}
         onBlur={(event) => {
           // A note with nothing in it would just be a stray mark on the page.
@@ -160,9 +171,22 @@ function NoteCard({ annotation, annotating, scale, page }: Omit<ControlProps, 'i
   );
 }
 
+/** A flat arrow or a thin line has almost no area of its own, so this keeps it easy to pick up. */
+function hitArea(bounds: Rect, scale: number) {
+  const width = Math.max(MIN_TARGET, bounds.width * scale);
+  const height = Math.max(MIN_TARGET, bounds.height * scale);
+  return {
+    left: (bounds.x + bounds.width / 2) * scale - width / 2,
+    top: (bounds.y + bounds.height / 2) * scale - height / 2,
+    width,
+    height,
+  };
+}
+
 function Control({ annotation, annotating, scale, page, interactive }: ControlProps) {
   const selected = annotating.selected?.id === annotation.id;
   const rootRef = useRef<HTMLDivElement>(null);
+  const pressedAt = useRef({ x: 0, y: 0 });
   const { id } = annotation;
   const onDone = useMemo(
     () => (finished: Annotation) => {
@@ -182,6 +206,7 @@ function Control({ annotation, annotating, scale, page, interactive }: ControlPr
 
   const startDrag = (event: ReactPointerEvent<HTMLElement>) => {
     if (event.button !== 0 || !interactive) return;
+    pressedAt.current = { x: event.clientX, y: event.clientY };
     annotating.select(id);
     rootRef.current?.focus({ preventScroll: true });
     if (!canMove(annotation)) return;
@@ -228,18 +253,24 @@ function Control({ annotation, annotating, scale, page, interactive }: ControlPr
         data-testid="annotation"
         data-kind={annotation.kind}
         role="group"
-        aria-label={`${annotation.kind} annotation`}
+        aria-label={
+          interactive
+            ? `${annotationLabel(annotation)}. Use the arrow keys to move it, or Delete to remove it.`
+            : annotationLabel(annotation)
+        }
         {...(interactive ? { tabIndex: 0 } : {})}
         style={{
-          left: bounds.x * scale,
-          top: bounds.y * scale,
-          width: bounds.width * scale,
-          height: bounds.height * scale,
+          ...hitArea(bounds, scale),
           pointerEvents: interactive ? 'auto' : 'none',
         }}
         onClick={(event) => {
           event.stopPropagation();
-          if (isNote && interactive) annotating.toggleNote(id);
+          // The end of a drag also counts as a click, which shouldn't open the note as well.
+          const travelled = Math.hypot(
+            event.clientX - pressedAt.current.x,
+            event.clientY - pressedAt.current.y,
+          );
+          if (isNote && interactive && travelled < CLICK_SLOP) annotating.toggleNote(id);
         }}
         onFocus={(event) => {
           if (interactive && event.target === event.currentTarget) annotating.select(id);

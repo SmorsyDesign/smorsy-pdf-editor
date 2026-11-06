@@ -11,6 +11,7 @@ import {
 import type { Color, Rect } from '../../engine/edits/model';
 import { LETTER_PAGE, type PageSize } from '../../engine/zoom';
 import type { DocumentEditor } from '../editing/useDocumentEditor';
+import { focusPages } from '../signing/useSigning';
 
 export type AnnotationTool = Annotation['kind'];
 
@@ -123,6 +124,8 @@ export function useAnnotating(
     setSelectedId(null);
     setMovingId(null);
     setOpenNoteId(null);
+    // What had focus has just gone, so this keeps the keyboard somewhere useful.
+    focusPages();
   };
 
   const base = (kind: AnnotationTool, pageNumber: number) => ({
@@ -248,6 +251,7 @@ export function useAnnotating(
       setOpenNoteId(null);
     },
     focusId,
+    focus: setFocusId,
     focused: () => {
       setFocusId(null);
     },

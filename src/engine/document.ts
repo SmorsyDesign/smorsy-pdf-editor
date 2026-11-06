@@ -8,7 +8,12 @@ import {
   type PDFPageProxy,
 } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { EngineError } from './errors';
-import { fieldFromWidget, type FormField, type WidgetData } from './forms/fields';
+import {
+  fieldFromWidget,
+  type FormField,
+  type WidgetData,
+  withBoxGroupsAsChoices,
+} from './forms/fields';
 import { noteFromAnnotation, type ExistingNote, type NoteData } from './notes';
 import {
   groupTextItems,
@@ -317,7 +322,7 @@ class PdfJsDocument implements PdfDocument {
         if (field) fields.push(field);
       }
     }
-    return fields;
+    return withBoxGroupsAsChoices(fields);
   }
 
   close(): Promise<void> {

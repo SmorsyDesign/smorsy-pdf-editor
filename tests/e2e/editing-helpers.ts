@@ -158,10 +158,19 @@ export function paintIn(page: Page, pageNumber: number, region: Region) {
   );
 }
 
+export async function waitForRedraw(page: Page, pageNumber: number) {
+  // A zoom change redraws after a short pause, so being drawn right now could be the old size.
+  await page.waitForTimeout(300);
+  await expect(pageElement(page, pageNumber).locator('canvas').first()).toHaveAttribute(
+    'data-drawn',
+    'true',
+  );
+}
+
 /** Remembers how a page looks now, to compare with once it's been saved and reopened. */
 export async function rememberPage(page: Page, pageNumber: number) {
   await showPage(page, pageNumber);
-  await page.waitForTimeout(300);
+  await waitForRedraw(page, pageNumber);
   await page.evaluate((number) => {
     const source = document.querySelector<HTMLCanvasElement>(`[data-page="${number}"] canvas`);
     if (!source) throw new Error('The page isn’t on screen.');
@@ -183,7 +192,7 @@ export async function rememberPage(page: Page, pageNumber: number) {
 /** The box around everything that's different from the remembered page, in displayed pixels. */
 export async function whatChanged(page: Page, pageNumber: number) {
   await showPage(page, pageNumber);
-  await page.waitForTimeout(300);
+  await waitForRedraw(page, pageNumber);
   return page.evaluate((number) => {
     const source = document.querySelector<HTMLCanvasElement>(`[data-page="${number}"] canvas`);
     const before = (window as unknown as { rememberedPage: ImageData }).rememberedPage;

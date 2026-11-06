@@ -269,7 +269,7 @@ export function DocumentView({
       <StatusBar
         os={os}
         page={`Page ${currentPage} of ${pdf.pageCount}`}
-        hint={modeHint(mode, annotating, signing)}
+        hint={modeHint(mode, annotating, signing, scan.pageIsScan)}
         fontsReplaced={editor.substitutedFonts}
         message={
           ((editor.changes === 0 && announcement) || originalNote) ??

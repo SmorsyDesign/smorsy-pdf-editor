@@ -47,8 +47,8 @@ export function FormPanel({ form, locked, onLockChange, onJump }: FormPanelProps
         <span>
           Lock answers when saving
           <small>
-            Answers become part of the page, so nobody can change them. Your original file stays
-            fillable.
+            Answers become part of the page, so nobody can change them. Signature fields stay. Your
+            original file stays fillable.
           </small>
         </span>
       </label>

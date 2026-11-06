@@ -25,8 +25,10 @@ import { findEmbeddedFont, type EmbeddedFont } from '../fonts/embedded';
 import { bundledFaceFile } from '../fonts/match';
 import { placementInPdf } from '../signatures/placement';
 import { annotationBounds, writeAnnotation } from './annotation-writing';
-import { fillFields, lockAnswers, type FieldAnswers } from './field-filling';
-import { clearFieldsUnder, countSolidFieldsOver } from './form-fields';
+import { fillFields, type FieldAnswers } from './field-filling';
+import { clearFieldsUnder, clearForWhiteout, countSolidFieldsOver } from './form-fields';
+import { lockAnswers } from './lock-answers';
+import { giveOwnAnnotationList } from './page-annotations';
 import { boundsOfWhiteout, drawWhiteout, pageBoxOf, textBoxBounds } from './page-geometry';
 import { boundsOfPlacement, drawSignaturePicture } from './signature-drawing';
 import { FontChooser, systemFontKey, type FontBytes, type FontOutcome } from './choose-font';
@@ -45,6 +47,8 @@ export interface SaveReport {
   readonly fieldsRetired: number;
   /** Form fields left in place that could still hide an edit beneath them. */
   readonly fieldsOnTop: number;
+  /** Existing annotations under a whiteout, which are now simply part of the page. */
+  readonly annotationsRetired: number;
 }
 
 type DrawFont =
@@ -220,7 +224,6 @@ export class PdfEditor {
     }
   }
 
-  /** Also says how many form fields became part of the page, so the person can be told. */
   private fieldFont(doc: PDFDocument): Promise<PDFFont> {
     // Not a subset, because a form stays fillable afterwards with any letter.
     return this.fonts
@@ -248,6 +251,7 @@ export class PdfEditor {
     );
     let fieldsRetired = 0;
     let fieldsOnTop = 0;
+    let annotationsRetired = 0;
     for (const pageNumber of pageNumbers) {
       const page = doc.getPage(pageNumber - 1);
       const pageBox = pageBoxOf(page);
@@ -255,11 +259,18 @@ export class PdfEditor {
       const signed = signatures.filter((signature) => signature.pageNumber === pageNumber);
       const marks = annotations.filter((annotation) => annotation.pageNumber === pageNumber);
       const whiteouts = marks.filter((mark) => mark.kind === 'whiteout');
+      giveOwnAnnotationList(page);
+      const beneath = clearForWhiteout(
+        page,
+        whiteouts.map((mark) => boundsOfWhiteout(mark, pageBox)),
+      );
+      fieldsRetired += beneath.retired;
+      fieldsOnTop += beneath.onTop;
+      annotationsRetired += beneath.annotations;
       // First, because anything drawn before a field's looks moved to the page would be under them.
       const cleared = clearFieldsUnder(page, [
         ...onPage.filter((box) => box.lines.length > 0).map((box) => textBoxBounds(box, pageBox)),
         ...signed.map(({ rect, angle }) => boundsOfPlacement(placementInPdf(rect, angle, pageBox))),
-        ...whiteouts.map((mark) => boundsOfWhiteout(mark, pageBox)),
       ]);
       fieldsRetired += cleared.retired;
       fieldsOnTop += cleared.onTop;
@@ -280,7 +291,12 @@ export class PdfEditor {
         marks.flatMap((mark) => annotationBounds(mark, pageBox) ?? []),
       );
     }
-    return { bytes: await doc.save({ updateFieldAppearances: false }), fieldsRetired, fieldsOnTop };
+    return {
+      bytes: await doc.save({ updateFieldAppearances: false }),
+      fieldsRetired,
+      fieldsOnTop,
+      annotationsRetired,
+    };
   }
 
   async save(

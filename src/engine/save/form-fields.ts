@@ -1,9 +1,12 @@
 import {
   PDFArray,
+  PDFContentStream,
   PDFDict,
   PDFHexString,
+  PDFName,
   PDFNumber,
   PDFRawStream,
+  PDFStream,
   PDFString,
   concatTransformationMatrix,
   decodePDFRawStream,
@@ -22,6 +25,7 @@ import {
   name,
   numbersIn,
   rectOf,
+  removeAnnotation,
   type UserBounds,
 } from './page-annotations';
 
@@ -34,11 +38,23 @@ const HEX_STRINGS = /<[0-9a-fA-F\s]*>/g;
 
 const PUSH_BUTTON = 65536;
 
-function appearanceOf(context: PDFContext, widget: PDFDict): PDFRawStream | null {
+/** What's showing now, including the drawing for the state a checkbox or radio button is in. */
+export function currentLook(context: PDFContext, annotation: PDFDict): PDFStream | null {
+  const appearances = context.lookup(annotation.get(name('AP')));
+  if (!(appearances instanceof PDFDict)) return null;
+  const normal = context.lookup(appearances.get(name('N')));
+  if (normal instanceof PDFStream) return normal;
+  const state = context.lookup(annotation.get(name('AS')));
+  if (!(normal instanceof PDFDict) || !(state instanceof PDFName)) return null;
+  const drawing = context.lookup(normal.get(state));
+  return drawing instanceof PDFStream ? drawing : null;
+}
+
+function appearanceOf(context: PDFContext, widget: PDFDict): PDFStream | null {
   const appearances = context.lookup(widget.get(name('AP')));
   if (!(appearances instanceof PDFDict)) return null;
   const normal = context.lookup(appearances.get(name('N')));
-  return normal instanceof PDFRawStream ? normal : null;
+  return normal instanceof PDFStream ? normal : null;
 }
 
 /** Text in an appearance could otherwise read as a drawing command. Strings can nest. */
@@ -55,11 +71,18 @@ function withoutStrings(drawing: string): string {
   return kept.replace(HEX_STRINGS, ' ');
 }
 
+/** A drawing from the file is compressed, while one made during this save isn't yet. */
+function contentsOf(appearance: PDFStream): Uint8Array {
+  if (appearance instanceof PDFRawStream) return decodePDFRawStream(appearance).decode();
+  if (appearance instanceof PDFContentStream) return appearance.getUnencodedContents();
+  throw new Error('This form field’s drawing is in an unknown format.');
+}
+
 /** Whether a field paints a solid area, which would hide a signature beneath it. */
-function paintsSolid(context: PDFContext, widget: PDFDict, appearance: PDFRawStream): boolean {
+function paintsSolid(context: PDFContext, widget: PDFDict, appearance: PDFStream): boolean {
   if (hasBackground(context, widget)) return true;
   try {
-    const drawing = new TextDecoder('latin1').decode(decodePDFRawStream(appearance).decode());
+    const drawing = new TextDecoder('latin1').decode(contentsOf(appearance));
     return PAINTS_AREA.test(withoutStrings(drawing));
   } catch {
     // If its drawing can't be read, it's safest to assume that it could cover the signature.
@@ -67,14 +90,14 @@ function paintsSolid(context: PDFContext, widget: PDFDict, appearance: PDFRawStr
   }
 }
 
-/**
- * Viewers always paint form fields last, in whatever order the file lists them, so nothing can sit
- * on top of a solid one. So what the field shows moves down into the page, where other things can
- * go over it.
- */
-function moveFieldLooksIntoPage(page: PDFPage, widget: PDFDict, appearance: PDFRawStream): boolean {
+/** Draws what an annotation shows into the page itself, fitted to its box as a viewer would. */
+export function drawLooksIntoPage(
+  page: PDFPage,
+  annotation: PDFDict,
+  appearance: PDFStream,
+): boolean {
   const { context } = page.doc;
-  const rect = rectOf(context, widget);
+  const rect = rectOf(context, annotation);
   const box = numbersIn(context, appearance.dict.get(name('BBox')));
   const [boxLeft = 0, boxBottom = 0, boxRight = 0, boxTop = 0] = box;
   if (!rect || boxRight === boxLeft || boxTop === boxBottom) return false;
@@ -110,19 +133,40 @@ function moveFieldLooksIntoPage(page: PDFPage, widget: PDFDict, appearance: PDFR
     drawObject(key),
     popGraphicsState(),
   );
+  return true;
+}
 
-  const empty = context.formXObject([], { BBox: [boxLeft, boxBottom, boxRight, boxTop] });
-  widget.set(name('AP'), context.obj({ N: context.register(empty) }));
+/** Leaves a field showing nothing, keeping the state a checkbox or radio button is in. */
+function blankLooks(context: PDFContext, widget: PDFDict, appearance: PDFStream): void {
+  const box = numbersIn(context, appearance.dict.get(name('BBox')));
+  const empty = context.register(context.formXObject([], { BBox: [...box] }));
+  const state = context.lookup(widget.get(name('AS')));
+  const normal = context.lookup(context.lookup(widget.get(name('AP')), PDFDict).get(name('N')));
+  const stateful = normal instanceof PDFDict && state instanceof PDFName;
+  widget.set(
+    name('AP'),
+    context.obj({ N: stateful ? context.obj({ [state.decodeText()]: empty }) : empty }),
+  );
   const looks = context.lookup(widget.get(name('MK')));
   if (looks instanceof PDFDict) {
     looks.delete(name('BG'));
     looks.delete(name('BC'));
   }
+}
+
+/**
+ * Viewers always paint form fields last, in whatever order the file lists them, so nothing can sit
+ * on top of a solid one. So what the field shows moves down into the page, where other things can
+ * go over it.
+ */
+function moveFieldLooksIntoPage(page: PDFPage, widget: PDFDict, appearance: PDFStream): boolean {
+  if (!drawLooksIntoPage(page, widget, appearance)) return false;
+  blankLooks(page.doc.context, widget, appearance);
   return true;
 }
 
 /** The value a field holds, which a widget can inherit from its parent field. */
-function hasValue(context: PDFContext, widget: PDFDict): boolean {
+export function hasValue(context: PDFContext, widget: PDFDict): boolean {
   let current: PDFDict | undefined = widget;
   for (let depth = 0; current && depth < MAX_FIELD_DEPTH; depth += 1) {
     const kind = context.lookup(current.get(name('FT')));
@@ -193,6 +237,50 @@ export interface ClearedFields {
   readonly retired: number;
   /** Fields left in place that could still hide what's beneath them, which the person must hear. */
   readonly onTop: number;
+}
+
+export interface ClearedForWhiteout extends ClearedFields {
+  /** Existing annotations that are now simply part of the page. */
+  readonly annotations: number;
+}
+
+/** Whether a ticked box or chosen radio button is showing that state. */
+const isSwitchedOn = (context: PDFContext, widget: PDFDict) => {
+  const state = context.lookup(widget.get(name('AS')));
+  return state instanceof PDFName && state !== name('Off');
+};
+
+/**
+ * A whiteout has to hide everything beneath it, but viewers paint annotations and fields over the
+ * page, even see-through ones. So whatever they'd paint there moves down into the page first.
+ */
+export function clearForWhiteout(page: PDFPage, areas: readonly UserBounds[]): ClearedForWhiteout {
+  const { doc } = page;
+  const { context } = doc;
+  const found = new Set(areas.flatMap((area) => annotationsOver(page, area)));
+  let retired = 0;
+  let onTop = 0;
+  let annotations = 0;
+  for (const annotation of found) {
+    const widget = isWidget(context, annotation);
+    const look = currentLook(context, annotation);
+    if (widget && isPushButton(context, annotation)) {
+      onTop += 1;
+    } else if (!look || !drawLooksIntoPage(page, annotation, look)) {
+      // Nothing to move, so it's only a problem if a viewer would draw something by itself.
+      if (!widget || hasBackground(context, annotation) || hasValue(context, annotation)) {
+        onTop += 1;
+      }
+    } else if (widget) {
+      const holdsAnswer = hasValue(context, annotation) || isSwitchedOn(context, annotation);
+      blankLooks(context, annotation, look);
+      if (holdsAnswer && retireField(doc, annotation)) retired += 1;
+    } else {
+      removeAnnotation(page, annotation);
+      annotations += 1;
+    }
+  }
+  return { retired, onTop, annotations };
 }
 
 /** How many solid fields would cover annotations, which can't go in the page beneath them. */

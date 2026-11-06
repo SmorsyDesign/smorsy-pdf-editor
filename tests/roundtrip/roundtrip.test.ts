@@ -2,7 +2,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { PDFDocument } from '@cantoo/pdf-lib';
+import { PDFDocument, PDFTextField } from '@cantoo/pdf-lib';
 import { OPS, getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { afterAll, describe, expect, it } from 'vitest';
 import { testPng } from '../helpers/test-png';
@@ -159,6 +159,26 @@ describe.each(files)('%s', (name) => {
       await reopened.close();
     },
   );
+
+  it.skipIf(password !== undefined)('survives filling in and locking its form', async () => {
+    const form = (await PDFDocument.load(original, { ignoreEncryption: true })).getForm();
+    const answers = form
+      .getFields()
+      .flatMap((field): (readonly [string, string])[] =>
+        field instanceof PDFTextField && !field.isReadOnly() ? [[field.getName(), 'A']] : [],
+      );
+    const before = await inspect(original);
+    for (const lock of [false, true]) {
+      const saved = await new PdfEditor(original, fonts).save([], [], { answers, lock });
+      const path = join(temp, `${lock ? 'locked' : 'filled'}-${name}`);
+      writeFileSync(path, saved);
+      expect([0, 3]).toContain(qpdfStatus(path));
+      const after = await inspect(saved);
+      expect(after.pages).toBe(before.pages);
+      expect(after.links).toBe(before.links);
+      expect(after.outlineItems).toBe(before.outlineItems);
+    }
+  });
 
   it.skipIf(password !== undefined)('survives every kind of annotation', async () => {
     const common = { pageNumber: 1, color: { r: 0.8, g: 0.2, b: 0.2 } };

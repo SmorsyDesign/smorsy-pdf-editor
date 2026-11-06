@@ -67,7 +67,7 @@ export function PageEditing({
   return (
     <PageOverlay
       showsTextLayer={mode === 'select' || marking}
-      beneath={<WhiteoutBoxes annotations={marks} scale={scale} />}
+      beneath={<WhiteoutBoxes annotations={marks} scale={scale} outlined={annotatingHere} />}
       document={document}
       pageNumber={pageNumber}
       zoomPercent={zoomPercent}
@@ -108,6 +108,17 @@ export function PageEditing({
           }}
         />
       )}
+      {/* Before annotations, because a saved image is part of the page and they go over it. */}
+      {mode === 'sign' && (
+        <SignLayer signing={signing} pageNumber={pageNumber} page={page} scale={scale} />
+      )}
+      <PlacedSignatures
+        placements={editor.signatures.filter((placed) => placed.pageNumber === pageNumber)}
+        signing={signing}
+        scale={scale}
+        page={page}
+        isInteractive={(placed) => (placed.purpose === 'image' ? pickable : mode === 'sign')}
+      />
       <Highlights annotations={marks} scale={scale} />
       <AnnotationArt annotations={marks} page={page} scale={scale} />
       {marking && (
@@ -128,16 +139,6 @@ export function PageEditing({
       {(mode === 'select' || pickable) && (
         <ExistingNotes document={document} pageNumber={pageNumber} page={page} scale={scale} />
       )}
-      {mode === 'sign' && (
-        <SignLayer signing={signing} pageNumber={pageNumber} page={page} scale={scale} />
-      )}
-      <PlacedSignatures
-        placements={editor.signatures.filter((placed) => placed.pageNumber === pageNumber)}
-        signing={signing}
-        scale={scale}
-        page={page}
-        isInteractive={(placed) => (placed.purpose === 'image' ? pickable : mode === 'sign')}
-      />
       {draft?.pageNumber === pageNumber && (
         <TextEditor
           key={draft.id}

@@ -33,6 +33,7 @@ function FieldInput({ field, form, scale, interactive, onSign }: FieldInputProps
     fontSize: Math.min(MAX_TEXT_SIZE, field.rect.height * TEXT_SHARE) * scale,
   };
   const disabled = !interactive || field.readOnly;
+  const required = field.required ? { 'aria-required': true } : {};
 
   switch (field.kind) {
     case 'checkbox':
@@ -66,6 +67,7 @@ function FieldInput({ field, form, scale, interactive, onSign }: FieldInputProps
           aria-label={label}
           style={style}
           disabled={disabled}
+          {...required}
           {...(typeof value === 'string' ? {} : { multiple: true })}
           value={typeof value === 'string' ? value : [...(value as readonly string[])]}
           onFocus={form.fieldFocused}
@@ -78,7 +80,8 @@ function FieldInput({ field, form, scale, interactive, onSign }: FieldInputProps
             );
           }}
         >
-          {field.kind === 'dropdown' && <option value="" />}
+          {/* Without a blank choice, an unanswered one would look like the first was picked. */}
+          {typeof value === 'string' && <option value="" />}
           {field.options.map((option) => (
             <option key={option} value={option}>
               {option}
@@ -88,7 +91,16 @@ function FieldInput({ field, form, scale, interactive, onSign }: FieldInputProps
       );
     case 'signature':
       return interactive ? (
-        <button type="button" className="f-sign form-field" style={style} onClick={onSign}>
+        <button
+          ref={(element) => {
+            ref.current = element;
+          }}
+          type="button"
+          className="f-sign form-field"
+          aria-label={`Click to sign: ${label}`}
+          style={style}
+          onClick={onSign}
+        >
           <Icon name="sign" />
           Click to sign
         </button>
@@ -105,6 +117,7 @@ function FieldInput({ field, form, scale, interactive, onSign }: FieldInputProps
           aria-label={label}
           style={style}
           disabled={disabled}
+          {...required}
           {...(field.maxLength > 0 ? { maxLength: field.maxLength } : {})}
           value={value as string}
           onFocus={form.fieldFocused}
@@ -122,6 +135,7 @@ function FieldInput({ field, form, scale, interactive, onSign }: FieldInputProps
           aria-label={label}
           style={style}
           disabled={disabled}
+          {...required}
           {...(field.maxLength > 0 ? { maxLength: field.maxLength } : {})}
           value={value as string}
           onFocus={form.fieldFocused}

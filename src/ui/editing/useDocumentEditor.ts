@@ -8,6 +8,7 @@ import {
   currentEntry,
   deriveAnnotations,
   deriveFieldAnswers,
+  deriveLock,
   deriveSignatures,
   deriveTextBoxes,
   record,
@@ -43,6 +44,7 @@ interface BuiltFile {
   readonly fieldsRetired: number;
   /** Form fields left in place that could still hide an edit beneath them. */
   readonly fieldsOnTop: number;
+  readonly annotationsRetired: number;
 }
 
 export interface DocumentEditor {
@@ -89,9 +91,6 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
   const [outcomes, setOutcomes] = useState<ReadonlyMap<string, FontOutcome>>(() => new Map());
   // Kept in step with the state, because saving straight after an edit must include that edit.
   const logRef = useRef(log);
-  const [locksAnswers, setLocksAnswers] = useState(false);
-  const lockRef = useRef(locksAnswers);
-  lockRef.current = locksAnswers;
   const savedRef = useRef(savedEntry);
   const clientRef = useRef<Promise<SaveClient> | null>(null);
   const createClientRef = useRef<(() => Promise<SaveClient>) | null>(null);
@@ -104,7 +103,6 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
     latestChange.current += 1;
     setLog(EMPTY_LOG);
     setSavedEntry(undefined);
-    setLocksAnswers(false);
     setNotice(null);
     setProblem(null);
     setOutcomes(new Map());
@@ -139,6 +137,7 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
   const signatures = useMemo(() => deriveSignatures(activeEdits(log)), [log]);
   const annotations = useMemo(() => deriveAnnotations(activeEdits(log)), [log]);
   const answers = useMemo(() => deriveFieldAnswers(activeEdits(log)), [log]);
+  const locksAnswers = useMemo(() => deriveLock(activeEdits(log)), [log]);
 
   const moveTo = useCallback((next: EditLog) => {
     logRef.current = next;
@@ -188,7 +187,7 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
     const placed = deriveSignatures(edits);
     const marks = deriveAnnotations(edits);
     const filled = [...deriveFieldAnswers(edits)];
-    const lock = lockRef.current;
+    const lock = deriveLock(edits);
     const nothingToDo =
       active.length === 0 && placed.length === 0 && marks.length === 0 && filled.length === 0;
     if (nothingToDo && !lock) {
@@ -199,6 +198,7 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
         entry,
         fieldsRetired: 0,
         fieldsOnTop: 0,
+        annotationsRetired: 0,
       };
     }
     let client = await clientRef.current;
@@ -235,7 +235,9 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
     annotations,
     answers,
     locksAnswers,
-    setLocksAnswers,
+    setLocksAnswers: (lock: boolean) => {
+      apply({ kind: 'lock-answers', lock });
+    },
     changes: changesSince(log, savedEntry),
     isDirty,
     canUndo: canUndo(log),

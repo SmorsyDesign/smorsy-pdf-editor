@@ -106,6 +106,9 @@
   background: #ffffff;
   pointer-events: none;
 }
+.whiteout.is-outlined {
+  outline: 1px dashed var(--mark);
+}
 .draw-layer {
   position: absolute;
   inset: 0;
@@ -125,7 +128,7 @@
   outline-offset: 2px;
 }
 .overlay .annotation-hit:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--mark);
   outline-offset: 2px;
 }
 .annotation-hit[data-kind='highlight'],
@@ -176,7 +179,7 @@
   pointer-events: none;
 }
 .markup-line:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--mark);
   outline-offset: 1px;
   opacity: 1;
 }
@@ -191,7 +194,7 @@
   padding: 0 var(--space-1);
   border: 1px solid #5c7f96;
   border-radius: 2px;
-  background: #eef6fb;
+  background: var(--field-wash);
   color: #1a1a1a;
   font-family: 'Doc Sans', sans-serif;
   user-select: text;
@@ -220,7 +223,7 @@ textarea.f-input {
   gap: var(--space-2);
   border: 1px dashed var(--mark);
   border-radius: 2px;
-  background: #eef6fb;
+  background: var(--field-wash);
   color: var(--mark);
   font: 500 var(--text-md) / var(--line-md) var(--font-ui);
 }
@@ -275,16 +278,16 @@ textarea.f-input {
 }
 
 .note-read:hover {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--mark);
 }
 
 .note-read:focus-visible {
-  outline: 2px solid var(--focus);
+  outline: 2px solid var(--mark);
   outline-offset: 1px;
 }
 
 .note-card.is-reading {
-  background: #fff4b8;
+  background: var(--note-yellow);
   color: #33290a;
   font: 400 var(--text-sm) / var(--line-sm) var(--font-ui);
 }
@@ -308,7 +311,18 @@ textarea.f-input {
   margin: 0;
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
-  background: var(--surface);
-  color: var(--ink);
+  background: var(--chrome-raised);
+  color: var(--text);
   font: 400 var(--text-sm) / var(--line-sm) var(--font-ui);
+}
+
+/* Everything on the paper is on white in both themes, where the dark theme's focus colour is too pale. */
+.overlay :focus-visible {
+  outline-color: var(--mark);
+}
+
+.note-card:focus-within {
+  box-shadow:
+    0 0 0 2px var(--mark),
+    0 4px 12px #17222b29;
 }

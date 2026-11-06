@@ -29,7 +29,7 @@ export function AnnotatePanel({ annotating, signing, annotations, images }: Anno
     <aside className="panel" aria-label="Annotations on this page">
       <div className="panel-head">
         <h2>On this page</h2>
-        <span className="kbd">
+        <span className="kbd" role="status">
           {total} {total === 1 ? 'annotation' : 'annotations'}
         </span>
       </div>
@@ -46,6 +46,7 @@ export function AnnotatePanel({ annotating, signing, annotations, images }: Anno
                 className="row-text"
                 onClick={() => {
                   annotating.select(annotation.id);
+                  annotating.focus(annotation.id);
                 }}
               >
                 <span className="row-title">{label}</span>
@@ -71,6 +72,7 @@ export function AnnotatePanel({ annotating, signing, annotations, images }: Anno
               type="button"
               className="row-text"
               onClick={() => {
+                annotating.clearTool();
                 signing.select(image.id);
               }}
             >

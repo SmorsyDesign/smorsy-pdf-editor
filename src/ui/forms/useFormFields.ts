@@ -5,7 +5,7 @@ import type { DocumentEditor } from '../editing/useDocumentEditor';
 
 /** A document's form: what's in it, and what's been answered so far. */
 export function useFormFields(document: PdfDocument, editor: DocumentEditor) {
-  const { answers, apply, reportProblem } = editor;
+  const { answers, apply, reportProblem, signatures } = editor;
   const [fields, setFields] = useState<readonly FormField[]>([]);
   const [focusFieldId, setFocusFieldId] = useState<string | null>(null);
   // Counts each time a field gets focus, so typing undoes in runs rather than letter by letter.
@@ -31,11 +31,22 @@ export function useFormFields(document: PdfDocument, editor: DocumentEditor) {
 
   const valueOf = (field: FormField): FieldValue => answers.get(field.name) ?? field.value;
 
+  // A signature isn't typed in. It counts once one has been placed over the field.
+  const isSigned = (field: FormField) =>
+    signatures.some(
+      ({ pageNumber, rect }) =>
+        pageNumber === field.pageNumber &&
+        rect.x < field.rect.x + field.rect.width &&
+        field.rect.x < rect.x + rect.width &&
+        rect.y < field.rect.y + field.rect.height &&
+        field.rect.y < rect.y + rect.height,
+    );
+
   // A radio group is one question, however many buttons it has.
-  const questions = [...new Map(fields.filter(isFillable).map((f) => [f.name, f])).values()].filter(
-    (field) => field.kind !== 'signature',
+  const questions = [...new Map(fields.filter(isFillable).map((f) => [f.name, f])).values()];
+  const unanswered = questions.filter((field) =>
+    field.kind === 'signature' ? !isSigned(field) : !hasAnswer(valueOf(field)),
   );
-  const unanswered = questions.filter((field) => !hasAnswer(valueOf(field)));
   const required = unanswered.filter((field) => field.required);
 
   return {

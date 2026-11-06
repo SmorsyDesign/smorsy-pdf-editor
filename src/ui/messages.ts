@@ -59,8 +59,17 @@ export function explainOpenFailure(error: unknown): OpenProblem {
 }
 
 /** What the person should know about a save that worked, or null if there's nothing to add. */
-export function explainFormChanges(retired: number, onTop: number): string | null {
+export function explainFormChanges(retired: number, onTop: number, annotations = 0): string | null {
   const notes: string[] = [];
+  if (annotations === 1) {
+    notes.push(
+      'An annotation under a whiteout box is now part of the page, so it can’t be changed in the saved file.',
+    );
+  } else if (annotations > 1) {
+    notes.push(
+      `${annotations} annotations under whiteout boxes are now part of the page, so they can’t be changed in the saved file.`,
+    );
+  }
   if (retired === 1) {
     notes.push(
       'A filled-in form field under your edit is now part of the page, so it can’t be changed in the saved file.',
@@ -72,7 +81,7 @@ export function explainFormChanges(retired: number, onTop: number): string | nul
   }
   if (onTop > 0) {
     notes.push(
-      'A form field or button could still cover part of your edit in the saved file. Check it, or move your edit away from the field.',
+      'A form field, button or existing annotation could still cover part of your edit in the saved file. Check it, or move your edit away from it.',
     );
   }
   return notes.length > 0 ? notes.join(' ') : null;
@@ -80,6 +89,8 @@ export function explainFormChanges(retired: number, onTop: number): string | nul
 
 export function explainSaveFailure(kind: SaveFailureKind, detail = ''): string {
   switch (kind) {
+    case 'field-problem':
+      return detail;
     case 'unsupported-text':
       return `No font available to the app has these characters: ${detail}. Change or remove them, then save again.`;
     case 'build-failed':

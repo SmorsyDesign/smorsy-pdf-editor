@@ -21,7 +21,7 @@ const START_WIDTH: Readonly<Record<SignatureKind, number>> = { signature: 168, i
 const START_IMAGE_WIDTH = 240;
 const DUPLICATE_OFFSET = 16;
 
-const focusPages = () => {
+export const focusPages = () => {
   document.querySelector<HTMLElement>('main.canvas')?.focus({ preventScroll: true });
 };
 

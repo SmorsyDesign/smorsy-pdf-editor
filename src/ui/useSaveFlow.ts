@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { copyFileName } from '../engine/copy';
-import { UNSUPPORTED_TEXT } from '../engine/errors';
+import { FIELD_PROBLEM, UNSUPPORTED_TEXT } from '../engine/errors';
 import { openDocument } from '../engine/document';
 import { SaveFailure, type OpenedFile, type Platform, type SaveFailureKind } from '../platform';
 import type { DocumentEditor } from './editing/useDocumentEditor';
@@ -20,6 +20,13 @@ function failureDialog(error: unknown, otherwise: SaveFailureKind): SaveDialog {
     return { kind: 'save-failed', failure: error.kind, detail: error.message };
   }
   const detail = error instanceof Error ? error.message : String(error);
+  if (detail.startsWith(FIELD_PROBLEM)) {
+    return {
+      kind: 'save-failed',
+      failure: 'field-problem',
+      detail: detail.slice(FIELD_PROBLEM.length),
+    };
+  }
   return detail.startsWith(UNSUPPORTED_TEXT)
     ? {
         kind: 'save-failed',
@@ -99,7 +106,8 @@ export function useSaveFlow({
   const writeTo = useCallback(
     async (target: OpenedFile, path: string, overOriginal: boolean): Promise<Outcome> => {
       try {
-        const { bytes, edited, entry, fieldsRetired, fieldsOnTop } = await buildBytes();
+        const { bytes, edited, entry, fieldsRetired, fieldsOnTop, annotationsRetired } =
+          await buildBytes();
         if (edited) {
           // Proves the result opens, before it can replace anything on disk.
           const check = await openDocument(bytes);
@@ -107,7 +115,7 @@ export function useSaveFlow({
         }
         await platform.writeFile(path, bytes);
         markSaved(entry);
-        saveNote.current = explainFormChanges(fieldsRetired, fieldsOnTop);
+        saveNote.current = explainFormChanges(fieldsRetired, fieldsOnTop, annotationsRetired);
         setSaved((previous) => ({
           file: target,
           path,

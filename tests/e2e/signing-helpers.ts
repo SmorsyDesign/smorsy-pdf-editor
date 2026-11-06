@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test';
-import { pageElement, reopenSaved, saveTo } from './editing-helpers';
+import { pageElement, reopenSaved, saveTo, waitForRedraw } from './editing-helpers';
 import { expectOpenDocument, expectPageDrawn, openFixture } from './helpers';
 
 export const PLAIN = 'test-pdfs/01-plain-text.pdf';
@@ -235,13 +235,4 @@ async function compareWithScreen(
     return count;
   }, pageNumber);
   expect(differing).toBeLessThan(Math.max(50, inkPixels * 0.05));
-}
-
-async function waitForRedraw(page: Page, pageNumber: number) {
-  // A zoom change redraws after a short pause, so being drawn right now could be the old size.
-  await page.waitForTimeout(300);
-  await expect(pageElement(page, pageNumber).locator('canvas').first()).toHaveAttribute(
-    'data-drawn',
-    'true',
-  );
 }

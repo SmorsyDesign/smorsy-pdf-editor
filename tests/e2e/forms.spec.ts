@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { PDFDocument } from '@cantoo/pdf-lib';
 import { expect, test, type Page } from '@playwright/test';
 import { openDocument } from '../../src/engine/document';
@@ -143,8 +144,8 @@ test.describe('answers', () => {
   test('an unchanged form saves as an exact copy', async ({ page }) => {
     await openForm(page);
     await saveTo(page);
-    const form = await savedForm(page);
-    expect(form.getFields().length).toBeGreaterThan(0);
+    const saved = Uint8Array.from((await lastWrite(page))?.bytes ?? []);
+    expect(Buffer.compare(saved, readFileSync(FORM))).toBe(0);
   });
 });
 
@@ -186,6 +187,28 @@ test.describe('forms that need care', () => {
       .click();
     await page.getByRole('button', { name: 'Select', exact: true }).click();
     await expect(panel(page)).toBeVisible();
+    const field = page.locator('input.form-field[type="text"]').first();
+    await field.fill('Theo Okafor');
+    await saveTo(page);
+    const doc = await openDocument(Uint8Array.from((await lastWrite(page))?.bytes ?? []));
+    const fields = await doc.formFields();
+    await doc.close();
+    expect(fields.some((saved) => saved.value === 'Theo Okafor')).toBe(true);
+  });
+
+  test('a line break in a multi-line answer doesn’t stop the save', async ({ page }) => {
+    await openFixture(page, 'test-pdfs/16-irs-form-w9.pdf', 'W9.pdf');
+    await expectOpenDocument(page, 6);
+    await page.getByRole('button', { name: 'Edit anyway' }).click();
+    await page
+      .getByRole('alertdialog', { name: 'Editing will break the signature' })
+      .getByRole('button', { name: 'Edit anyway' })
+      .click();
+    await page.getByRole('button', { name: 'Select', exact: true }).click();
+    const field = page.locator('textarea.form-field').first();
+    await field.fill('First line\nSecond line');
+    await saveTo(page);
+    await expect(page.getByText('Copy saved')).toBeVisible();
   });
 
   test('a protected PDF doesn’t offer filling', async ({ page }) => {

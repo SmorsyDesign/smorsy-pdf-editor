@@ -58,6 +58,33 @@ export function rectOf(context: PDFContext, annotation: PDFDict): UserBounds | n
 const overlap = (one: UserBounds, two: UserBounds) =>
   one.left < two.right && two.left < one.right && one.bottom < two.top && two.bottom < one.top;
 
+/** Whether viewers show it at all. */
+export function isShown(context: PDFContext, annotation: PDFDict): boolean {
+  const flags = context.lookup(annotation.get(name('F')));
+  return !(flags instanceof PDFNumber && flags.asNumber() & (HIDDEN_FLAG | NO_VIEW_FLAG));
+}
+
+/**
+ * Pages can share one list, or inherit it, and a change to a shared list would land on every page
+ * using it. So a page gets its own before anything about it changes.
+ */
+export function giveOwnAnnotationList(page: PDFPage): void {
+  const { context } = page.doc;
+  const list = context.lookup(page.node.getInheritableAttribute(name('Annots')));
+  if (list instanceof PDFArray) page.node.set(name('Annots'), list.clone(context));
+}
+
+/** Takes an annotation off the page, along with the pop-up that belongs to it. */
+export function removeAnnotation(page: PDFPage, annotation: PDFDict): void {
+  const { context } = page.doc;
+  const list = page.node.Annots();
+  if (!list) return;
+  const going = new Set([annotation, context.lookup(annotation.get(name('Popup')))]);
+  for (let index = list.size() - 1; index >= 0; index -= 1) {
+    if (going.has(context.lookup(list.get(index)))) list.remove(index);
+  }
+}
+
 export function annotationsOver(page: PDFPage, bounds: UserBounds): readonly PDFDict[] {
   const annotations = page.node.Annots();
   if (!annotations) return [];
@@ -66,8 +93,7 @@ export function annotationsOver(page: PDFPage, bounds: UserBounds): readonly PDF
   for (let index = 0; index < annotations.size(); index += 1) {
     const annotation = context.lookup(annotations.get(index));
     if (!(annotation instanceof PDFDict)) continue;
-    const flags = context.lookup(annotation.get(name('F')));
-    if (flags instanceof PDFNumber && flags.asNumber() & (HIDDEN_FLAG | NO_VIEW_FLAG)) continue;
+    if (!isShown(context, annotation)) continue;
     const kind = context.lookup(annotation.get(name('Subtype')));
     if (kind instanceof PDFName && PAINTS_NOTHING.has(kind.toString())) continue;
     const rect = rectOf(context, annotation);

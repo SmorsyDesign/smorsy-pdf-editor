@@ -33,6 +33,7 @@ export const SAVE_FAILURE_KINDS = [
   'read-only',
   'in-use',
   'unsupported-text',
+  'field-problem',
   'build-failed',
   'invalid-request',
   'other',
