@@ -7,6 +7,7 @@ import {
   createTyped,
   dialog,
   expectSavedToMatchScreen,
+  expectSavedToMatchScreenAfterSave,
   openForSigning,
   placeTyped,
   placed,
@@ -135,6 +136,40 @@ test.describe('saving before placing', () => {
   });
 });
 
+test.describe('saving from the unsaved prompt before placing', () => {
+  test('asks about the signature too, then goes on to close', async ({ page }) => {
+    await openForSigning(page);
+    await placeTyped(page);
+    await createTyped(page);
+    await page.keyboard.press('ControlOrMeta+w');
+    await queueSavePath(page, '/Users/test/Kept.pdf');
+    await page
+      .getByRole('alertdialog', { name: 'Save your changes to Lease.pdf?' })
+      .getByRole('button', { name: 'Save', exact: true })
+      .click();
+    await page
+      .getByRole('alertdialog', { name: 'Your signature isn’t on the page yet' })
+      .getByRole('button', { name: 'Save without it' })
+      .click();
+    await expect(page.getByRole('heading', { name: 'Open a PDF' })).toBeVisible();
+    expect(await lastWrite(page)).not.toBeNull();
+  });
+});
+
+test.describe('a filled-in field under a signature', () => {
+  test('says it’s now part of the page, and still shows both', async ({ page }) => {
+    await openForSigning(page, 'test-pdfs/22-form-filled-value.pdf', 1);
+    await createTyped(page);
+    const sheet = await pageElement(page, 1).boundingBox();
+    const scale = (sheet?.width ?? 612) / 612;
+    await signLayer(page).click({ position: { x: 200 * scale, y: 220 * scale } });
+    await page.getByRole('button', { name: 'Close signatures' }).click();
+    await saveTo(page);
+    await expect(page.getByRole('alert')).toContainText('now part of the page');
+    await expectSavedToMatchScreenAfterSave(page, 1, 1);
+  });
+});
+
 test.describe('focus', () => {
   test('comes back when the create window is cancelled', async ({ page }) => {
     await openForSigning(page);
@@ -156,6 +191,13 @@ test.describe('focus', () => {
     await openForSigning(page);
     await page.getByRole('button', { name: 'Close signatures' }).click();
     await expect(page.locator('main.canvas')).toBeFocused();
+  });
+
+  test('isn’t lost when a signature is removed from the list', async ({ page }) => {
+    await openForSigning(page);
+    await createTyped(page);
+    await page.getByRole('button', { name: /^Remove signature 1/ }).click();
+    await expect(page.getByRole('button', { name: 'Create signature' })).toBeFocused();
   });
 
   test('isn’t lost when a signature is deleted', async ({ page }) => {
@@ -200,6 +242,38 @@ test.describe('pointer details', () => {
     await page.mouse.move(before.x + 100, before.y + 80, { steps: 4 });
     await page.mouse.up({ button: 'right' });
     expect((await placed(page).boundingBox())?.x).toBeCloseTo(before.x, 0);
+  });
+
+  test('Esc during a resize puts it back, with the screen matching the file', async ({ page }) => {
+    await openForSigning(page);
+    await placeTyped(page);
+    const before = await placed(page).boundingBox();
+    const grip = await page.getByRole('button', { name: 'Resize from bottom right' }).boundingBox();
+    if (!before || !grip) throw new Error('Not on screen.');
+    await page.mouse.move(grip.x + 12, grip.y + 12);
+    await page.mouse.down();
+    await page.mouse.move(grip.x + 80, grip.y + 40, { steps: 4 });
+    await placed(page).focus();
+    await page.keyboard.press('Escape');
+    await page.mouse.up();
+    expect((await placed(page).boundingBox())?.width).toBeCloseTo(before.width, 0);
+    await expect(page.getByText('1 unsaved change')).toBeVisible();
+  });
+
+  test('Move doesn’t linger once something else is chosen', async ({ page }) => {
+    await openForSigning(page);
+    await placeTyped(page);
+    await page.getByRole('button', { name: 'Duplicate' }).click();
+    await page.getByRole('button', { name: /^Move:/ }).click();
+    await placed(page)
+      .first()
+      .click({ position: { x: 4, y: 4 } });
+    await placed(page)
+      .nth(1)
+      .click({ position: { x: 40, y: 20 } });
+    const before = await placed(page).nth(1).boundingBox();
+    await signLayer(page).click({ position: { x: 100, y: 100 } });
+    expect((await placed(page).nth(1).boundingBox())?.x).toBeCloseTo(before?.x ?? -1, 0);
   });
 
   test('a keyboard press right after a drag still works', async ({ page }) => {

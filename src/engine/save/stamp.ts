@@ -1,9 +1,11 @@
 import {
   PDFArray,
   PDFDict,
+  PDFHexString,
   PDFName,
   PDFNumber,
   PDFRawStream,
+  PDFString,
   concatTransformationMatrix,
   decodePDFRawStream,
   degrees,
@@ -18,7 +20,7 @@ import {
 } from '@cantoo/pdf-lib';
 import type { PdfImagePlacement } from '../signatures/placement';
 
-interface UserBounds {
+export interface UserBounds {
   readonly left: number;
   readonly bottom: number;
   readonly right: number;
@@ -26,12 +28,16 @@ interface UserBounds {
 }
 
 const HIDDEN_FLAG = 2;
+const NO_VIEW_FLAG = 32;
 // These draw nothing of their own, so nothing placed beneath them is hidden.
 const PAINTS_NOTHING = new Set(['/Link', '/Popup']);
 const PICTURE_NAME = 'Signature';
 const PRINT_FLAG = 4;
-// Any fill or fill-and-stroke drawing command in an appearance.
-const FILLS = /(^|\s)[fFbB]\*?(\s|$)/;
+const MAX_FIELD_DEPTH = 16;
+// Drawing commands that paint an area: fills, shadings and images or nested drawings.
+const PAINTS_AREA = /(^|\s)([fFbB]\*?|sh|Do)(\s|$)/;
+// Text in an appearance could otherwise read as one of those commands.
+const STRINGS = /\((?:\\.|[^\\()])*\)|<[0-9a-fA-F\s]*>/g;
 
 const name = (text: string) => PDFName.of(text);
 
@@ -81,7 +87,7 @@ function annotationsOver(page: PDFPage, bounds: UserBounds): readonly PDFDict[] 
     const annotation = context.lookup(annotations.get(index));
     if (!(annotation instanceof PDFDict)) continue;
     const flags = context.lookup(annotation.get(name('F')));
-    if (flags instanceof PDFNumber && flags.asNumber() & HIDDEN_FLAG) continue;
+    if (flags instanceof PDFNumber && flags.asNumber() & (HIDDEN_FLAG | NO_VIEW_FLAG)) continue;
     const kind = context.lookup(annotation.get(name('Subtype')));
     if (kind instanceof PDFName && PAINTS_NOTHING.has(kind.toString())) continue;
     const rect = rectOf(context, annotation);
@@ -105,7 +111,8 @@ function paintsSolid(context: PDFContext, widget: PDFDict, appearance: PDFRawStr
   const looks = context.lookup(widget.get(name('MK')));
   if (looks instanceof PDFDict && numbersIn(context, looks.get(name('BG'))).length > 0) return true;
   try {
-    return FILLS.test(new TextDecoder('latin1').decode(decodePDFRawStream(appearance).decode()));
+    const drawing = new TextDecoder('latin1').decode(decodePDFRawStream(appearance).decode());
+    return PAINTS_AREA.test(drawing.replace(STRINGS, ' '));
   } catch {
     // If its drawing can't be read, it's safest to assume that it could cover the signature.
     return true;
@@ -114,8 +121,8 @@ function paintsSolid(context: PDFContext, widget: PDFDict, appearance: PDFRawStr
 
 /**
  * Viewers always paint form fields last, in whatever order the file lists them, so nothing can sit
- * on top of a solid one. So what the field shows moves down into the page, where the signature can
- * go over it, and the field itself stays, still fillable, but see-through.
+ * on top of a solid one. So what the field shows moves down into the page, where other things can
+ * go over it.
  */
 function moveFieldLooksIntoPage(
   doc: PDFDocument,
@@ -172,6 +179,64 @@ function moveFieldLooksIntoPage(
   }
 }
 
+/** The value a field holds, which a widget can inherit from its parent field. */
+function hasValue(context: PDFContext, widget: PDFDict): boolean {
+  let current: PDFDict | undefined = widget;
+  for (let depth = 0; current && depth < MAX_FIELD_DEPTH; depth += 1) {
+    const kind = context.lookup(current.get(name('FT')));
+    const value = context.lookup(current.get(name('V')));
+    // Buttons hold a state rather than something typed, and their looks come from that state.
+    if (kind === name('Btn')) return false;
+    if (value instanceof PDFString || value instanceof PDFHexString) {
+      return value.decodeText() !== '';
+    }
+    const parent: PDFObject | undefined = context.lookup(current.get(name('Parent')));
+    current = parent instanceof PDFDict ? parent : undefined;
+  }
+  return false;
+}
+
+/**
+ * With its value now part of the page, leaving the field in place would mean changing it later
+ * left the old text showing underneath. So it stops being a field, as long as nothing else
+ * depends on it. Resolves to whether it did.
+ */
+function retireField(doc: PDFDocument, widget: PDFDict): boolean {
+  const form = doc.getForm();
+  const field = form
+    .getFields()
+    .find((candidate) => candidate.acroField.getWidgets().some((other) => other.dict === widget));
+  if (!field || field.acroField.getWidgets().length !== 1) return false;
+  form.removeField(field);
+  return true;
+}
+
+/** Makes solid form fields safe to draw over. Resolves to how many stopped being fields. */
+export function clearFieldsUnder(
+  doc: PDFDocument,
+  page: PDFPage,
+  areas: readonly UserBounds[],
+): number {
+  const { context } = doc;
+  const widgets = new Set(
+    areas.flatMap((area) =>
+      annotationsOver(page, area).filter((annotation) => isWidget(context, annotation)),
+    ),
+  );
+  let retired = 0;
+  for (const widget of widgets) {
+    const appearance = appearanceOf(context, widget);
+    if (!appearance || !paintsSolid(context, widget, appearance)) continue;
+    // A field left out of print is usually a form's own button, and shouldn't start printing.
+    const flags = context.lookup(widget.get(name('F')));
+    if (!(flags instanceof PDFNumber) || !(flags.asNumber() & PRINT_FLAG)) continue;
+    const holdsValue = hasValue(context, widget);
+    moveFieldLooksIntoPage(doc, page, widget, appearance);
+    if (holdsValue && retireField(doc, widget)) retired += 1;
+  }
+  return retired;
+}
+
 /** Added last, so it's painted after any other annotation beneath it. */
 function addStamp(
   doc: PDFDocument,
@@ -213,8 +278,8 @@ function addStamp(
 }
 
 /**
- * Draws on the page where it can, so the signature becomes part of it. Annotations always paint
- * above the page, so anything solid over this spot has to be dealt with for it to be seen.
+ * Draws on the page where it can, so the signature becomes part of it. Other annotations always
+ * paint above the page, but in the order the file lists them, so over those it's added as a stamp.
  */
 export function drawSignaturePicture(
   doc: PDFDocument,
@@ -224,17 +289,11 @@ export function drawSignaturePicture(
 ): void {
   const bounds = boundsOf(placed);
   const { context } = doc;
-  let needsStamp = false;
-  for (const annotation of annotationsOver(page, bounds)) {
-    if (isWidget(context, annotation)) {
-      const appearance = appearanceOf(context, annotation);
-      if (appearance && paintsSolid(context, annotation, appearance)) {
-        moveFieldLooksIntoPage(doc, page, annotation, appearance);
-      }
-    } else {
-      needsStamp = true;
-    }
-  }
-  if (needsStamp) addStamp(doc, page, picture, placed, bounds);
+  const overAnnotation = annotationsOver(page, bounds).some(
+    (annotation) => !isWidget(context, annotation),
+  );
+  if (overAnnotation) addStamp(doc, page, picture, placed, bounds);
   else page.drawImage(picture, { ...placed, rotate: degrees(placed.rotate) });
 }
+
+export { boundsOf as boundsOfPlacement };

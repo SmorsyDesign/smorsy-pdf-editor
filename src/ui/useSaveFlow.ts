@@ -85,7 +85,7 @@ export function useSaveFlow({
   const writeTo = useCallback(
     async (target: OpenedFile, path: string, overOriginal: boolean): Promise<Outcome> => {
       try {
-        const { bytes, edited, entry } = await buildBytes();
+        const { bytes, edited, entry, fieldsRetired } = await buildBytes();
         if (edited) {
           // Proves the result opens, before it can replace anything on disk.
           const check = await openDocument(bytes);
@@ -93,6 +93,13 @@ export function useSaveFlow({
         }
         await platform.writeFile(path, bytes);
         markSaved(entry);
+        if (fieldsRetired > 0) {
+          reportProblem(
+            fieldsRetired === 1
+              ? 'A filled-in form field under your edit is now part of the page, so it can’t be changed in the saved file.'
+              : `${fieldsRetired} filled-in form fields under your edits are now part of the page, so they can’t be changed in the saved file.`,
+          );
+        }
         setSaved((previous) => ({
           file: target,
           path,
@@ -106,7 +113,7 @@ export function useSaveFlow({
         return 'stopped';
       }
     },
-    [buildBytes, markSaved, platform, showDialog],
+    [buildBytes, markSaved, platform, reportProblem, showDialog],
   );
 
   const saveCopy = useCallback(

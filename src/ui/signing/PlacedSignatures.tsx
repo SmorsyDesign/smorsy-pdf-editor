@@ -66,6 +66,11 @@ function Placed({ placement, signing, scale, page, interactive, selected }: Plac
     placedFocused();
   }, [focusPlacedId, id, placedFocused]);
 
+  // Deselecting removes the handles, and a drag held by one would never hear the pointer lift.
+  useEffect(() => {
+    if (!selected) endDrag.current?.();
+  }, [selected]);
+
   // A drag works in the scale it began at, so a zoom or the page leaving view ends it unrecorded.
   useEffect(
     () => () => {
@@ -87,7 +92,15 @@ function Placed({ placement, signing, scale, page, interactive, selected }: Plac
       latest = update(move);
       setPreview(latest);
     };
+    // Wherever focus happens to be, Esc takes back the drag and nothing else.
+    const onKey = (key: globalThis.KeyboardEvent) => {
+      if (key.key !== 'Escape') return;
+      key.preventDefault();
+      key.stopPropagation();
+      stop();
+    };
     const stop = () => {
+      window.removeEventListener('keydown', onKey, true);
       target.removeEventListener('pointermove', onMove);
       target.removeEventListener('pointerup', onUp);
       target.removeEventListener('pointercancel', stop);
@@ -100,6 +113,7 @@ function Placed({ placement, signing, scale, page, interactive, selected }: Plac
       stop();
       if (finished) signing.change(id, finished);
     };
+    window.addEventListener('keydown', onKey, true);
     target.addEventListener('pointermove', onMove);
     target.addEventListener('pointerup', onUp);
     target.addEventListener('pointercancel', stop);

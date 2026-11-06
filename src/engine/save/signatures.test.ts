@@ -338,6 +338,72 @@ describe('saving a placed signature', () => {
     });
   });
 
+  describe('over a filled-in form field', () => {
+    const name = '22-form-filled-value.pdf';
+    const onField = () => placed({ rect: { x: 100, y: 200, width: 200, height: 40 } });
+
+    it('makes it part of the page, and says so', async () => {
+      const report = await new PdfEditor(original(name), fontBytes).saveWithReport([], [onField()]);
+      expect(report.fieldsRetired).toBe(1);
+      const doc = await PDFDocument.load(report.bytes);
+      expect(doc.getForm().getFields()).toHaveLength(0);
+      expect(doc.getPage(0).node.Annots()?.size() ?? 0).toBe(0);
+    });
+
+    it('keeps the value showing', async () => {
+      const saved = await new PdfEditor(original(name), fontBytes).save([], [onField()]);
+      const task = getDocument({ data: saved.slice() });
+      const page = await (await task.promise).getPage(1);
+      const { fnArray } = await page.getOperatorList();
+      await task.destroy();
+      expect(fnArray).toContain(OPS.showText);
+    });
+
+    it('reports nothing when the signature is elsewhere', async () => {
+      const report = await new PdfEditor(original(name), fontBytes).saveWithReport(
+        [],
+        [placed({ rect: { x: 100, y: 500, width: 200, height: 40 } })],
+      );
+      expect(report.fieldsRetired).toBe(0);
+      expect((await PDFDocument.load(report.bytes)).getForm().getFields()).toHaveLength(1);
+    });
+  });
+
+  it('moves a solid field out of the way of text too, drawing the text after it', async () => {
+    const stamp = {
+      id: 'text',
+      pageNumber: 1,
+      rect: { x: 110, y: 210, width: 150, height: 17 },
+      angle: 0,
+      text: 'On the field',
+      lines: ['On the field'],
+      firstBaseline: 12,
+      lineHeight: 17,
+      style: {
+        font: 'sans' as const,
+        size: 14,
+        color: { r: 0, g: 0, b: 0 },
+        bold: false,
+        italic: false,
+        align: 'left' as const,
+      },
+      covers: [],
+      original: null,
+    };
+    const saved = await new PdfEditor(original('21-form-filled-field.pdf'), fontBytes).save([
+      stamp,
+    ]);
+    const doc = await PDFDocument.load(saved);
+    const [widget] = doc.getForm().getTextField('signature-line').acroField.getWidgets();
+    const looks = doc.context.lookup(widget?.dict.get(PDFName.of('MK')));
+    expect(looks instanceof PDFDict && looks.has(PDFName.of('BG'))).toBe(false);
+    const task = getDocument({ data: saved.slice() });
+    const { fnArray } = await (await (await task.promise).getPage(1)).getOperatorList();
+    await task.destroy();
+    // The original label, then the field's fill, then the new text on top of it.
+    expect(fnArray.lastIndexOf(OPS.showText)).toBeGreaterThan(fnArray.indexOf(OPS.rectangle));
+  });
+
   it('becomes a stamp over other annotations, whose order viewers respect', async () => {
     const doc = await PDFDocument.create();
     const page = doc.addPage([612, 792]);

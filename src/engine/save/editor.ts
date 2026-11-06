@@ -25,8 +25,19 @@ import { UNSUPPORTED_TEXT, nameCharacter } from '../errors';
 import { findEmbeddedFont, type EmbeddedFont } from '../fonts/embedded';
 import { bundledFaceFile } from '../fonts/match';
 import { placementInPdf } from '../signatures/placement';
-import { drawSignaturePicture } from './stamp';
+import {
+  boundsOfPlacement,
+  clearFieldsUnder,
+  drawSignaturePicture,
+  type UserBounds,
+} from './stamp';
 import { FontChooser, systemFontKey, type FontBytes, type FontOutcome } from './choose-font';
+
+export interface SaveReport {
+  readonly bytes: Uint8Array;
+  /** Filled-in form fields under an edit, which are now simply part of the page. */
+  readonly fieldsRetired: number;
+}
 
 type DrawFont =
   | { readonly kind: 'pdf-font'; readonly font: PDFFont }
@@ -223,17 +234,54 @@ export class PdfEditor {
     }
   }
 
-  async save(
+  /** The space a text box takes up in the PDF, so a solid field there can be dealt with. */
+  private textBoxBounds(box: TextBox, pageBox: PageBox): UserBounds {
+    const { x, y, width, height } = box.rect;
+    const radians = (box.angle * Math.PI) / 180;
+    const corners = [
+      [0, 0],
+      [width, 0],
+      [0, height],
+      [width, height],
+    ].map(([across = 0, down = 0]) =>
+      displayToUser(
+        {
+          x: x + across * Math.cos(radians) - down * Math.sin(radians),
+          y: y + across * Math.sin(radians) + down * Math.cos(radians),
+        },
+        pageBox,
+      ),
+    );
+    return {
+      left: Math.min(...corners.map((corner) => corner.x)),
+      right: Math.max(...corners.map((corner) => corner.x)),
+      bottom: Math.min(...corners.map((corner) => corner.y)),
+      top: Math.max(...corners.map((corner) => corner.y)),
+    };
+  }
+
+  /** Also says how many form fields became part of the page, so the person can be told. */
+  async saveWithReport(
     boxes: readonly TextBox[],
     signatures: readonly PlacedSignature[] = [],
-  ): Promise<Uint8Array> {
+  ): Promise<SaveReport> {
     const doc = await this.load();
     const embedded = new Map<string, Promise<PDFFont>>();
     const pictures = new Map<string, Promise<PDFImage>>();
     const pageNumbers = new Set([...boxes, ...signatures].map((item) => item.pageNumber));
+    let fieldsRetired = 0;
     for (const pageNumber of pageNumbers) {
       const page = doc.getPage(pageNumber - 1);
+      const pageBox = pageBoxOf(page);
       const onPage = boxes.filter((box) => box.pageNumber === pageNumber);
+      const signed = signatures.filter((signature) => signature.pageNumber === pageNumber);
+      // First, because anything drawn before a field's looks moved to the page would be under them.
+      fieldsRetired += clearFieldsUnder(doc, page, [
+        ...onPage
+          .filter((box) => box.lines.length > 0)
+          .map((box) => this.textBoxBounds(box, pageBox)),
+        ...signed.map(({ rect, angle }) => boundsOfPlacement(placementInPdf(rect, angle, pageBox))),
+      ]);
       // All covers go first, so a patch can never hide another box's new text.
       for (const box of onPage) this.drawCovers(page, box);
       for (const box of onPage) {
@@ -242,13 +290,15 @@ export class PdfEditor {
         }
       }
       // Last, because the screen shows signatures on top of everything else on the page.
-      await this.drawSignatures(
-        doc,
-        page,
-        signatures.filter((signature) => signature.pageNumber === pageNumber),
-        pictures,
-      );
+      await this.drawSignatures(doc, page, signed, pictures);
     }
-    return doc.save({ updateFieldAppearances: false });
+    return { bytes: await doc.save({ updateFieldAppearances: false }), fieldsRetired };
+  }
+
+  async save(
+    boxes: readonly TextBox[],
+    signatures: readonly PlacedSignature[] = [],
+  ): Promise<Uint8Array> {
+    return (await this.saveWithReport(boxes, signatures)).bytes;
   }
 }

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
-import { field, pageElement, regionOnPage, saveTo, savedText } from './editing-helpers';
+import { openDocument } from '../../src/engine/document';
+import { field, lastWrite, pageElement, regionOnPage, saveTo, savedText } from './editing-helpers';
 import { expectOpenDocument, openFixture, queueOpen } from './helpers';
 import {
   createTyped,
@@ -304,6 +305,21 @@ test.describe('the date stamp', () => {
     await page.keyboard.press('Delete');
     await expect(placed(page)).toHaveCount(0);
     await expect(page.getByText('Signed in Vancouver')).toBeVisible();
+  });
+
+  test('still shows when it lands on a solid form field', async ({ page }) => {
+    await openForSigning(page, 'test-pdfs/21-form-filled-field.pdf', 1);
+    await page.getByRole('checkbox', { name: 'Add today’s date beside it' }).check();
+    await createTyped(page);
+    const sheet = await pageElement(page, 1).boundingBox();
+    const scale = (sheet?.width ?? 612) / 612;
+    await signLayer(page).click({ position: { x: 120 * scale, y: 220 * scale } });
+    await saveTo(page);
+    const task = await lastWrite(page);
+    const doc = await openDocument(Uint8Array.from(task?.bytes ?? []));
+    const { blocks } = await doc.pageText(1);
+    await doc.close();
+    expect(blocks.map((block) => block.text).join(' ')).toContain(expected());
   });
 
   test('can be edited like any other text', async ({ page }) => {

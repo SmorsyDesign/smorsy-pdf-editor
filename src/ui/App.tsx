@@ -250,13 +250,26 @@ export function App({ platform }: { platform: Platform }) {
           void chooseAndOpen();
         }}
         onSaveAndLeave={(then) => {
-          void save(() => {
-            carryOut(then);
-          });
+          if (viewRef.current?.hasPendingPlacement()) {
+            setDialog({ kind: 'unplaced', copy: false, then });
+          } else {
+            void save(() => {
+              carryOut(then);
+            });
+          }
         }}
         onLeaveWithoutSaving={carryOut}
-        onSaveWithoutPlacing={(copy) => {
-          void (copy ? saveCopy() : save());
+        onSaveWithoutPlacing={(copy, then) => {
+          if (copy) {
+            void saveCopy();
+          } else {
+            void save(
+              then &&
+                (() => {
+                  carryOut(then);
+                }),
+            );
+          }
         }}
       />
     </>

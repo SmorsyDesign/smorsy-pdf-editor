@@ -126,8 +126,26 @@ export async function drawStroke(page: Page) {
  * because all of those still leave ink somewhere near the right place.
  */
 export async function expectSavedToMatchScreen(page: Page, pageNumber: number, pageCount: number) {
+  await compareWithScreen(page, pageNumber, pageCount, true);
+}
+
+/** The same, for when the test has already saved and only needs the comparison's second half. */
+export async function expectSavedToMatchScreenAfterSave(
+  page: Page,
+  pageNumber: number,
+  pageCount: number,
+) {
+  await compareWithScreen(page, pageNumber, pageCount, false);
+}
+
+async function compareWithScreen(
+  page: Page,
+  pageNumber: number,
+  pageCount: number,
+  closePanel: boolean,
+) {
   // Closed first, so the page is the same size on screen before and after reopening.
-  await page.getByRole('button', { name: 'Close signatures' }).click();
+  if (closePanel) await page.getByRole('button', { name: 'Close signatures' }).click();
   await expect(page.getByRole('complementary', { name: 'Signatures' })).toHaveCount(0);
   await pageElement(page, pageNumber).scrollIntoViewIfNeeded();
   await waitForRedraw(page, pageNumber);
@@ -175,7 +193,7 @@ export async function expectSavedToMatchScreen(page: Page, pageNumber: number, p
   // Otherwise a signature that never appeared would match the empty page perfectly.
   expect(inkPixels).toBeGreaterThan(100);
 
-  await saveTo(page);
+  if (closePanel) await saveTo(page);
   await reopenSaved(page, pageCount);
   await pageElement(page, pageNumber).scrollIntoViewIfNeeded();
   await waitForRedraw(page, pageNumber);

@@ -7,7 +7,7 @@ export type Dialog<LeaveAction> =
   | SaveDialog
   | { readonly kind: 'open-failed'; readonly fileName: string; readonly problem: OpenProblem }
   | { readonly kind: 'unsaved'; readonly fileName: string; readonly then: LeaveAction }
-  | { readonly kind: 'unplaced'; readonly copy: boolean };
+  | { readonly kind: 'unplaced'; readonly copy: boolean; readonly then?: LeaveAction };
 
 interface AppDialogsProps<LeaveAction> {
   readonly dialog: Dialog<LeaveAction> | null;
@@ -18,7 +18,7 @@ interface AppDialogsProps<LeaveAction> {
   readonly onChooseAnother: () => void;
   readonly onSaveAndLeave: (then: LeaveAction) => void;
   readonly onLeaveWithoutSaving: (then: LeaveAction) => void;
-  readonly onSaveWithoutPlacing: (copy: boolean) => void;
+  readonly onSaveWithoutPlacing: (copy: boolean, then?: LeaveAction) => void;
 }
 
 export function AppDialogs<LeaveAction>({
@@ -104,7 +104,7 @@ export function AppDialogs<LeaveAction>({
           confirmLabel="Save without it"
           onConfirm={() => {
             onClose();
-            onSaveWithoutPlacing(dialog.copy);
+            onSaveWithoutPlacing(dialog.copy, dialog.then);
           }}
           onCancel={onClose}
         />

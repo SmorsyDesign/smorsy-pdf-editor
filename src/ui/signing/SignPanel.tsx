@@ -102,8 +102,13 @@ export function SignPanel({ signing, currentPage, onClose }: SignPanelProps) {
                   className="icon-btn slip-del"
                   aria-label={`Remove ${noun} ${index + 1} from this list`}
                   title="Remove from this list. Anything already placed stays."
-                  onClick={() => {
+                  onClick={(event) => {
                     signing.removeSlip(slip.image.id);
+                    // This button is about to go, and keyboard users shouldn't lose their place.
+                    event.currentTarget
+                      .closest('.panel')
+                      ?.querySelector<HTMLElement>('.btn.add')
+                      ?.focus();
                   }}
                 >
                   <Icon name="trash" />

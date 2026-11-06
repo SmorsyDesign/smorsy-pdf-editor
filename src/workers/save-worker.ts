@@ -1,6 +1,6 @@
 import type { PlacedSignature, TextBox } from '../engine/edits/model';
 import type { FontOutcome, SystemFontStyle } from '../engine/save/choose-font';
-import { PdfEditor } from '../engine/save/editor';
+import { PdfEditor, type SaveReport } from '../engine/save/editor';
 
 export type SaveRequest =
   | {
@@ -18,7 +18,7 @@ export type SaveRequest =
 
 export type SaveResponse =
   | { readonly id: number; readonly ok: true; readonly outcome: FontOutcome }
-  | { readonly id: number; readonly ok: true; readonly bytes: Uint8Array }
+  | { readonly id: number; readonly ok: true; readonly report: SaveReport }
   | { readonly id: number; readonly ok: false; readonly error: string };
 
 let editor: PdfEditor | null = null;
@@ -34,7 +34,11 @@ async function handle(request: Exclude<SaveRequest, { type: 'init' }>): Promise<
   if (request.type === 'resolve') {
     return { id: request.id, ok: true, outcome: await editor.resolveFont(request.box) };
   }
-  return { id: request.id, ok: true, bytes: await editor.save(request.boxes, request.signatures) };
+  return {
+    id: request.id,
+    ok: true,
+    report: await editor.saveWithReport(request.boxes, request.signatures),
+  };
 }
 
 // Saving can take seconds on a large file, and this worker keeps the window responsive meanwhile.
@@ -50,8 +54,9 @@ self.onmessage = (event: MessageEvent<SaveRequest>) => {
   }
   handle(request)
     .then((response) => {
-      if ('bytes' in response) self.postMessage(response, { transfer: [response.bytes.buffer] });
-      else self.postMessage(response);
+      if ('report' in response) {
+        self.postMessage(response, { transfer: [response.report.bytes.buffer] });
+      } else self.postMessage(response);
     })
     .catch((error: unknown) => {
       const failure: SaveResponse = {

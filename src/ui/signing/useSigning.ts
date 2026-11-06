@@ -4,12 +4,7 @@ import type {
   PlacedSignatureChanges,
   SignatureImage,
 } from '../../engine/edits/model';
-import {
-  dateStampBox,
-  formatStampDate,
-  keptOnPage,
-  newPlacementRect,
-} from '../../engine/signatures/placement';
+import { dateStampBox, keptOnPage, newPlacementRect } from '../../engine/signatures/placement';
 import { LETTER_PAGE, type PageSize } from '../../engine/zoom';
 import type { DocumentEditor } from '../editing/useDocumentEditor';
 import { INK_BLACK } from './makeSignature';
@@ -48,6 +43,8 @@ export function useSigning(
   const urls = useRef(new Map<string, string>());
   const opener = useRef<HTMLElement | null>(null);
   const wasActive = useRef(active);
+  // What each date stamp said, because the day may have changed by the time it's checked.
+  const stampTexts = useRef(new Map<string, string>());
 
   // Leaving Sign mode shouldn't leave a click on the page waiting to do something.
   useEffect(() => {
@@ -123,6 +120,7 @@ export function useSigning(
         new Date(),
       );
       apply({ kind: 'add-text', box }, id);
+      stampTexts.current.set(box.id, box.text);
     }
     setPickedId(null);
     setSelectedId(id);
@@ -182,7 +180,7 @@ export function useSigning(
     // A date that came with it goes too, unless it's been reworded and so is the person's own text.
     const stampId = `date-${id}`;
     const stamp = boxes.find((box) => box.id === stampId);
-    if (stamp?.text === formatStampDate(new Date())) {
+    if (stamp && stamp.text === stampTexts.current.get(stampId)) {
       apply({ kind: 'remove-text', id: stampId }, `removed-${id}`);
     }
     setSelectedId(null);
@@ -230,7 +228,11 @@ export function useSigning(
       setMovingId(null);
     },
     selected,
-    select: setSelectedId,
+    select: (id: string | null) => {
+      // Choosing something else shouldn't leave the last one waiting to jump to the next click.
+      setSelectedId(id);
+      setMovingId((current) => (current === id ? current : null));
+    },
     moving: selected && movingId === selected.id ? selected : null,
     toggleMoving: (id: string) => {
       setPickedId(null);

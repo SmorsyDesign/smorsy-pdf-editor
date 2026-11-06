@@ -273,6 +273,25 @@ async function formWithFilledField() {
   writeFileSync(join(out, '21-form-filled-field.pdf'), await doc.save());
 }
 
+/** The same, already filled in, because a value has to stay right as well as the background. */
+async function formWithFilledValue() {
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const page = doc.addPage([612, 792]);
+  const field = doc.getForm().createTextField('name');
+  field.setText('Filled in already');
+  field.addToPage(page, {
+    x: 100,
+    y: 552,
+    width: 200,
+    height: 40,
+    font,
+    backgroundColor: rgb(0.85, 0.9, 1),
+    borderWidth: 0,
+  });
+  writeFileSync(join(out, '22-form-filled-value.pdf'), await doc.save());
+}
+
 async function annotationsAndLinks() {
   const doc = await newDoc('Annotations and links');
   const font = await doc.embedFont(StandardFonts.Helvetica);
@@ -475,6 +494,7 @@ await scanned();
 await passwordProtected();
 await annotationsAndLinks();
 await formWithFilledField();
+await formWithFilledValue();
 await bookmarks();
 await largeDocument();
 await imagesAndText();
