@@ -41,7 +41,9 @@ Node is pinned to 26 LTS in `.nvmrc`. Use terse test reporters and show only fai
 - `src-tauri/`: minimal Rust, only what the web layer can't do well. `quit.rs` holds off a macOS quit while `setUnsavedWork` says there's unsaved work.
 - Every change is an entry in the immutable edit log. The canvas renders from it, undo and redo walk it, and saving applies it to the original bytes in one pass.
 - Least-privilege Tauri capabilities: only files the user picks or opens via the OS. Strict CSP; never load remote content.
-- Saved output is checked by reopening it and reading rendered pixels (`tests/e2e/saved-output.spec.ts`), since text can read correctly while a patch sits elsewhere.
+- Saved output is checked by reopening it and reading rendered pixels (`tests/e2e/saved-output.spec.ts`, and `expectSavedToMatchScreen` for signatures), since a file can read correctly while something sits elsewhere.
+- Signatures are never stored on the computer, only held in memory while a PDF is open.
+- Viewers always paint form fields last, so anything drawn over a solid field needs `clearFieldsUnder` first.
 - The webview has no network route. The update check runs in Rust.
 
 ## Conventions

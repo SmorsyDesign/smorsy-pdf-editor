@@ -1,6 +1,6 @@
 # Progress
 
-**Current phase:** 2 finished, waiting for the owner's "continue" before Phase 3.
+**Current phase:** 3, in Part 7 review.
 
 ## Phase 0: Plan and design
 
@@ -62,13 +62,15 @@
 
 ## Phase 3: Signatures
 
-- [ ] Create by drawing
-- [ ] Create by typing (handwriting fonts)
-- [ ] Create by uploading an image (auto-remove white background)
-- [ ] Reuse signatures and initials while the document is open, with nothing stored on the computer
-- [ ] Place, resize, rotate
-- [ ] Optional date stamp
+- [x] Create by drawing
+- [x] Create by typing (handwriting fonts)
+- [x] Create by uploading an image (auto-remove white background)
+- [x] Reuse signatures and initials while the document is open, with nothing stored on the computer
+- [x] Place, resize, rotate
+- [x] Optional date stamp
 - [ ] Part 7 gates and check-in
+- [x] Single-click move and resize, as an alternative to dragging
+- [x] Signatures stay visible over form fields
 
 ## Phase 4: Annotations and forms
 
@@ -116,10 +118,18 @@
 - [ ] `DEPLOY.md`
 - [ ] `FAMILY-GUIDE.md` and short in-app help
 - [ ] Retina, Windows 125% and 150%, pinch zoom, unusual file names
-- [ ] Manual checklist given to and signed off by owner
+- [ ] Manual checklist given to and signed off by owner, including a signature over a form field in Adobe Reader and macOS Preview
 - [ ] Part 7 gates and final check-in
 
 ## Skipped minor findings
+
+- **Phase 3, thumbnails are hidden while the Sign panel is open below 1280 px.** The design has a toggle for them there, which isn't built yet. Closing the panel brings them back. It belongs with the other narrow-window work in Phase 8.
+- **Phase 3, a signature made and then cancelled with Esc gets no save warning.** Cancelling is a deliberate choice, and the signature stays in the panel. The warning covers one still waiting to be placed.
+- **Phase 3, moving a signature to another page leaves its date stamp behind.** The date is its own text box, which can be moved in Edit text.
+- **Phase 3, checkboxes and radio buttons under a signature can still cover it.** They keep separate looks per state, and they're small. A signature rarely sits on one.
+- **Phase 3, a form field that doesn't print stays on top of a signature on screen.** Moving its looks into the page would make things like a form's own Clear button start printing.
+- **Phase 3, a date stamp can overlap on a page narrower than 120 points.** Nothing that small needs signing in practice.
+- **Phase 3, not checked in Adobe Reader or macOS Preview.** Signatures over form fields are verified with the pdf.js renderer only, and there's no copy of the others here. It's on the Phase 8 manual checklist.
 
 - **Phase 2, a PDF built to lie about its own text can still mislead font reuse.** A glyph drawn on the page but labelled as another letter passes the checks, because the labels are all a PDF offers. Decoy fonts are refused. Fixing the rest needs real glyph comparison.
 - **Phase 2, encryption check misses unusual spellings such as `/Encr#79pt`.** It fails safely: the save stops and nothing is written, though the protected notice doesn't show.
