@@ -65,7 +65,7 @@
 - [ ] Create by drawing
 - [ ] Create by typing (handwriting fonts)
 - [ ] Create by uploading an image (auto-remove white background)
-- [ ] Save up to 3 signatures and initials locally; one-click delete
+- [ ] Reuse signatures and initials while the document is open, with nothing stored on the computer
 - [ ] Place, resize, rotate
 - [ ] Optional date stamp
 - [ ] Part 7 gates and check-in

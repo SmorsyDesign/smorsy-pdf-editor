@@ -185,7 +185,7 @@ export function signPanel({ picked = 0 } = {}) {
         ${slip(1, 'ink-sacramento', 'Mara Okafor, formal', 'Mara Okafor')}
       </ul>
       <a class="btn add" href="signature-draw.html">${icon('plus')}Create signature</a>
-      <p class="slot-note">2 of 3 saved. Stored only on this computer.</p>
+      <p class="slot-note">Kept until you close this PDF, and never stored on this computer.</p>
       <h3>Initials</h3>
       <ul class="slips">
         ${slip(2, 'ink-dancing', 'M O', 'M.O.', 'initials')}

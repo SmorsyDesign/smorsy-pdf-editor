@@ -358,7 +358,7 @@ function signedScreen(p, warning) {
 function signatureDialog({ p }, tab) {
   const tabs = [['draw', 'Draw'], ['type', 'Type'], ['upload', 'Upload']]
     .map(([id, label]) => `<a class="tab" href="signature-${id}.html"${id === tab ? ' aria-current="page"' : ''}>${label}</a>`).join('');
-  const kind = `<div><span class="opt-label">Save as</span><div class="choice-row"><label class="choice"><input type="radio" name="kind" checked>Signature</label><label class="choice"><input type="radio" name="kind">Initials</label></div></div>`;
+  const kind = `<div><span class="opt-label">Use as</span><div class="choice-row"><label class="choice"><input type="radio" name="kind" checked>Signature</label><label class="choice"><input type="radio" name="kind">Initials</label></div></div>`;
   const ink = `<div><span class="opt-label">Ink</span><div class="choice-row"><label class="choice"><input type="radio" name="ink" checked>Blue</label><label class="choice"><input type="radio" name="ink">Black</label></div></div>`;
   const body = {
     draw: `<div class="pad"><span class="pad-line"></span><span class="pad-hint">Sign above the line with your mouse or trackpad</span><svg viewBox="0 0 512 176" aria-label="Your drawn signature" role="img"><path d="${signature}"/></svg></div>
@@ -387,7 +387,7 @@ function signatureDialog({ p }, tab) {
       <div class="dialog-head"><h2 id="sig-title">Create a signature</h2><a class="icon-btn" href="sign.html" aria-label="Close">${icon('close')}</a></div>
       <nav class="tabs" aria-label="How to create it">${tabs}</nav>
       <div class="dialog-body">${body}</div>
-      <div class="dialog-foot"><p class="foot-note">2 of 3 saved. Stored only on this computer.</p><div class="foot-actions"><a class="btn" href="sign.html">Cancel</a><a class="btn btn-primary" href="sign.html">Save signature</a></div></div>
+      <div class="dialog-foot"><p class="foot-note">Kept until you close this PDF, and never stored on this computer.</p><div class="foot-actions"><a class="btn" href="sign.html">Cancel</a><a class="btn btn-primary" href="sign.html">Use signature</a></div></div>
     </section>
   </div>`,
   };

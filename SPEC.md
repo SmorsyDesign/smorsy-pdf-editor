@@ -58,7 +58,7 @@ Build in priority order. Priority 1 must be excellent before Priority 2 starts.
 **P1, signatures:**
 
 - Create by drawing, typing (handwriting fonts), or uploading an image (auto-remove a white background).
-- Save up to 3 signatures and initials locally, with one-click delete. Place, resize, rotate; optional date stamp.
+- Signatures and initials can be placed repeatedly while the document is open. They are never stored on the computer, so another PDF needs a new one or an uploaded image. Place, resize, rotate; optional date stamp.
 - **Phase 7:** sign with a .p12/.pfx certificate or an in-app self-signed one; show and validate signature details; explain that self-signed shows as "validity unknown" in other readers.
 
 **P2, core editor and desktop integration:**
@@ -89,7 +89,7 @@ End every phase with the Part 7 gates and a check-in, then wait for "continue". 
 
 1. **Foundation:** Tauri + Vite scaffold, tokens, app shell and menus, open and render PDFs, thumbnails, zoom, save a copy via the native dialog, test scripts. A GitHub Actions workflow that builds unsigned macOS and Windows apps from day one, so platform problems surface early.
 2. **Text editing:** add, edit, delete; font matching and notices; undo and redo. This phase gets the most care.
-3. **Signatures:** draw, type, upload; saved signatures; place, resize, rotate; date stamp.
+3. **Signatures:** draw, type, upload; reuse within the open document; place, resize, rotate; date stamp.
 4. **Annotations and forms.**
 5. **Page tools.**
 6. **Document tools:** OCR, redaction, page numbers, watermarks, headers and footers, compression, metadata, passwords.
