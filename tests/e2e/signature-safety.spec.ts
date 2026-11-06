@@ -164,6 +164,8 @@ test.describe('a filled-in field under a signature', () => {
     const scale = (sheet?.width ?? 612) / 612;
     await signLayer(page).click({ position: { x: 200 * scale, y: 220 * scale } });
     await page.getByRole('button', { name: 'Close signatures' }).click();
+    // A mode with no panel, because the form's panel goes once its one field is part of the page.
+    await page.getByRole('button', { name: 'Edit text', exact: true }).click();
     await saveTo(page);
     await expect(page.getByRole('alert')).toContainText('now part of the page');
     await expectSavedToMatchScreenAfterSave(page, 1, 1);

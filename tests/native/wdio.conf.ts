@@ -15,6 +15,7 @@ if (!process.env['SMORSY_E2E_DIR']) {
   const workspace = mkdtempSync(join(tmpdir(), 'smorsy-native-'));
   for (const name of [
     '01-plain-text.pdf',
+    '08-fillable-form.pdf',
     '05-non-latin.pdf',
     '09-scanned-image-only.pdf',
     '16-irs-form-w9.pdf',
