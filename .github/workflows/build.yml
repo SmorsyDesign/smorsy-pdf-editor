@@ -38,6 +38,13 @@ jobs:
       - run: npm run test:rust
       - run: npm run test:roundtrip
       - run: npm run test:e2e
+      # Only test fixtures appear in these, and they show what a failing page looked like.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-results
+          path: test-results
+          retention-days: 7
 
   native:
     name: Native tests (${{ matrix.os }})

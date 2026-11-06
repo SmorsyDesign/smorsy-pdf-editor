@@ -5,6 +5,8 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: Boolean(process.env['CI']),
   retries: process.env['CI'] ? 1 : 0,
+  // CI machines run the suite about ten times slower, and the first test waits for a cold server.
+  expect: { timeout: process.env['CI'] ? 15_000 : 5_000 },
   use: {
     baseURL: 'http://127.0.0.1:5173',
     viewport: { width: 1280, height: 800 },
