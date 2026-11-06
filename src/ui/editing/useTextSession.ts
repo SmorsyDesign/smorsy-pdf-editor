@@ -78,6 +78,12 @@ export function useTextSession(editor: DocumentEditor) {
   const editorHandleRef = useRef<TextEditorHandle | null>(null);
   const pendingCommit = useRef<Promise<void>>(Promise.resolve());
   const commitsInProgress = useRef(0);
+  // Also kept as state, because the system side has to hear about it, not just this code.
+  const [recording, setRecording] = useState(false);
+  const countCommit = useCallback((change: 1 | -1) => {
+    commitsInProgress.current += change;
+    setRecording(commitsInProgress.current > 0);
+  }, []);
   const commitFailed = useRef(false);
   const draftRef = useRef(draft);
   draftRef.current = draft;
@@ -93,7 +99,7 @@ export function useTextSession(editor: DocumentEditor) {
         JSON.stringify(style) === JSON.stringify(current.style);
       if (unchanged || (current.kind === 'add' && text.trim() === '')) return;
 
-      commitsInProgress.current += 1;
+      countCommit(1);
       // One after another, so edits are recorded in the order they were made.
       pendingCommit.current = pendingCommit.current
         .then(async () => {
@@ -112,10 +118,10 @@ export function useTextSession(editor: DocumentEditor) {
           );
         })
         .finally(() => {
-          commitsInProgress.current -= 1;
+          countCommit(-1);
         });
     },
-    [apply, reportProblem],
+    [apply, countCommit, reportProblem],
   );
 
   const finishOpenEdit = useCallback(() => {
@@ -224,7 +230,7 @@ export function useTextSession(editor: DocumentEditor) {
     if (deleting.current.has(block.id)) return;
     deleting.current.add(block.id);
     finishOpenEdit();
-    commitsInProgress.current += 1;
+    countCommit(1);
     // In the same queue as other edits, so saving or leaving waits for it.
     pendingCommit.current = pendingCommit.current
       .then(async () => {
@@ -245,7 +251,7 @@ export function useTextSession(editor: DocumentEditor) {
       })
       .finally(() => {
         deleting.current.delete(block.id);
-        commitsInProgress.current -= 1;
+        countCommit(-1);
       });
   };
 
@@ -261,6 +267,7 @@ export function useTextSession(editor: DocumentEditor) {
     },
     finishOpenEdit,
     flush,
+    recording,
     hasUnfinishedEdit: () => draftRef.current !== null || commitsInProgress.current > 0,
     undo,
     redo,

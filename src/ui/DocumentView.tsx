@@ -152,7 +152,7 @@ export function DocumentView({
     },
   }));
 
-  const hasUnsavedWork = draft !== null || editor.changes > 0;
+  const hasUnsavedWork = draft !== null || session.recording || editor.changes > 0;
   useEffect(() => {
     onUnsavedWorkChange(hasUnsavedWork);
   }, [hasUnsavedWork, onUnsavedWorkChange]);

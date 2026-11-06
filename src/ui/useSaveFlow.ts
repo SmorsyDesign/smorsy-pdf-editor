@@ -129,7 +129,7 @@ export function useSaveFlow({
           return 'stopped';
         }
       });
-      settle(outcome);
+      settle(outcome, next !== undefined);
     },
     [exclusively, file, flush, platform, settle, showDialog, writeTo],
   );

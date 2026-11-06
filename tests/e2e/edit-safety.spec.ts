@@ -73,6 +73,22 @@ test.describe('telling the system about unsaved work', () => {
     await expect.poll(() => unsavedWork(page)).toBe(false);
   });
 
+  test('covers an edit that’s still being recorded', async ({ page }) => {
+    await page.route('**/LiberationMono-Regular.ttf', () => {
+      // Holds the edit in the recording stage, with the text box already closed.
+    });
+    await openForEditing(page);
+    await page
+      .getByTestId('edit-layer')
+      .first()
+      .click({ position: { x: 96, y: 600 } });
+    await field(page).fill('Being recorded');
+    await page.getByRole('combobox', { name: 'Font' }).selectOption('mono');
+    await page.keyboard.press('ControlOrMeta+Enter');
+    await expect(editor(page)).toHaveCount(0);
+    expect(await unsavedWork(page)).toBe(true);
+  });
+
   test('clears when the document closes without saving', async ({ page }) => {
     await openForEditing(page);
     await replaceHeading(page, 'Discarded');
