@@ -2,14 +2,14 @@ import type { OsFamily } from '../platform';
 import { Icon, type IconName } from './Icon';
 import { shortcutLabel } from './shortcuts';
 
-export type EditorMode = 'select' | 'edit';
+export type EditorMode = 'select' | 'edit' | 'sign';
 
 interface TopBarProps {
   readonly os: OsFamily;
   readonly fileName: string;
   readonly fileState: string;
   readonly mode: EditorMode;
-  /** Why editing is unavailable, when it is. */
+  /** Why changing the document is unavailable, when it is. */
   readonly editBlocked: string | null;
   readonly canUndo: boolean;
   readonly canRedo: boolean;
@@ -24,6 +24,7 @@ interface TopBarProps {
 const MODES: readonly (readonly [EditorMode, IconName, string])[] = [
   ['select', 'select', 'Select'],
   ['edit', 'text', 'Edit text'],
+  ['sign', 'sign', 'Sign'],
 ];
 
 export function TopBar({
@@ -59,8 +60,8 @@ export function TopBar({
             type="button"
             className="mode"
             aria-pressed={mode === id}
-            disabled={id === 'edit' && editBlocked !== null}
-            {...(id === 'edit' && editBlocked !== null ? { title: editBlocked } : {})}
+            disabled={id !== 'select' && editBlocked !== null}
+            {...(id !== 'select' && editBlocked !== null ? { title: editBlocked } : {})}
             onClick={() => {
               onModeChange(id);
             }}

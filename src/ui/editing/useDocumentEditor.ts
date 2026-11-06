@@ -6,6 +6,7 @@ import {
   canUndo,
   changesSince,
   currentEntry,
+  deriveSignatures,
   deriveTextBoxes,
   record,
   redo,
@@ -13,6 +14,7 @@ import {
   type Edit,
   type EditEntry,
   type EditLog,
+  type PlacedSignature,
   type TextBox,
 } from '../../engine/edits/model';
 import { embeddingAllowed } from '../../engine/fonts/embedded';
@@ -37,6 +39,7 @@ interface BuiltFile {
 
 export interface DocumentEditor {
   readonly boxes: readonly TextBox[];
+  readonly signatures: readonly PlacedSignature[];
   readonly changes: number;
   /** Reads the latest state directly, so it's right even straight after an edit. */
   readonly isDirty: () => boolean;
@@ -48,7 +51,8 @@ export interface DocumentEditor {
   readonly substitutedFonts: number;
   readonly dismissNotice: () => void;
   readonly reportProblem: (problem: string | null) => void;
-  readonly apply: (edit: Edit) => void;
+  /** Edits given the same group undo together. */
+  readonly apply: (edit: Edit, group?: string) => void;
   readonly undo: () => void;
   readonly redo: () => void;
   /** The bytes to write: the original exactly, unless there are edits. */
@@ -114,6 +118,7 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
   }, [file, platform]);
 
   const boxes = useMemo(() => deriveTextBoxes(activeEdits(log)), [log]);
+  const signatures = useMemo(() => deriveSignatures(activeEdits(log)), [log]);
 
   const moveTo = useCallback((next: EditLog) => {
     logRef.current = next;
@@ -123,8 +128,8 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
   }, []);
 
   const apply = useCallback(
-    (edit: Edit) => {
-      const next = record(logRef.current, edit);
+    (edit: Edit, group?: string) => {
+      const next = record(logRef.current, edit, group);
       moveTo(next);
       const box = changedBox(edit, deriveTextBoxes(activeEdits(next)));
       const client = clientRef.current;
@@ -159,7 +164,8 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
     const current = logRef.current;
     const entry = currentEntry(current);
     const active = deriveTextBoxes(activeEdits(current));
-    if (active.length === 0) {
+    const placed = deriveSignatures(activeEdits(current));
+    if (active.length === 0 && placed.length === 0) {
       if (!file) throw new Error('The document closed before it could be saved.');
       return { bytes: unchangedCopy(file.bytes), edited: false, entry };
     }
@@ -171,7 +177,7 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
       clientRef.current = createClientRef.current();
       client = await clientRef.current;
     }
-    return { bytes: await client.save(active), edited: true, entry };
+    return { bytes: await client.save(active, placed), edited: true, entry };
   }, [file]);
 
   const markSaved = useCallback((entry: EditEntry | undefined) => {
@@ -192,6 +198,7 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
 
   return {
     boxes,
+    signatures,
     changes: changesSince(log, savedEntry),
     isDirty,
     canUndo: canUndo(log),

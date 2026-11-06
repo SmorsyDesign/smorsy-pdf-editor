@@ -1,4 +1,4 @@
-import type { TextBox } from '../engine/edits/model';
+import type { PlacedSignature, TextBox } from '../engine/edits/model';
 import type { FontOutcome, SystemFontStyle } from '../engine/save/choose-font';
 import type { SaveRequest, SaveResponse } from './save-worker';
 
@@ -46,8 +46,11 @@ export class SaveClient {
     throw new Error('The save worker gave an unexpected reply.');
   }
 
-  async save(boxes: readonly TextBox[]): Promise<Uint8Array> {
-    const response = await this.request((id) => ({ type: 'save', id, boxes }));
+  async save(
+    boxes: readonly TextBox[],
+    signatures: readonly PlacedSignature[],
+  ): Promise<Uint8Array> {
+    const response = await this.request((id) => ({ type: 'save', id, boxes, signatures }));
     if ('bytes' in response) return response.bytes;
     throw new Error('The save worker gave an unexpected reply.');
   }

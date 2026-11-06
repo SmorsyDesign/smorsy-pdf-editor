@@ -10,6 +10,7 @@ import './ui/styles/document-fonts.css';
 import './ui/styles/editor-bars.css';
 import './ui/styles/page-overlay.css';
 import './ui/styles/notices.css';
+import './ui/styles/signing.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('The page is missing its root element.');

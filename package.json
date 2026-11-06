@@ -30,7 +30,8 @@
     "@tauri-apps/plugin-fs": "2.7.1",
     "pdfjs-dist": "6.5.438",
     "react": "19.3.1",
-    "react-dom": "19.3.1"
+    "react-dom": "19.3.1",
+    "signature_pad": "5.1.4"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",

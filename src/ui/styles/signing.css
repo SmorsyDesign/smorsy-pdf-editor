@@ -1,0 +1,474 @@
+/* Sign mode, from design/direction-a-blue-pencil/styles.css and screens.css. */
+
+.body.has-panel {
+  grid-template-columns: var(--thumbs-width) minmax(0, 1fr) var(--panel-width);
+}
+@media (max-width: 1279px) {
+  :root {
+    --panel-width: 256px;
+  }
+  .body.has-panel {
+    grid-template-columns: minmax(0, 1fr) var(--panel-width);
+  }
+  .body.has-panel .thumbs {
+    display: none;
+  }
+}
+
+/* The panel */
+.panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  overflow-y: auto;
+  border-left: 1px solid var(--line);
+  background: var(--chrome);
+}
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 32px;
+  margin-bottom: var(--space-2);
+}
+.panel h2,
+.dialog h2 {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  line-height: var(--line-lg);
+}
+.panel h3 {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: var(--text-md);
+  font-weight: 600;
+  line-height: var(--line-md);
+}
+.hint {
+  margin: 0;
+  color: var(--text-muted);
+}
+.slips {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.slip {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+/* A signature is always shown on white, as it would be on paper, so these stay in dark mode. */
+.slip-pick {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  height: 56px;
+  padding: var(--space-2) 40px var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: #ffffff;
+  box-shadow: 0 0 0 1px var(--line-strong);
+  cursor: grab;
+  touch-action: none;
+}
+.slip-pick:hover,
+.slip-pick[aria-pressed='true'] {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.slip-pick img {
+  display: block;
+  max-width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: left center;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.icon-btn.slip-del {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-2);
+  background: transparent;
+  color: #4d5b66;
+}
+.icon-btn.slip-del:hover {
+  background: #e8ecef;
+}
+.slot-note {
+  margin: var(--space-2) 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--line-sm);
+}
+.btn.add {
+  width: 100%;
+  margin-top: var(--space-3);
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 24px;
+  margin-top: var(--space-4);
+}
+.check input,
+.choice input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+.panel-foot {
+  margin-top: auto;
+  padding-top: var(--space-4);
+}
+.panel-foot p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--line-sm);
+}
+.slip-ghost {
+  position: fixed;
+  top: -28px;
+  left: -84px;
+  z-index: 20;
+  width: 168px;
+  max-height: 84px;
+  object-fit: contain;
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+/* On the page. Pages keep one look in dark mode. */
+.sign-layer {
+  position: absolute;
+  inset: 0;
+}
+.sign-layer.is-placing {
+  cursor: copy;
+}
+.placed-signature {
+  position: absolute;
+  z-index: 1;
+  cursor: move;
+  touch-action: none;
+}
+.placed-signature > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.overlay .placed-signature:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.placed-signature.is-selected {
+  outline: 1px solid var(--mark);
+}
+.handle {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.handle::after {
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--mark);
+  border-radius: 2px;
+  background: #ffffff;
+  content: '';
+}
+.handle:focus-visible::after {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+.h-tl {
+  top: -12px;
+  left: -12px;
+  cursor: nwse-resize;
+}
+.h-tr {
+  top: -12px;
+  right: -12px;
+  cursor: nesw-resize;
+}
+.h-bl {
+  bottom: -12px;
+  left: -12px;
+  cursor: nesw-resize;
+}
+.h-br {
+  right: -12px;
+  bottom: -12px;
+  cursor: nwse-resize;
+}
+.h-rot {
+  top: -40px;
+  left: 50%;
+  margin-left: -12px;
+  cursor: grab;
+}
+.h-rot::after {
+  border-radius: 4px;
+  background: var(--mark);
+}
+.h-stem {
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  width: 1px;
+  height: 20px;
+  background: var(--mark);
+}
+.placed-bar {
+  position: absolute;
+  z-index: 3;
+  color-scheme: light dark;
+}
+.float-bar .sep {
+  flex: none;
+  width: 1px;
+  height: 20px;
+  margin: 0 var(--space-1);
+  background: var(--line);
+}
+
+/* Creating a signature */
+.dialog {
+  flex-direction: column;
+  width: var(--dialog-width);
+  max-width: calc(100vw - 48px);
+  max-height: calc(100vh - 48px);
+  padding: 0;
+  overflow-y: auto;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--chrome);
+  color: var(--text);
+  box-shadow:
+    0 0 0 1px var(--line),
+    0 16px 48px var(--bar-shadow);
+  font: 400 var(--text-md) / var(--line-md) var(--font-ui);
+}
+.dialog[open] {
+  display: flex;
+}
+.dialog::backdrop {
+  background: var(--scrim);
+}
+.dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-3) 0 var(--space-5);
+}
+.tabs {
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-5) 0;
+  border-bottom: 1px solid var(--line);
+}
+.tab {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-weight: 500;
+}
+.tab:hover {
+  color: var(--text);
+}
+.tab[aria-current='page'] {
+  border-bottom-color: var(--accent);
+  color: var(--text);
+  font-weight: 600;
+}
+/* Same height on every tab, so the dialog doesn't jump when you switch. */
+.dialog-body {
+  min-height: 364px;
+  padding: var(--space-4) var(--space-5);
+}
+.dialog-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-5) var(--space-4);
+  border-top: 1px solid var(--line);
+}
+.foot-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--line-sm);
+}
+.signature-note {
+  margin-top: var(--space-2);
+}
+.signature-problem {
+  margin: var(--space-2) 0 0;
+  color: var(--danger);
+}
+.foot-actions {
+  display: flex;
+  flex: none;
+  gap: var(--space-2);
+}
+.pad {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 176px;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: #ffffff;
+  box-shadow: 0 0 0 1px var(--line-strong);
+}
+.pad canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+  touch-action: none;
+}
+.pad-line {
+  position: absolute;
+  right: var(--space-6);
+  bottom: 40px;
+  left: var(--space-6);
+  height: 1px;
+  background: #7c8a95;
+}
+.pad-hint {
+  position: absolute;
+  bottom: var(--space-3);
+  left: var(--space-6);
+  color: #4d5b66;
+  font-size: var(--text-sm);
+  line-height: var(--line-sm);
+}
+.pad.checker {
+  background-color: #ffffff;
+  background-image: conic-gradient(#d5dade 25%, #ffffff 0 50%, #d5dade 0 75%, #ffffff 0);
+  background-size: 16px 16px;
+}
+.pad-image {
+  position: absolute;
+  inset: var(--space-3);
+  width: calc(100% - var(--space-6));
+  height: calc(100% - var(--space-6));
+  object-fit: contain;
+}
+.pad-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+.pad-tools > div {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+  margin-top: var(--space-4);
+}
+.choice-group {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.opt-label {
+  display: block;
+  margin-bottom: var(--space-1);
+  padding: 0;
+  font-weight: 600;
+}
+.choice-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.choice {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 24px;
+}
+.field-label {
+  display: block;
+  margin-bottom: var(--space-1);
+  font-weight: 600;
+}
+.text-input {
+  width: 100%;
+  height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--chrome-raised);
+  color: var(--text);
+  font: inherit;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.font-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.font-opt {
+  position: relative;
+  display: block;
+  height: 64px;
+  padding: var(--space-3);
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: #ffffff;
+  box-shadow: 0 0 0 1px var(--line-strong);
+}
+.font-opt:has(input:checked) {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.font-opt:has(input:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.font-opt input {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--mark);
+}
+.font-opt .ink {
+  font-size: 24px;
+  line-height: 40px;
+  white-space: nowrap;
+}

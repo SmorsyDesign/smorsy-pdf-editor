@@ -3,7 +3,8 @@ import { openDocument, type PdfDocument } from '../engine/document';
 import { ReadFailure, type MenuCommand, type OpenedFile, type Platform } from '../platform';
 import { pdfAssets } from '../workers/pdf-setup';
 import { AppDialogs, type Dialog } from './AppDialogs';
-import { DocumentView, type DocumentViewHandle } from './DocumentView';
+import { DocumentView } from './DocumentView';
+import type { DocumentViewHandle } from './useDocumentCommands';
 import { useDocumentEditor } from './editing/useDocumentEditor';
 import { explainOpenFailure, type OpenProblem } from './messages';
 import { StartScreen } from './StartScreen';
@@ -163,7 +164,7 @@ export function App({ platform }: { platform: Platform }) {
   useEffect(() => {
     const onCommand = (command: MenuCommand) => {
       // Native menus stay live behind an open dialog, so they must not change what it's about.
-      if (dialogIsOpen) return;
+      if (dialogIsOpen || document.querySelector('dialog[open]')) return;
       switch (command) {
         case 'open':
           if (!busyRef.current) void leaveDocument('open');
@@ -212,6 +213,7 @@ export function App({ platform }: { platform: Platform }) {
             void save();
           }}
           handleRef={viewRef}
+          platform={platform}
         />
       ) : (
         <StartScreen

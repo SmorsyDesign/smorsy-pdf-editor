@@ -24,6 +24,8 @@
   --bar-height: 52px;
   --status-height: 28px;
   --thumbs-width: 148px;
+  --panel-width: 300px;
+  --dialog-width: 560px;
   --mac-controls-width: 80px;
 
   /* Pages stay white in dark mode, so what's drawn on them keeps one colour. */

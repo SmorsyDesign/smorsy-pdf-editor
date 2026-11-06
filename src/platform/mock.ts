@@ -5,6 +5,7 @@ import {
   type MenuCommand,
   type OpenedFile,
   type OsFamily,
+  type PickedImage,
   type Platform,
   type SaveFailureKind,
 } from './types';
@@ -12,6 +13,7 @@ import {
 interface MockControls {
   /** What the next open dialog returns. Leave empty to act as if the person cancelled. */
   nextOpen: OpenedFile | 'read-failure' | null;
+  nextImage: PickedImage | 'read-failure' | null;
   nextSavePath: string | null;
   nextWriteFailure: SaveFailureKind | null;
   /** Runs before a write finishes, so tests can act while a save is under way. */
@@ -51,6 +53,7 @@ const SHORTCUTS: Readonly<Record<string, MenuCommand>> = {
 export function createMockPlatform(): Platform {
   const controls: MockControls = {
     nextOpen: null,
+    nextImage: null,
     nextSavePath: null,
     nextWriteFailure: null,
     beforeWrite: null,
@@ -72,6 +75,12 @@ export function createMockPlatform(): Platform {
       const next = controls.nextOpen;
       controls.nextOpen = null;
       if (next === 'read-failure') return Promise.reject(new ReadFailure('Unreadable.pdf'));
+      return Promise.resolve(next);
+    },
+    chooseImage() {
+      const next = controls.nextImage;
+      controls.nextImage = null;
+      if (next === 'read-failure') return Promise.reject(new ReadFailure('Unreadable.png'));
       return Promise.resolve(next);
     },
     chooseSaveLocation() {

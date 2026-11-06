@@ -23,3 +23,25 @@
   font-display: swap;
   src: url('../fonts/atkinson-hyperlegible-next-latin-700-normal.woff2') format('woff2');
 }
+
+/* Handwriting styles for typed signatures. */
+@font-face {
+  font-family: 'Sig Caveat';
+  font-weight: 500;
+  src: url('../fonts/handwriting/caveat-latin-500-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Sig Dancing Script';
+  font-weight: 500;
+  src: url('../fonts/handwriting/dancing-script-latin-500-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Sig Sacramento';
+  font-weight: 400;
+  src: url('../fonts/handwriting/sacramento-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Sig Homemade Apple';
+  font-weight: 400;
+  src: url('../fonts/handwriting/homemade-apple-latin-400-normal.woff2') format('woff2');
+}

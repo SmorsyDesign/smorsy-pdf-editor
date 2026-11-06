@@ -15,12 +15,13 @@ import {
 } from './types';
 
 const PDF_FILTER = { name: 'PDF', extensions: ['pdf'] };
+const IMAGE_FILTER = { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] };
 
 /** Native dialogs can't be automated. Only test builds read answers here: Vite strips it from releases. */
-function testDialogAnswer(dialog: 'open' | 'save'): string | undefined {
+function testDialogAnswer(dialog: 'open' | 'save' | 'image'): string | undefined {
   if (import.meta.env.MODE !== 'e2e') return undefined;
   const { smorsyTestDialogs } = window as unknown as {
-    smorsyTestDialogs?: Partial<Record<'open' | 'save', string>>;
+    smorsyTestDialogs?: Partial<Record<'open' | 'save' | 'image', string>>;
   };
   return smorsyTestDialogs?.[dialog];
 }
@@ -193,6 +194,18 @@ export async function createTauriPlatform(): Promise<Platform> {
       const name = fileNameOf(path);
       try {
         return { path, name, bytes: await readFile(path) };
+      } catch (error) {
+        throw new ReadFailure(name, { cause: error });
+      }
+    },
+    async chooseImage() {
+      const path =
+        testDialogAnswer('image') ??
+        (await open({ multiple: false, directory: false, filters: [IMAGE_FILTER] }));
+      if (path === null) return null;
+      const name = fileNameOf(path);
+      try {
+        return { name, bytes: await readFile(path) };
       } catch (error) {
         throw new ReadFailure(name, { cause: error });
       }

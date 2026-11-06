@@ -16,13 +16,15 @@ import {
   showText,
   translate,
   type PDFFont,
+  type PDFImage,
   type PDFPage,
 } from '@cantoo/pdf-lib';
 import { displayToUser, userAngle, type PageBox } from '../coordinates';
-import type { Color, TextBox } from '../edits/model';
+import type { Color, PlacedSignature, TextBox } from '../edits/model';
 import { UNSUPPORTED_TEXT, nameCharacter } from '../errors';
 import { findEmbeddedFont, type EmbeddedFont } from '../fonts/embedded';
 import { bundledFaceFile } from '../fonts/match';
+import { placementInPdf } from '../signatures/placement';
 import { FontChooser, systemFontKey, type FontBytes, type FontOutcome } from './choose-font';
 
 type DrawFont =
@@ -202,10 +204,33 @@ export class PdfEditor {
     }
   }
 
-  async save(boxes: readonly TextBox[]): Promise<Uint8Array> {
+  private async drawSignatures(
+    doc: PDFDocument,
+    page: PDFPage,
+    signatures: readonly PlacedSignature[],
+    pictures: Map<string, Promise<PDFImage>>,
+  ): Promise<void> {
+    const box = pageBoxOf(page);
+    for (const { rect, angle, image } of signatures) {
+      // One picture in the file, however many times it's placed.
+      let picture = pictures.get(image.id);
+      if (!picture) {
+        picture = doc.embedPng(image.png);
+        pictures.set(image.id, picture);
+      }
+      const placed = placementInPdf(rect, angle, box);
+      page.drawImage(await picture, { ...placed, rotate: degrees(placed.rotate) });
+    }
+  }
+
+  async save(
+    boxes: readonly TextBox[],
+    signatures: readonly PlacedSignature[] = [],
+  ): Promise<Uint8Array> {
     const doc = await this.load();
     const embedded = new Map<string, Promise<PDFFont>>();
-    const pageNumbers = [...new Set(boxes.map((box) => box.pageNumber))];
+    const pictures = new Map<string, Promise<PDFImage>>();
+    const pageNumbers = new Set([...boxes, ...signatures].map((item) => item.pageNumber));
     for (const pageNumber of pageNumbers) {
       const page = doc.getPage(pageNumber - 1);
       const onPage = boxes.filter((box) => box.pageNumber === pageNumber);
@@ -216,6 +241,13 @@ export class PdfEditor {
           this.drawLines(page, box, await this.drawFont(doc, page, box, embedded));
         }
       }
+      // Last, because the screen shows signatures on top of everything else.
+      await this.drawSignatures(
+        doc,
+        page,
+        signatures.filter((signature) => signature.pageNumber === pageNumber),
+        pictures,
+      );
     }
     return doc.save({ updateFieldAppearances: false });
   }

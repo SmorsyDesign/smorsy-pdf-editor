@@ -6,6 +6,7 @@ import {
   changeCount,
   changesSince,
   currentEntry,
+  deriveSignatures,
   deriveTextBoxes,
   EMPTY_LOG,
   record,
@@ -149,5 +150,66 @@ describe('deriveTextBoxes', () => {
   it('ignores an update to a box that no longer exists', () => {
     const edits = [{ kind: 'update-text', id: 'gone', changes: { text: 'x' } }] as const;
     expect(deriveTextBoxes(edits)).toEqual([]);
+  });
+});
+
+describe('signatures in the edit log', () => {
+  const image = { id: 'image', png: new Uint8Array([1]), width: 200, height: 100, ink: null };
+  const placement = {
+    id: 'one',
+    pageNumber: 1,
+    rect: { x: 10, y: 20, width: 100, height: 50 },
+    angle: 0,
+    image,
+  };
+
+  it('derives what’s placed, following moves and removals', () => {
+    let log = record(EMPTY_LOG, { kind: 'place-signature', placement });
+    expect(deriveSignatures(activeEdits(log))).toEqual([placement]);
+
+    const rect = { x: 30, y: 40, width: 100, height: 50 };
+    log = record(log, { kind: 'update-signature', id: 'one', changes: { rect, angle: 90 } });
+    expect(deriveSignatures(activeEdits(log))).toEqual([{ ...placement, rect, angle: 90 }]);
+
+    log = record(log, { kind: 'remove-signature', id: 'one' });
+    expect(deriveSignatures(activeEdits(log))).toEqual([]);
+  });
+
+  it('undo and redo walk placements like any other edit', () => {
+    const log = record(EMPTY_LOG, { kind: 'place-signature', placement });
+    expect(deriveSignatures(activeEdits(undo(log)))).toEqual([]);
+    expect(deriveSignatures(activeEdits(redo(undo(log))))).toEqual([placement]);
+  });
+
+  it('a signature and its date stamp undo together', () => {
+    const box = {
+      id: 'date',
+      pageNumber: 1,
+      rect: { x: 0, y: 0, width: 10, height: 10 },
+      angle: 0,
+      text: 'November 5, 2026',
+      lines: ['November 5, 2026'],
+      firstBaseline: 10,
+      lineHeight: 14,
+      style: {
+        font: 'serif' as const,
+        size: 12,
+        color: { r: 0, g: 0, b: 0 },
+        bold: false,
+        italic: false,
+        align: 'left' as const,
+      },
+      covers: [],
+      original: null,
+    };
+    let log = record(EMPTY_LOG, { kind: 'place-signature', placement }, 'signed');
+    log = record(log, { kind: 'add-text', box }, 'signed');
+    expect(changeCount(log)).toBe(1);
+    expect(undo(log).cursor).toBe(0);
+  });
+
+  it('ignores signatures when working out text, and text when working out signatures', () => {
+    const log = record(EMPTY_LOG, { kind: 'place-signature', placement });
+    expect(deriveTextBoxes(activeEdits(log))).toEqual([]);
   });
 });

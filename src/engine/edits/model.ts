@@ -68,11 +68,41 @@ type TextBoxChanges = Partial<
   Pick<TextBox, 'rect' | 'text' | 'lines' | 'style' | 'firstBaseline' | 'lineHeight'>
 >;
 
+/** A signature picture, made once and placed as often as needed. It exists only in memory. */
+export interface SignatureImage {
+  readonly id: string;
+  /** Always re-encoded by the app, so nothing from an uploaded file's metadata comes along. */
+  readonly png: Uint8Array;
+  readonly width: number;
+  readonly height: number;
+  /** The ink colour, when known, so a date stamp can match it. */
+  readonly ink: Color | null;
+}
+
+export interface PlacedSignature {
+  readonly id: string;
+  readonly pageNumber: number;
+  /** Before turning. A signature turns around its middle. */
+  readonly rect: Rect;
+  /** Degrees clockwise, as displayed. */
+  readonly angle: number;
+  readonly image: SignatureImage;
+}
+
+export type PlacedSignatureChanges = Partial<Pick<PlacedSignature, 'rect' | 'angle'>>;
+
 export type Edit =
   | { readonly kind: 'add-text'; readonly box: TextBox }
   | { readonly kind: 'replace-text'; readonly box: TextBox }
   | { readonly kind: 'update-text'; readonly id: string; readonly changes: TextBoxChanges }
-  | { readonly kind: 'remove-text'; readonly id: string };
+  | { readonly kind: 'remove-text'; readonly id: string }
+  | { readonly kind: 'place-signature'; readonly placement: PlacedSignature }
+  | {
+      readonly kind: 'update-signature';
+      readonly id: string;
+      readonly changes: PlacedSignatureChanges;
+    }
+  | { readonly kind: 'remove-signature'; readonly id: string };
 
 export interface EditEntry {
   readonly edit: Edit;
@@ -160,7 +190,31 @@ export function deriveTextBoxes(edits: readonly Edit[]): readonly TextBox[] {
       case 'remove-text':
         boxes.delete(edit.id);
         break;
+      default:
+        break;
     }
   }
   return [...boxes.values()];
+}
+
+export function deriveSignatures(edits: readonly Edit[]): readonly PlacedSignature[] {
+  const placed = new Map<string, PlacedSignature>();
+  for (const edit of edits) {
+    switch (edit.kind) {
+      case 'place-signature':
+        placed.set(edit.placement.id, edit.placement);
+        break;
+      case 'update-signature': {
+        const current = placed.get(edit.id);
+        if (current) placed.set(edit.id, { ...current, ...edit.changes });
+        break;
+      }
+      case 'remove-signature':
+        placed.delete(edit.id);
+        break;
+      default:
+        break;
+    }
+  }
+  return [...placed.values()];
 }

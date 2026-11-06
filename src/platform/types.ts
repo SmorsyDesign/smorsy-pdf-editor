@@ -60,11 +60,18 @@ export class ReadFailure extends Error {
   }
 }
 
+export interface PickedImage {
+  readonly name: string;
+  readonly bytes: Uint8Array;
+}
+
 /** Everything the app needs from the operating system. The browser mock implements it for tests. */
 export interface Platform {
   readonly os: OsFamily;
   /** Resolves to null when the person cancels. Rejects with ReadFailure if the file can't be read. */
   chooseFileToOpen(): Promise<OpenedFile | null>;
+  /** Resolves to null when the person cancels. Rejects with ReadFailure if it can't be read. */
+  chooseImage(): Promise<PickedImage | null>;
   /** Resolves to null when the person cancels. */
   chooseSaveLocation(suggestedName: string): Promise<string | null>;
   /** Compares what's on disk rather than the spelling, because one file can have many names. */

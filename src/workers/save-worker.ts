@@ -1,4 +1,4 @@
-import type { TextBox } from '../engine/edits/model';
+import type { PlacedSignature, TextBox } from '../engine/edits/model';
 import type { FontOutcome, SystemFontStyle } from '../engine/save/choose-font';
 import { PdfEditor } from '../engine/save/editor';
 
@@ -9,7 +9,12 @@ export type SaveRequest =
       readonly systemFonts: Partial<Record<SystemFontStyle, Uint8Array>>;
     }
   | { readonly type: 'resolve'; readonly id: number; readonly box: TextBox }
-  | { readonly type: 'save'; readonly id: number; readonly boxes: readonly TextBox[] };
+  | {
+      readonly type: 'save';
+      readonly id: number;
+      readonly boxes: readonly TextBox[];
+      readonly signatures: readonly PlacedSignature[];
+    };
 
 export type SaveResponse =
   | { readonly id: number; readonly ok: true; readonly outcome: FontOutcome }
@@ -29,7 +34,7 @@ async function handle(request: Exclude<SaveRequest, { type: 'init' }>): Promise<
   if (request.type === 'resolve') {
     return { id: request.id, ok: true, outcome: await editor.resolveFont(request.box) };
   }
-  return { id: request.id, ok: true, bytes: await editor.save(request.boxes) };
+  return { id: request.id, ok: true, bytes: await editor.save(request.boxes, request.signatures) };
 }
 
 // Saving can take seconds on a large file, and this worker keeps the window responsive meanwhile.

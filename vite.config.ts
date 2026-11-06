@@ -3,6 +3,8 @@ import { defineConfig } from 'vite';
 
 // Tauri expects a fixed port, and its dev window points here.
 export default defineConfig({
+  // Named up front, because finding one mid-session makes the dev server reload the page.
+  optimizeDeps: { include: ['@cantoo/fontkit', '@cantoo/pdf-lib', 'signature_pad'] },
   plugins: [react()],
   clearScreen: false,
   server: { port: 5173, strictPort: true, host: '127.0.0.1' },

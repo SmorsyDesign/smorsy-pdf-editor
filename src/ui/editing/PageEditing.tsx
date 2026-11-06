@@ -2,6 +2,9 @@ import type { PdfDocument } from '../../engine/document';
 import type { PageText } from '../../engine/extract';
 import type { SearchMatch } from '../../engine/search';
 import type { PageSize } from '../../engine/zoom';
+import { PlacedSignatures } from '../signing/PlacedSignatures';
+import { SignLayer } from '../signing/SignLayer';
+import type { Signing } from '../signing/useSigning';
 import type { EditorMode } from '../TopBar';
 import { FontCard, needsFontCard } from './Notices';
 import { PageOverlay } from './PageOverlay';
@@ -18,6 +21,7 @@ interface PageEditingProps {
   readonly mode: EditorMode;
   readonly editor: DocumentEditor;
   readonly session: TextSession;
+  readonly signing: Signing;
   readonly matches: readonly SearchMatch[];
   readonly currentMatch: SearchMatch | null;
   readonly pageText: (pageNumber: number) => Promise<PageText>;
@@ -33,6 +37,7 @@ export function PageEditing({
   mode,
   editor,
   session,
+  signing,
   matches,
   currentMatch,
   pageText,
@@ -63,6 +68,16 @@ export function PageEditing({
         session.clickEmptyPage(pageNumber, x, y, page);
       }}
     >
+      {mode === 'sign' && (
+        <SignLayer signing={signing} pageNumber={pageNumber} page={page} scale={scale} />
+      )}
+      <PlacedSignatures
+        placements={editor.signatures.filter((placed) => placed.pageNumber === pageNumber)}
+        signing={signing}
+        scale={scale}
+        page={page}
+        interactive={mode === 'sign'}
+      />
       {draft?.pageNumber === pageNumber && (
         <TextEditor
           key={draft.id}
