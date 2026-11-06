@@ -1,0 +1,314 @@
+/* Annotate mode and form filling, from design/direction-a-blue-pencil/screens.css. */
+
+.at-top-center {
+  position: absolute;
+  top: var(--space-3);
+  right: 0;
+  left: 0;
+  width: fit-content;
+  margin: 0 auto;
+}
+.tool-group {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.tool-swatch {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px var(--line-strong);
+}
+.swatch-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+}
+.swatch-btn[aria-pressed='true'] .tool-swatch {
+  box-shadow:
+    0 0 0 2px var(--chrome-raised),
+    0 0 0 4px var(--accent);
+}
+.kbd {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--line-sm);
+}
+
+/* The list of what's on the page */
+.rows {
+  display: grid;
+  gap: var(--space-1);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.row {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 48px;
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+}
+.row:hover {
+  background: var(--chrome-sunken);
+}
+.row-text {
+  display: grid;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.row-title {
+  font-weight: 500;
+}
+.row-sub {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--line-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* On the page. Pages keep one look in dark mode. */
+.annotation-art {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+.annotation-art * {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.annotation-highlight {
+  position: absolute;
+  border-radius: 2px;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+.whiteout {
+  position: absolute;
+  background: #ffffff;
+  pointer-events: none;
+}
+.draw-layer {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+}
+.draw-layer.is-drawing {
+  cursor: crosshair;
+}
+.annotation-hit {
+  position: absolute;
+  z-index: 1;
+  cursor: move;
+  touch-action: none;
+}
+.annotation-hit.is-selected {
+  outline: 1px dashed var(--mark);
+  outline-offset: 2px;
+}
+.overlay .annotation-hit:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.annotation-hit[data-kind='highlight'],
+.annotation-hit[data-kind='underline'],
+.annotation-hit[data-kind='strikeout'] {
+  cursor: pointer;
+}
+.note-pin {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border: 1px solid #9a7b00;
+  border-radius: var(--radius-sm);
+  color: #4a3b00;
+  pointer-events: none;
+}
+.note-card {
+  position: absolute;
+  z-index: 4;
+  width: 200px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  box-shadow:
+    0 0 0 1px #c4a93c,
+    0 4px 12px #17222b29;
+}
+.note-card textarea {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #33290a;
+  font: 400 var(--text-sm) / var(--line-sm) var(--font-ui);
+  resize: none;
+  user-select: text;
+  -webkit-user-select: text;
+}
+/* Only there for the keyboard, so the pointer goes straight through to the text underneath. */
+.markup-line {
+  position: absolute;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  opacity: 0;
+  pointer-events: none;
+}
+.markup-line:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+  opacity: 1;
+}
+
+/* Filling a form */
+.form-field,
+.form-choice {
+  position: absolute;
+  z-index: 1;
+}
+.f-input {
+  padding: 0 var(--space-1);
+  border: 1px solid #5c7f96;
+  border-radius: 2px;
+  background: #eef6fb;
+  color: #1a1a1a;
+  font-family: 'Doc Sans', sans-serif;
+  user-select: text;
+  -webkit-user-select: text;
+}
+textarea.f-input {
+  resize: none;
+}
+.f-input:focus {
+  outline: 2px solid var(--mark);
+  outline-offset: 0;
+}
+.f-input:disabled {
+  border-color: transparent;
+  background: #f4f5f6;
+  opacity: 1;
+}
+.form-choice {
+  margin: 0;
+  accent-color: var(--mark);
+}
+.f-sign {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border: 1px dashed var(--mark);
+  border-radius: 2px;
+  background: #eef6fb;
+  color: var(--mark);
+  font: 500 var(--text-md) / var(--line-md) var(--font-ui);
+}
+.jump {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.jump:hover {
+  background: var(--chrome-sunken);
+}
+.lock {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+.lock input {
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+}
+.lock small {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--line-sm);
+}
+
+/* The file's own pin shows through, so this is only a target and a focus ring. */
+.note-read {
+  position: absolute;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: transparent;
+  cursor: pointer;
+}
+
+.note-read:hover {
+  outline: 2px solid var(--focus);
+}
+
+.note-read:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.note-card.is-reading {
+  background: #fff4b8;
+  color: #33290a;
+  font: 400 var(--text-sm) / var(--line-sm) var(--font-ui);
+}
+
+.note-card.is-reading strong {
+  display: block;
+  font-weight: 600;
+}
+
+.note-card.is-reading p {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.note-problem {
+  position: absolute;
+  bottom: var(--space-2);
+  left: var(--space-2);
+  z-index: 3;
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font: 400 var(--text-sm) / var(--line-sm) var(--font-ui);
+}

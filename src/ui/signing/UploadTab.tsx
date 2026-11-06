@@ -3,60 +3,19 @@ import {
   cropToInk,
   inkCoverage,
   removeWhiteBackground,
-  scaledToFit,
   type RgbaImage,
 } from '../../engine/signatures/image';
-import { imageSize } from '../../engine/signatures/imageSize';
-import { FileTooLarge, ReadFailure, type Platform } from '../../platform';
+import type { Platform } from '../../platform';
 import {
-  contextOf,
-  pixelsOf,
+  decodeImage,
+  explainImageProblem,
   pngObjectUrl,
   pngOf,
-  SignatureError,
   type SignatureBuild,
 } from './makeSignature';
 
-const MAX_PIXELS = 100_000_000;
-// Larger than a signature ever prints, and keeps the work quick on a phone photo.
-const MAX_SIDE = 2000;
 // A clean signature is mostly paper, so this much ink means the background probably stayed.
 const TOO_MUCH_INK = 0.6;
-
-const UNREADABLE = 'That file couldn’t be read as an image. Try a PNG, JPEG or WebP.';
-const TOO_MANY_PIXELS = 'That image is too large. Try one under 100 megapixels.';
-
-async function decode(bytes: Uint8Array): Promise<RgbaImage> {
-  // Checked from the header, because a tiny file can decode to gigabytes of pixels.
-  const size = imageSize(bytes);
-  if (!size) throw new SignatureError(UNREADABLE);
-  if (size.width * size.height > MAX_PIXELS) throw new SignatureError(TOO_MANY_PIXELS);
-  let bitmap: ImageBitmap;
-  try {
-    bitmap = await createImageBitmap(new Blob([new Uint8Array(bytes)]));
-  } catch (error) {
-    throw new SignatureError(UNREADABLE, { cause: error });
-  }
-  try {
-    const fitted = scaledToFit(bitmap.width, bitmap.height, MAX_SIDE);
-    const canvas = document.createElement('canvas');
-    canvas.width = fitted.width;
-    canvas.height = fitted.height;
-    contextOf(canvas).drawImage(bitmap, 0, 0, fitted.width, fitted.height);
-    return pixelsOf(canvas);
-  } finally {
-    bitmap.close();
-  }
-}
-
-function explain(error: unknown): string {
-  if (error instanceof SignatureError) return error.message;
-  if (error instanceof FileTooLarge) return 'That image is too large. Try one under 25 MB.';
-  if (error instanceof ReadFailure) {
-    return 'That file couldn’t be read from your computer. Check that it still exists.';
-  }
-  return UNREADABLE;
-}
 
 interface UploadTabProps {
   readonly platform: Platform;
@@ -92,7 +51,7 @@ export function UploadTab({ platform, onChange }: UploadTabProps) {
       })
       .catch((error: unknown) => {
         console.error(error);
-        if (!cancelled) setProblem(explain(error));
+        if (!cancelled) setProblem(explainImageProblem(error));
       });
     return () => {
       cancelled = true;
@@ -108,13 +67,13 @@ export function UploadTab({ platform, onChange }: UploadTabProps) {
       setSource(null);
       setFileName(null);
       setProblem(null);
-      setSource(await decode(picked.bytes));
+      setSource(await decodeImage(picked.bytes));
       setFileName(picked.name);
     } catch (error) {
       console.error(error);
       setSource(null);
       setFileName(null);
-      setProblem(explain(error));
+      setProblem(explainImageProblem(error));
     }
   };
 

@@ -18,6 +18,7 @@ export interface SignatureSlip {
 }
 
 const START_WIDTH: Readonly<Record<SignatureKind, number>> = { signature: 168, initials: 72 };
+const START_IMAGE_WIDTH = 240;
 const DUPLICATE_OFFSET = 16;
 
 const focusPages = () => {
@@ -123,6 +124,25 @@ export function useSigning(
       stampTexts.current.set(box.id, box.text);
     }
     setPickedId(null);
+    setSelectedId(id);
+    setFocusPlacedId(id);
+  };
+
+  /** An image from the Annotate tools. It handles just like a signature, without a date. */
+  const placeImage = (image: SignatureImage, pageNumber: number) => {
+    const page = pageSizes[pageNumber - 1] ?? LETTER_PAGE;
+    const rect = newPlacementRect(
+      page.width / 2,
+      page.height / 2,
+      START_IMAGE_WIDTH,
+      image.width / image.height,
+      page,
+    );
+    const id = crypto.randomUUID();
+    apply({
+      kind: 'place-signature',
+      placement: { id, pageNumber, rect, angle: 0, image, purpose: 'image' },
+    });
     setSelectedId(id);
     setFocusPlacedId(id);
   };
@@ -247,6 +267,7 @@ export function useSigning(
     removeSlip,
     urlFor,
     place,
+    placeImage,
     placeInView,
     dropAt,
     change,

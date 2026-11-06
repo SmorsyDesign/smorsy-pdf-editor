@@ -195,6 +195,20 @@ export interface ClearedFields {
   readonly onTop: number;
 }
 
+/** How many solid fields would cover annotations, which can't go in the page beneath them. */
+export function countSolidFieldsOver(page: PDFPage, areas: readonly UserBounds[]): number {
+  const { context } = page.doc;
+  const widgets = new Set(
+    areas.flatMap((area) =>
+      annotationsOver(page, area).filter((annotation) => isWidget(context, annotation)),
+    ),
+  );
+  return [...widgets].filter((widget) => {
+    const appearance = appearanceOf(context, widget);
+    return appearance ? paintsSolid(context, widget, appearance) : hasBackground(context, widget);
+  }).length;
+}
+
 /** Makes solid form fields safe to draw over, where that can be done. */
 export function clearFieldsUnder(page: PDFPage, areas: readonly UserBounds[]): ClearedFields {
   const { doc } = page;

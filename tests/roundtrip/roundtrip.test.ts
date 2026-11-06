@@ -160,6 +160,34 @@ describe.each(files)('%s', (name) => {
     },
   );
 
+  it.skipIf(password !== undefined)('survives every kind of annotation', async () => {
+    const common = { pageNumber: 1, color: { r: 0.8, g: 0.2, b: 0.2 } };
+    const rect = { x: 72, y: 72, width: 120, height: 40 };
+    const saved = await new PdfEditor(original, fonts).save([], [], {
+      annotations: [
+        { ...common, id: 'a', kind: 'highlight', rects: [rect], text: 'marked' },
+        { ...common, id: 'b', kind: 'underline', rects: [rect], text: 'marked' },
+        { ...common, id: 'c', kind: 'strikeout', rects: [rect], text: 'marked' },
+        { ...common, id: 'd', kind: 'pen', points: [rect, { x: 200, y: 200 }], width: 2 },
+        { ...common, id: 'e', kind: 'rect', rect, width: 2 },
+        { ...common, id: 'f', kind: 'ellipse', rect, width: 2 },
+        { ...common, id: 'g', kind: 'arrow', from: rect, to: { x: 200, y: 200 }, width: 2 },
+        { ...common, id: 'h', kind: 'note', at: rect, text: 'Note' },
+        { ...common, id: 'i', kind: 'whiteout', rect, width: 0 },
+      ],
+    });
+    const path = join(temp, `annotated-${name}`);
+    writeFileSync(path, saved);
+    expect([0, 3]).toContain(qpdfStatus(path));
+    const before = await inspect(original);
+    const after = await inspect(saved);
+    expect(after.pages).toBe(before.pages);
+    expect(after.links).toBe(before.links);
+    expect(after.outlineItems).toBe(before.outlineItems);
+    // Eight of them are real annotations. Whiteout goes in the page itself.
+    expect(after.annotations).toBe(before.annotations + 8);
+  });
+
   it.skipIf(password !== undefined)('survives a placed signature', async () => {
     const saved = await new PdfEditor(original, fonts).save(
       [],

@@ -1,6 +1,6 @@
 import type { PlacedSignature, TextBox } from '../engine/edits/model';
 import type { FontOutcome, SystemFontStyle } from '../engine/save/choose-font';
-import { PdfEditor, type SaveReport } from '../engine/save/editor';
+import { PdfEditor, type SaveExtras, type SaveReport } from '../engine/save/editor';
 
 export type SaveRequest =
   | {
@@ -14,6 +14,7 @@ export type SaveRequest =
       readonly id: number;
       readonly boxes: readonly TextBox[];
       readonly signatures: readonly PlacedSignature[];
+      readonly extras: SaveExtras;
     };
 
 export type SaveResponse =
@@ -37,7 +38,7 @@ async function handle(request: Exclude<SaveRequest, { type: 'init' }>): Promise<
   return {
     id: request.id,
     ok: true,
-    report: await editor.saveWithReport(request.boxes, request.signatures),
+    report: await editor.saveWithReport(request.boxes, request.signatures, request.extras),
   };
 }
 

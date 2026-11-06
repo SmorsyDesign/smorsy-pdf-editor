@@ -25,6 +25,10 @@ interface PageOverlayProps {
   readonly onDeleteBlock: (block: TextBlock, pageElement: HTMLElement) => void;
   readonly onOpenBox: (box: TextBox) => void;
   readonly onAddAt: (x: number, y: number) => void;
+  /** Whether text can be selected, which marking it needs too. */
+  readonly showsTextLayer: boolean;
+  /** What's painted under text edits, because it goes in the page before them when saved. */
+  readonly beneath: ReactNode;
   readonly children: ReactNode;
 }
 
@@ -45,6 +49,8 @@ export function PageOverlay({
   onDeleteBlock,
   onOpenBox,
   onAddAt,
+  showsTextLayer,
+  beneath,
   children,
 }: PageOverlayProps) {
   const [text, setText] = useState<PageText | null>(null);
@@ -67,7 +73,7 @@ export function PageOverlay({
 
   return (
     <div className="overlay">
-      {mode === 'select' && (
+      {showsTextLayer && (
         <SelectLayer
           document={document}
           pageNumber={pageNumber}
@@ -85,6 +91,7 @@ export function PageOverlay({
           onAddAt={onAddAt}
         />
       )}
+      {beneath}
       <EditedBoxes
         boxes={boxes}
         scale={scale}

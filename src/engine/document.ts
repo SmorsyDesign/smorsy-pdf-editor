@@ -8,6 +8,8 @@ import {
   type PDFPageProxy,
 } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { EngineError } from './errors';
+import { fieldFromWidget, type FormField, type WidgetData } from './forms/fields';
+import { noteFromAnnotation, type ExistingNote, type NoteData } from './notes';
 import {
   groupTextItems,
   type FontFacts,
@@ -50,6 +52,10 @@ export interface PdfDocument {
   render(request: RenderRequest): RenderTask;
   /** Frees what a page holds in memory. Call it when the page scrolls well out of view. */
   release(pageNumber: number): void;
+  /** Every form field in the document, or nothing if it has no form. */
+  formFields(): Promise<readonly FormField[]>;
+  /** Sticky notes saved in the file earlier, whose words the page itself doesn't show. */
+  existingNotes(pageNumber: number): Promise<readonly ExistingNote[]>;
   close(): Promise<void>;
 }
 
@@ -273,6 +279,45 @@ class PdfJsDocument implements PdfDocument {
       (page) => page.cleanup(),
       () => undefined,
     );
+  }
+
+  async existingNotes(pageNumber: number): Promise<readonly ExistingNote[]> {
+    const page = await this.page(pageNumber);
+    const viewport = page.getViewport({ scale: 1 });
+    const annotations = (await page.getAnnotations()) as readonly NoteData[];
+    return annotations.flatMap(
+      (data) =>
+        noteFromAnnotation(data, ([x1 = 0, y1 = 0, x2 = 0, y2 = 0]) => [
+          ...(viewport.convertToViewportPoint(x1, y1) as readonly number[]),
+          ...(viewport.convertToViewportPoint(x2, y2) as readonly number[]),
+        ]) ?? [],
+    );
+  }
+
+  async formFields(): Promise<readonly FormField[]> {
+    const objects = await this.proxy.getFieldObjects();
+    if (!objects) return [];
+    const pageNumbers = new Set<number>();
+    for (const entries of objects.values()) {
+      for (const entry of entries as readonly { page?: number }[]) {
+        // A field that only groups others isn't on any page, which it reports as page -1.
+        if (typeof entry.page === 'number' && entry.page >= 0) pageNumbers.add(entry.page + 1);
+      }
+    }
+    const fields: FormField[] = [];
+    for (const pageNumber of [...pageNumbers].sort((one, two) => one - two)) {
+      const page = await this.page(pageNumber);
+      const viewport = page.getViewport({ scale: 1 });
+      const widgets = (await page.getAnnotations()) as readonly WidgetData[];
+      for (const widget of widgets) {
+        const field = fieldFromWidget(widget, pageNumber, ([x1 = 0, y1 = 0, x2 = 0, y2 = 0]) => [
+          ...(viewport.convertToViewportPoint(x1, y1) as readonly number[]),
+          ...(viewport.convertToViewportPoint(x2, y2) as readonly number[]),
+        ]);
+        if (field) fields.push(field);
+      }
+    }
+    return fields;
   }
 
   close(): Promise<void> {

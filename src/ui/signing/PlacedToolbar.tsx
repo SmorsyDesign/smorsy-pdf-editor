@@ -68,7 +68,7 @@ export function PlacedToolbar({
     <div
       className="float-bar placed-bar"
       role="toolbar"
-      aria-label="Signature actions"
+      aria-label={placement.purpose === 'image' ? 'Image actions' : 'Signature actions'}
       style={position}
       onClick={(event) => {
         event.stopPropagation();

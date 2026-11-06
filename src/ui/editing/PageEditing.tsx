@@ -2,6 +2,14 @@ import type { PdfDocument } from '../../engine/document';
 import type { PageText } from '../../engine/extract';
 import type { SearchMatch } from '../../engine/search';
 import type { PageSize } from '../../engine/zoom';
+import { AnnotationArt, Highlights, WhiteoutBoxes } from '../annotating/AnnotationArt';
+import { AnnotationControls } from '../annotating/AnnotationControls';
+import { ExistingNotes } from '../annotating/ExistingNotes';
+import { DrawLayer } from '../annotating/DrawLayer';
+import { MarkupLines } from '../annotating/MarkupLines';
+import { isMarkupTool, type Annotating } from '../annotating/useAnnotating';
+import { FormLayer } from '../forms/FormLayer';
+import type { FormFields } from '../forms/useFormFields';
 import { PlacedSignatures } from '../signing/PlacedSignatures';
 import { SignLayer } from '../signing/SignLayer';
 import type { Signing } from '../signing/useSigning';
@@ -22,6 +30,10 @@ interface PageEditingProps {
   readonly editor: DocumentEditor;
   readonly session: TextSession;
   readonly signing: Signing;
+  readonly annotating: Annotating;
+  readonly form: FormFields;
+  readonly canFillForm: boolean;
+  readonly onSign: () => void;
   readonly matches: readonly SearchMatch[];
   readonly currentMatch: SearchMatch | null;
   readonly pageText: (pageNumber: number) => Promise<PageText>;
@@ -38,14 +50,24 @@ export function PageEditing({
   editor,
   session,
   signing,
+  annotating,
+  form,
+  canFillForm,
+  onSign,
   matches,
   currentMatch,
   pageText,
 }: PageEditingProps) {
   const { draft } = session;
+  const marks = annotating.annotations.filter((annotation) => annotation.pageNumber === pageNumber);
+  const annotatingHere = mode === 'note';
+  const marking = annotatingHere && isMarkupTool(annotating.tool);
+  const pickable = annotatingHere && annotating.tool === null;
   const fontCard = editor.notice && needsFontCard(editor.notice) && !draft ? editor.notice : null;
   return (
     <PageOverlay
+      showsTextLayer={mode === 'select' || marking}
+      beneath={<WhiteoutBoxes annotations={marks} scale={scale} />}
       document={document}
       pageNumber={pageNumber}
       zoomPercent={zoomPercent}
@@ -68,6 +90,44 @@ export function PageEditing({
         session.clickEmptyPage(pageNumber, x, y, page);
       }}
     >
+      <FormLayer
+        form={form}
+        pageNumber={pageNumber}
+        scale={scale}
+        interactive={mode === 'select' && canFillForm}
+        onSign={onSign}
+      />
+      {annotatingHere && (
+        <DrawLayer
+          annotating={annotating}
+          pageNumber={pageNumber}
+          page={page}
+          scale={scale}
+          onEmptyClick={() => {
+            signing.select(null);
+          }}
+        />
+      )}
+      <Highlights annotations={marks} scale={scale} />
+      <AnnotationArt annotations={marks} page={page} scale={scale} />
+      {marking && (
+        <MarkupLines
+          annotating={annotating}
+          pageNumber={pageNumber}
+          scale={scale}
+          pageText={pageText}
+        />
+      )}
+      <AnnotationControls
+        annotations={marks}
+        annotating={annotating}
+        scale={scale}
+        page={page}
+        interactive={pickable}
+      />
+      {(mode === 'select' || pickable) && (
+        <ExistingNotes document={document} pageNumber={pageNumber} page={page} scale={scale} />
+      )}
       {mode === 'sign' && (
         <SignLayer signing={signing} pageNumber={pageNumber} page={page} scale={scale} />
       )}
@@ -76,7 +136,7 @@ export function PageEditing({
         signing={signing}
         scale={scale}
         page={page}
-        interactive={mode === 'sign'}
+        isInteractive={(placed) => (placed.purpose === 'image' ? pickable : mode === 'sign')}
       />
       {draft?.pageNumber === pageNumber && (
         <TextEditor

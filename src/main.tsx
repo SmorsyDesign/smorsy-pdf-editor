@@ -13,6 +13,7 @@ import './ui/styles/notices.css';
 import './ui/styles/signing-panel.css';
 import './ui/styles/signing-page.css';
 import './ui/styles/signing-dialog.css';
+import './ui/styles/annotating.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('The page is missing its root element.');

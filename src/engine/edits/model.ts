@@ -1,3 +1,6 @@
+import type { FieldValue } from '../forms/fields';
+import type { Annotation } from './annotations';
+
 /** Positions are PDF points as displayed: origin at the page's top left, y going down. */
 export interface Rect {
   readonly x: number;
@@ -87,6 +90,8 @@ export interface PlacedSignature {
   /** Degrees clockwise, as displayed. */
   readonly angle: number;
   readonly image: SignatureImage;
+  /** Placed the same way as a signature, but managed with the other annotations. */
+  readonly purpose?: 'image';
 }
 
 export type PlacedSignatureChanges = Partial<
@@ -104,7 +109,11 @@ export type Edit =
       readonly id: string;
       readonly changes: PlacedSignatureChanges;
     }
-  | { readonly kind: 'remove-signature'; readonly id: string };
+  | { readonly kind: 'remove-signature'; readonly id: string }
+  | { readonly kind: 'add-annotation'; readonly annotation: Annotation }
+  | { readonly kind: 'change-annotation'; readonly annotation: Annotation }
+  | { readonly kind: 'remove-annotation'; readonly id: string }
+  | { readonly kind: 'fill-field'; readonly name: string; readonly value: FieldValue };
 
 export interface EditEntry {
   readonly edit: Edit;
@@ -219,4 +228,25 @@ export function deriveSignatures(edits: readonly Edit[]): readonly PlacedSignatu
     }
   }
   return [...placed.values()];
+}
+
+export function deriveAnnotations(edits: readonly Edit[]): readonly Annotation[] {
+  const annotations = new Map<string, Annotation>();
+  for (const edit of edits) {
+    if (edit.kind === 'add-annotation' || edit.kind === 'change-annotation') {
+      annotations.set(edit.annotation.id, edit.annotation);
+    } else if (edit.kind === 'remove-annotation') {
+      annotations.delete(edit.id);
+    }
+  }
+  return [...annotations.values()];
+}
+
+/** The latest answer for each field that's been changed. */
+export function deriveFieldAnswers(edits: readonly Edit[]): ReadonlyMap<string, FieldValue> {
+  const answers = new Map<string, FieldValue>();
+  for (const edit of edits) {
+    if (edit.kind === 'fill-field') answers.set(edit.name, edit.value);
+  }
+  return answers;
 }

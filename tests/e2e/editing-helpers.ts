@@ -157,3 +157,81 @@ export function paintIn(page: Page, pageNumber: number, region: Region) {
     { number: pageNumber, area: region },
   );
 }
+
+/** Remembers how a page looks now, to compare with once it's been saved and reopened. */
+export async function rememberPage(page: Page, pageNumber: number) {
+  await showPage(page, pageNumber);
+  await page.waitForTimeout(300);
+  await page.evaluate((number) => {
+    const source = document.querySelector<HTMLCanvasElement>(`[data-page="${number}"] canvas`);
+    if (!source) throw new Error('The page isn’t on screen.');
+    const copy = document.createElement('canvas');
+    copy.width = source.width;
+    copy.height = source.height;
+    const context = copy.getContext('2d', { willReadFrequently: true });
+    if (!context) throw new Error('No drawing context.');
+    context.drawImage(source, 0, 0);
+    (window as unknown as { rememberedPage: ImageData }).rememberedPage = context.getImageData(
+      0,
+      0,
+      copy.width,
+      copy.height,
+    );
+  }, pageNumber);
+}
+
+/** The box around everything that's different from the remembered page, in displayed pixels. */
+export async function whatChanged(page: Page, pageNumber: number) {
+  await showPage(page, pageNumber);
+  await page.waitForTimeout(300);
+  return page.evaluate((number) => {
+    const source = document.querySelector<HTMLCanvasElement>(`[data-page="${number}"] canvas`);
+    const before = (window as unknown as { rememberedPage: ImageData }).rememberedPage;
+    if (!source) throw new Error('The page isn’t on screen.');
+    if (source.width !== before.width || source.height !== before.height) {
+      throw new Error('The page is a different size, so it can’t be compared.');
+    }
+    const ratio = source.width / source.getBoundingClientRect().width;
+    const copy = document.createElement('canvas');
+    copy.width = source.width;
+    copy.height = source.height;
+    const context = copy.getContext('2d', { willReadFrequently: true });
+    if (!context) throw new Error('No drawing context.');
+    context.drawImage(source, 0, 0);
+    const { data } = context.getImageData(0, 0, copy.width, copy.height);
+    let left = Infinity;
+    let right = -Infinity;
+    let top = Infinity;
+    let bottom = -Infinity;
+    let pixels = 0;
+    let red = 0;
+    let green = 0;
+    let blue = 0;
+    for (let y = 0; y < copy.height; y += 1) {
+      for (let x = 0; x < copy.width; x += 1) {
+        const at = (y * copy.width + x) * 4;
+        const difference =
+          Math.abs((data[at] ?? 0) - (before.data[at] ?? 0)) +
+          Math.abs((data[at + 1] ?? 0) - (before.data[at + 1] ?? 0)) +
+          Math.abs((data[at + 2] ?? 0) - (before.data[at + 2] ?? 0));
+        if (difference <= 48) continue;
+        pixels += 1;
+        red += data[at] ?? 0;
+        green += data[at + 1] ?? 0;
+        blue += data[at + 2] ?? 0;
+        left = Math.min(left, x);
+        right = Math.max(right, x);
+        top = Math.min(top, y);
+        bottom = Math.max(bottom, y);
+      }
+    }
+    return {
+      pixels,
+      x: left / ratio,
+      y: top / ratio,
+      width: (right - left) / ratio,
+      height: (bottom - top) / ratio,
+      average: pixels ? [red / pixels, green / pixels, blue / pixels] : [0, 0, 0],
+    };
+  }, pageNumber);
+}

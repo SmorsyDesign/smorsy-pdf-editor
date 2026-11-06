@@ -6,6 +6,8 @@ import {
   changeCount,
   changesSince,
   currentEntry,
+  deriveAnnotations,
+  deriveFieldAnswers,
   deriveSignatures,
   deriveTextBoxes,
   EMPTY_LOG,
@@ -211,5 +213,38 @@ describe('signatures in the edit log', () => {
   it('ignores signatures when working out text, and text when working out signatures', () => {
     const log = record(EMPTY_LOG, { kind: 'place-signature', placement });
     expect(deriveTextBoxes(activeEdits(log))).toEqual([]);
+  });
+});
+
+describe('annotations and form answers in the edit log', () => {
+  const highlight = {
+    id: 'a',
+    pageNumber: 1,
+    color: { r: 1, g: 1, b: 0 },
+    kind: 'highlight' as const,
+    rects: [],
+    text: 'x',
+  };
+
+  it('derives annotations, following changes and removals', () => {
+    let log = record(EMPTY_LOG, { kind: 'add-annotation', annotation: highlight });
+    expect(deriveAnnotations(activeEdits(log))).toEqual([highlight]);
+    const changed = { ...highlight, text: 'y' };
+    log = record(log, { kind: 'change-annotation', annotation: changed });
+    expect(deriveAnnotations(activeEdits(log))).toEqual([changed]);
+    log = record(log, { kind: 'remove-annotation', id: 'a' });
+    expect(deriveAnnotations(activeEdits(log))).toEqual([]);
+    expect(deriveAnnotations(activeEdits(undo(log)))).toEqual([changed]);
+  });
+
+  it('keeps the latest answer for each field', () => {
+    let log = record(EMPTY_LOG, { kind: 'fill-field', name: 'name', value: 'Ma' });
+    log = record(log, { kind: 'fill-field', name: 'name', value: 'Mara' });
+    log = record(log, { kind: 'fill-field', name: 'agree', value: true });
+    expect([...deriveFieldAnswers(activeEdits(log))]).toEqual([
+      ['name', 'Mara'],
+      ['agree', true],
+    ]);
+    expect(deriveFieldAnswers(activeEdits(EMPTY_LOG)).size).toBe(0);
   });
 });

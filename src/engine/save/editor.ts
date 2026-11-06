@@ -2,8 +2,6 @@ import fontkit from '@cantoo/fontkit';
 import {
   PDFDocument,
   PDFHexString,
-  PDFName,
-  PDFNumber,
   beginText,
   degrees,
   endText,
@@ -19,16 +17,27 @@ import {
   type PDFImage,
   type PDFPage,
 } from '@cantoo/pdf-lib';
-import { displayToUser, userAngle, type PageBox } from '../coordinates';
+import { displayToUser, userAngle } from '../coordinates';
+import type { Annotation } from '../edits/annotations';
 import type { Color, PlacedSignature, TextBox } from '../edits/model';
 import { UNSUPPORTED_TEXT, nameCharacter } from '../errors';
 import { findEmbeddedFont, type EmbeddedFont } from '../fonts/embedded';
 import { bundledFaceFile } from '../fonts/match';
 import { placementInPdf } from '../signatures/placement';
-import { clearFieldsUnder } from './form-fields';
-import { boundsAround, type UserBounds } from './page-annotations';
+import { annotationBounds, writeAnnotation } from './annotation-writing';
+import { fillFields, lockAnswers, type FieldAnswers } from './field-filling';
+import { clearFieldsUnder, countSolidFieldsOver } from './form-fields';
+import { boundsOfWhiteout, drawWhiteout, pageBoxOf, textBoxBounds } from './page-geometry';
 import { boundsOfPlacement, drawSignaturePicture } from './signature-drawing';
 import { FontChooser, systemFontKey, type FontBytes, type FontOutcome } from './choose-font';
+
+/** What else goes in a save, beyond text and signatures. */
+export interface SaveExtras {
+  readonly annotations?: readonly Annotation[];
+  readonly answers?: FieldAnswers;
+  /** Makes answers part of the page. */
+  readonly lock?: boolean;
+}
 
 export interface SaveReport {
   readonly bytes: Uint8Array;
@@ -42,52 +51,8 @@ type DrawFont =
   | { readonly kind: 'pdf-font'; readonly font: PDFFont }
   | { readonly kind: 'embedded'; readonly font: EmbeddedFont };
 
-/** The visible page is where the crop box and media box overlap, which is what pdf.js shows. */
-function pageBoxOf(page: PDFPage): PageBox {
-  const crop = page.getCropBox();
-  const media = page.getMediaBox();
-  const x = Math.max(crop.x, media.x);
-  const y = Math.max(crop.y, media.y);
-  const width = Math.min(crop.x + crop.width, media.x + media.width) - x;
-  const height = Math.min(crop.y + crop.height, media.y + media.height) - y;
-  const unit = page.node.lookup(PDFName.of('UserUnit'));
-  const rotation = ((page.getRotation().angle % 360) + 360) % 360;
-  // A crop box that shows nothing is ignored, which is what pdf.js does when it draws the page.
-  const visible = width > 0 && height > 0 ? { x, y, width, height } : media;
-  return {
-    x: visible.x,
-    y: visible.y,
-    width: visible.width,
-    height: visible.height,
-    rotation,
-    unit: unit instanceof PDFNumber && unit.asNumber() > 0 ? unit.asNumber() : 1,
-  };
-}
-
 function toRgb({ r, g, b }: Color) {
   return rgb(r, g, b);
-}
-
-/** The space a text box takes up in the PDF, so a solid field there can be dealt with. */
-function textBoxBounds(box: TextBox, pageBox: PageBox): UserBounds {
-  const { x, y, width, height } = box.rect;
-  const radians = (box.angle * Math.PI) / 180;
-  return boundsAround(
-    [
-      [0, 0],
-      [width, 0],
-      [0, height],
-      [width, height],
-    ].map(([across = 0, down = 0]) =>
-      displayToUser(
-        {
-          x: x + across * Math.cos(radians) - down * Math.sin(radians),
-          y: y + across * Math.sin(radians) + down * Math.cos(radians),
-        },
-        pageBox,
-      ),
-    ),
-  );
 }
 
 /** Applies text edits to the original bytes. Every save starts again from those bytes. */
@@ -256,14 +221,31 @@ export class PdfEditor {
   }
 
   /** Also says how many form fields became part of the page, so the person can be told. */
+  private fieldFont(doc: PDFDocument): Promise<PDFFont> {
+    // Not a subset, because a form stays fillable afterwards with any letter.
+    return this.fonts
+      .bundled(bundledFaceFile('sans', false, false))
+      .then((bytes) => doc.embedFont(bytes));
+  }
+
+  /** Also says what happened to form fields, so the person can be told. */
   async saveWithReport(
     boxes: readonly TextBox[],
     signatures: readonly PlacedSignature[],
+    { annotations = [], answers = [], lock = false }: SaveExtras = {},
   ): Promise<SaveReport> {
     const doc = await this.load();
     const embedded = new Map<string, Promise<PDFFont>>();
     const pictures = new Map<string, Promise<PDFImage>>();
-    const pageNumbers = new Set([...boxes, ...signatures].map((item) => item.pageNumber));
+    // First, so that a field's looks are up to date when anything else needs to move them.
+    if (answers.length > 0 || lock) {
+      const font = await this.fieldFont(doc);
+      fillFields(doc, answers, font);
+      if (lock) lockAnswers(doc, font);
+    }
+    const pageNumbers = new Set(
+      [...boxes, ...signatures, ...annotations].map((item) => item.pageNumber),
+    );
     let fieldsRetired = 0;
     let fieldsOnTop = 0;
     for (const pageNumber of pageNumbers) {
@@ -271,13 +253,18 @@ export class PdfEditor {
       const pageBox = pageBoxOf(page);
       const onPage = boxes.filter((box) => box.pageNumber === pageNumber);
       const signed = signatures.filter((signature) => signature.pageNumber === pageNumber);
+      const marks = annotations.filter((annotation) => annotation.pageNumber === pageNumber);
+      const whiteouts = marks.filter((mark) => mark.kind === 'whiteout');
       // First, because anything drawn before a field's looks moved to the page would be under them.
       const cleared = clearFieldsUnder(page, [
         ...onPage.filter((box) => box.lines.length > 0).map((box) => textBoxBounds(box, pageBox)),
         ...signed.map(({ rect, angle }) => boundsOfPlacement(placementInPdf(rect, angle, pageBox))),
+        ...whiteouts.map((mark) => boundsOfWhiteout(mark, pageBox)),
       ]);
       fieldsRetired += cleared.retired;
       fieldsOnTop += cleared.onTop;
+      // Under everything else, so new text can go on a space that's been cleared.
+      for (const mark of whiteouts) drawWhiteout(page, mark, pageBox);
       // All covers go first, so a patch can never hide another box's new text.
       for (const box of onPage) this.drawCovers(page, box);
       for (const box of onPage) {
@@ -287,6 +274,11 @@ export class PdfEditor {
       }
       // Last, because the screen shows signatures on top of everything else on the page.
       await this.drawSignatures(doc, page, signed, pictures);
+      for (const mark of marks) writeAnnotation(page, mark, pageBox);
+      fieldsOnTop += countSolidFieldsOver(
+        page,
+        marks.flatMap((mark) => annotationBounds(mark, pageBox) ?? []),
+      );
     }
     return { bytes: await doc.save({ updateFieldAppearances: false }), fieldsRetired, fieldsOnTop };
   }
@@ -294,7 +286,8 @@ export class PdfEditor {
   async save(
     boxes: readonly TextBox[],
     signatures: readonly PlacedSignature[] = [],
+    extras?: SaveExtras,
   ): Promise<Uint8Array> {
-    return (await this.saveWithReport(boxes, signatures)).bytes;
+    return (await this.saveWithReport(boxes, signatures, extras)).bytes;
   }
 }

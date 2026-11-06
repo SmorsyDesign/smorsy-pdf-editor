@@ -256,6 +256,34 @@ describe('the built app', () => {
     expect(readFileSync(target).equals(readFileSync(plainText))).toBe(false);
   });
 
+  it('annotates and saves through the real app', async () => {
+    await openFromStartScreen(plainText);
+    await waitForPageDrawn();
+    await $('button=Annotate').click();
+    await $('[aria-label="Rectangle"]').click();
+    await $('[data-testid="draw-layer"]').click();
+    await expect($('[data-kind="rect"]')).toExist();
+    const target = join(workspace, 'Annotated copy.pdf');
+    await answerDialogs({ save: target });
+    await $('button=Save a copy').click();
+    await expect($('span=Copy saved')).toBeDisplayed();
+    const saved = await PDFDocument.load(new Uint8Array(readFileSync(target)));
+    expect(saved.getPage(0).node.Annots()?.size()).toBe(1);
+  });
+
+  it('fills in a form and saves it through the real app', async () => {
+    const form = join(workspace, '08-fillable-form.pdf');
+    await openFromStartScreen(form);
+    await waitForPageDrawn();
+    await $('[aria-label="Student name"]').setValue('Theo Okafor');
+    const target = join(workspace, 'Filled copy.pdf');
+    await answerDialogs({ save: target });
+    await $('button=Save a copy').click();
+    await expect($('span=Copy saved')).toBeDisplayed();
+    const saved = await PDFDocument.load(new Uint8Array(readFileSync(target)));
+    expect(saved.getForm().getTextField('student.name').getText()).toBe('Theo Okafor');
+  });
+
   it('asks before quitting the way the macOS Dock does', async function () {
     if (process.platform !== 'darwin') this.skip();
     await openFromStartScreen(plainText);

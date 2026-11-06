@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import type { PlacedSignature } from '../../engine/edits/model';
 
-type Shape = Pick<PlacedSignature, 'rect' | 'angle'>;
-
-/** Follows a pointer drag of a placed signature, and hands over the shape it ends on. */
-export function useDragPreview(selected: boolean, scale: number, onFinish: (shape: Shape) => void) {
+/** Follows a pointer drag of something on the page, and hands over what it ends up as. */
+export function useDragPreview<Shape>(
+  selected: boolean,
+  scale: number,
+  onFinish: (shape: Shape) => void,
+) {
   // While dragging only this preview changes. The edit is recorded once, when it ends.
   const [preview, setPreview] = useState<Shape | null>(null);
   const endDrag = useRef<(() => void) | null>(null);

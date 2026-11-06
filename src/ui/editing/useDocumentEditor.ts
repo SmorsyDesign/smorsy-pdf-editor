@@ -6,6 +6,8 @@ import {
   canUndo,
   changesSince,
   currentEntry,
+  deriveAnnotations,
+  deriveFieldAnswers,
   deriveSignatures,
   deriveTextBoxes,
   record,
@@ -17,7 +19,9 @@ import {
   type PlacedSignature,
   type TextBox,
 } from '../../engine/edits/model';
+import type { Annotation } from '../../engine/edits/annotations';
 import { embeddingAllowed } from '../../engine/fonts/embedded';
+import type { FieldValue } from '../../engine/forms/fields';
 import type { FontOutcome, SystemFontStyle } from '../../engine/save/choose-font';
 import { unchangedCopy } from '../../engine/copy';
 import type { OpenedFile, Platform } from '../../platform';
@@ -44,6 +48,12 @@ interface BuiltFile {
 export interface DocumentEditor {
   readonly boxes: readonly TextBox[];
   readonly signatures: readonly PlacedSignature[];
+  readonly annotations: readonly Annotation[];
+  /** Form answers that have been changed, by field name. */
+  readonly answers: ReadonlyMap<string, FieldValue>;
+  /** Whether saving makes answers part of the page. */
+  readonly locksAnswers: boolean;
+  readonly setLocksAnswers: (locks: boolean) => void;
   readonly changes: number;
   /** Reads the latest state directly, so it's right even straight after an edit. */
   readonly isDirty: () => boolean;
@@ -79,6 +89,9 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
   const [outcomes, setOutcomes] = useState<ReadonlyMap<string, FontOutcome>>(() => new Map());
   // Kept in step with the state, because saving straight after an edit must include that edit.
   const logRef = useRef(log);
+  const [locksAnswers, setLocksAnswers] = useState(false);
+  const lockRef = useRef(locksAnswers);
+  lockRef.current = locksAnswers;
   const savedRef = useRef(savedEntry);
   const clientRef = useRef<Promise<SaveClient> | null>(null);
   const createClientRef = useRef<(() => Promise<SaveClient>) | null>(null);
@@ -91,6 +104,7 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
     latestChange.current += 1;
     setLog(EMPTY_LOG);
     setSavedEntry(undefined);
+    setLocksAnswers(false);
     setNotice(null);
     setProblem(null);
     setOutcomes(new Map());
@@ -123,6 +137,8 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
 
   const boxes = useMemo(() => deriveTextBoxes(activeEdits(log)), [log]);
   const signatures = useMemo(() => deriveSignatures(activeEdits(log)), [log]);
+  const annotations = useMemo(() => deriveAnnotations(activeEdits(log)), [log]);
+  const answers = useMemo(() => deriveFieldAnswers(activeEdits(log)), [log]);
 
   const moveTo = useCallback((next: EditLog) => {
     logRef.current = next;
@@ -168,8 +184,14 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
     const current = logRef.current;
     const entry = currentEntry(current);
     const active = deriveTextBoxes(activeEdits(current));
-    const placed = deriveSignatures(activeEdits(current));
-    if (active.length === 0 && placed.length === 0) {
+    const edits = activeEdits(current);
+    const placed = deriveSignatures(edits);
+    const marks = deriveAnnotations(edits);
+    const filled = [...deriveFieldAnswers(edits)];
+    const lock = lockRef.current;
+    const nothingToDo =
+      active.length === 0 && placed.length === 0 && marks.length === 0 && filled.length === 0;
+    if (nothingToDo && !lock) {
       if (!file) throw new Error('The document closed before it could be saved.');
       return {
         bytes: unchangedCopy(file.bytes),
@@ -187,7 +209,7 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
       clientRef.current = createClientRef.current();
       client = await clientRef.current;
     }
-    const report = await client.save(active, placed);
+    const report = await client.save(active, placed, { annotations: marks, answers: filled, lock });
     return { ...report, edited: true, entry };
   }, [file]);
 
@@ -210,6 +232,10 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
   return {
     boxes,
     signatures,
+    annotations,
+    answers,
+    locksAnswers,
+    setLocksAnswers,
     changes: changesSince(log, savedEntry),
     isDirty,
     canUndo: canUndo(log),

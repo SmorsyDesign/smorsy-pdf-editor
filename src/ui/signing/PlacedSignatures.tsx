@@ -39,6 +39,8 @@ const ARROWS: Readonly<Record<string, readonly [number, number]>> = {
   ArrowDown: [0, 1],
 };
 
+type Shape = Pick<PlacedSignature, 'rect' | 'angle'>;
+
 interface PlacedProps {
   readonly placement: PlacedSignature;
   readonly signing: Signing;
@@ -59,7 +61,7 @@ function Placed({ placement, signing, scale, page, interactive, selected }: Plac
     placedFocused();
   }, [focusPlacedId, id, placedFocused]);
 
-  const { preview, trackPointer } = useDragPreview(selected, scale, (shape) => {
+  const { preview, trackPointer } = useDragPreview<Shape>(selected, scale, (shape) => {
     signing.change(id, shape);
   });
   const rect = preview?.rect ?? placement.rect;
@@ -176,6 +178,8 @@ function Placed({ placement, signing, scale, page, interactive, selected }: Plac
     );
   };
 
+  const noun = placement.purpose ?? 'signature';
+
   return (
     <>
       <div
@@ -185,8 +189,8 @@ function Placed({ placement, signing, scale, page, interactive, selected }: Plac
         role="group"
         aria-label={
           interactive
-            ? 'Placed signature. Use the arrow keys to move it, or Delete to remove it.'
-            : 'Placed signature'
+            ? `Placed ${noun}. Use the arrow keys to move it, or Delete to remove it.`
+            : `Placed ${noun}`
         }
         {...(interactive ? { tabIndex: 0 } : {})}
         style={{
@@ -253,7 +257,7 @@ interface PlacedSignaturesProps {
   readonly signing: Signing;
   readonly scale: number;
   readonly page: PageSize;
-  readonly interactive: boolean;
+  readonly isInteractive: (placement: PlacedSignature) => boolean;
 }
 
 export function PlacedSignatures({
@@ -261,7 +265,7 @@ export function PlacedSignatures({
   signing,
   scale,
   page,
-  interactive,
+  isInteractive,
 }: PlacedSignaturesProps) {
   return placements.map((placement) => (
     <Placed
@@ -270,8 +274,8 @@ export function PlacedSignatures({
       signing={signing}
       scale={scale}
       page={page}
-      interactive={interactive}
-      selected={interactive && signing.selected?.id === placement.id}
+      interactive={isInteractive(placement)}
+      selected={isInteractive(placement) && signing.selected?.id === placement.id}
     />
   ));
 }

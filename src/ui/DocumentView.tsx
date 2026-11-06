@@ -10,9 +10,14 @@ import type { DocumentEditor } from './editing/useDocumentEditor';
 import { useScanCheck } from './editing/useScanCheck';
 import { useTextSession } from './editing/useTextSession';
 import { SignatureDialog } from './signing/SignatureDialog';
-import { SignPanel } from './signing/SignPanel';
+import { decodeImage, explainImageProblem, signatureImageFrom } from './signing/makeSignature';
 import { useSigning } from './signing/useSigning';
+import { AnnotateBar } from './annotating/AnnotateBar';
+import { useAnnotating } from './annotating/useAnnotating';
+import { useFormFields } from './forms/useFormFields';
+import { modeHint } from './modeHint';
 import { PageStack } from './PageStack';
+import { SidePanel } from './SidePanel';
 import { SearchBar } from './SearchBar';
 import { StatusBar } from './StatusBar';
 import { Thumbnails } from './Thumbnails';
@@ -63,7 +68,9 @@ export function DocumentView({
   const [signedWarning, setSignedWarning] = useState<EditorMode | null>(null);
   const scrollToPageRef = useRef<((pageNumber: number, yOffset?: number) => void) | null>(null);
   const session = useTextSession(editor);
-  const signing = useSigning(editor, mode === 'sign', pageSizes);
+  const signing = useSigning(editor, mode === 'sign' || mode === 'note', pageSizes);
+  const annotating = useAnnotating(editor, mode === 'note', pageSizes);
+  const form = useFormFields(pdf, editor);
   const { draft, finishOpenEdit } = session;
   const pageText = usePageText(pdf);
   const scan = useScanCheck(mode, currentPage, pageText);
@@ -120,12 +127,17 @@ export function DocumentView({
     [onUnsavedWorkChange],
   );
 
-  const hintFor = () => {
-    if (mode === 'edit') return 'Click a line to edit it, or click an empty area to add text';
-    if (mode === 'select') return 'Drag across text to select it';
-    if (signing.picked || signing.moving) return 'Click where it goes on the page';
-    if (signing.selected) return 'Drag the corners to resize, or the top handle to rotate';
-    return 'Create a signature to place it';
+  const chooseImage = async () => {
+    try {
+      const picked = await platform.chooseImage();
+      if (!picked) return;
+      const image = await signatureImageFrom(await decodeImage(picked.bytes), null);
+      annotating.clearTool();
+      signing.placeImage(image, currentPage);
+    } catch (error) {
+      console.error(error);
+      editor.reportProblem(explainImageProblem(error));
+    }
   };
 
   const stateLabel = () => {
@@ -136,6 +148,11 @@ export function DocumentView({
     if (signedLocked) return 'Looks signed';
     return pdf.pageCount === 1 ? '1 page' : `${pdf.pageCount} pages`;
   };
+
+  const canFillForm = !isProtected && !signedLocked;
+  const showsFormPanel = mode === 'select' && canFillForm && form.total > 0;
+  const hasPanel = mode === 'sign' || mode === 'note' || showsFormPanel;
+  const pageForTools = pageSizes[currentPage - 1] ?? LETTER_PAGE;
 
   return (
     <div className="window" data-os={os}>
@@ -155,7 +172,7 @@ export function DocumentView({
         onSave={onSave}
       />
 
-      <div className={mode === 'sign' ? 'body has-panel' : 'body'}>
+      <div className={hasPanel ? 'body has-panel' : 'body'}>
         <Thumbnails
           document={pdf}
           pageSizes={pageSizes}
@@ -197,12 +214,28 @@ export function DocumentView({
                 editor={editor}
                 session={session}
                 signing={signing}
+                annotating={annotating}
+                form={form}
+                canFillForm={canFillForm}
+                onSign={() => {
+                  setMode('sign');
+                }}
                 matches={search.matchesOn(pageNumber)}
                 currentMatch={search.currentMatch}
                 pageText={pageText}
               />
             )}
           />
+          {mode === 'note' && (
+            <AnnotateBar
+              annotating={annotating}
+              currentPage={currentPage}
+              centre={{ x: pageForTools.width / 2, y: pageForTools.height / 2 }}
+              onChooseImage={() => {
+                void chooseImage();
+              }}
+            />
+          )}
           {search.open && <SearchBar {...search.barProps} />}
           <EditToasts editor={editor} session={session} />
           {scan.showScanCard && !draft && (
@@ -215,21 +248,28 @@ export function DocumentView({
             />
           )}
         </div>
-        {mode === 'sign' && (
-          <SignPanel
-            signing={signing}
-            currentPage={currentPage}
-            onClose={() => {
-              setMode('select');
-            }}
-          />
-        )}
+        <SidePanel
+          mode={mode}
+          showsFormPanel={showsFormPanel}
+          form={form}
+          editor={editor}
+          annotating={annotating}
+          signing={signing}
+          currentPage={currentPage}
+          onLeaveSign={() => {
+            setMode('select');
+          }}
+          onJumpToField={(pageNumber, fieldId, y) => {
+            scrollToPageRef.current?.(pageNumber, y);
+            form.focusField(fieldId);
+          }}
+        />
       </div>
 
       <StatusBar
         os={os}
         page={`Page ${currentPage} of ${pdf.pageCount}`}
-        hint={hintFor()}
+        hint={modeHint(mode, annotating, signing)}
         fontsReplaced={editor.substitutedFonts}
         message={
           ((editor.changes === 0 && announcement) || originalNote) ??
