@@ -4,11 +4,12 @@ import type { PageSize } from '../../engine/zoom';
 import { Icon } from '../Icon';
 import type { Signing } from './useSigning';
 
-const BAR_WIDTH = 168;
+const BAR_WIDTH = 136;
 const BAR_HEIGHT = 40;
-const GAP = 12;
-// Leaves room for the rotate handle, which stands above the signature.
-const ABOVE_HANDLE = 44;
+const GAP = 8;
+// Past the rotate handle, which stands above the middle of the signature.
+const CLEAR_OF_HANDLE = 24;
+const EDGE = 8;
 
 interface PlacedToolbarProps {
   readonly placement: PlacedSignature;
@@ -29,25 +30,20 @@ export function PlacedToolbar({
 }: PlacedToolbarProps) {
   const { id } = placement;
   const bounds = boundsOf(rect, angle);
-  const right = (bounds.x + bounds.width) * scale;
-  const top = bounds.y * scale;
-  const fitsBeside = right + GAP + BAR_WIDTH <= page.width * scale;
-  const fitsAbove = top >= BAR_HEIGHT + ABOVE_HANDLE;
-  const below = (bounds.y + bounds.height) * scale + GAP;
+  const middle = (bounds.x + bounds.width / 2) * scale;
+  const top = bounds.y * scale - BAR_HEIGHT - GAP;
+  // Above the signature, so it never sits on a date stamp beside it.
+  const position = {
+    left: Math.max(EDGE, Math.min(middle + CLEAR_OF_HANDLE, page.width * scale - BAR_WIDTH - EDGE)),
+    top: top >= EDGE ? top : (bounds.y + bounds.height) * scale + GAP,
+  };
 
   return (
     <div
       className="float-bar placed-bar"
       role="toolbar"
       aria-label="Signature actions"
-      style={
-        fitsBeside
-          ? { left: right + GAP, top }
-          : {
-              left: Math.max(8, (page.width * scale - BAR_WIDTH) / 2),
-              top: fitsAbove ? top - BAR_HEIGHT - ABOVE_HANDLE : below,
-            }
-      }
+      style={position}
       onClick={(event) => {
         event.stopPropagation();
       }}

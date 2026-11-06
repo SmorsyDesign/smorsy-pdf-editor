@@ -494,6 +494,21 @@ test.describe('the date stamp', () => {
     await expect(page.getByText(expected())).toHaveCount(0);
   });
 
+  test('isn’t hidden behind the signature’s toolbar', async ({ page }) => {
+    await openForSigning(page);
+    await page.getByRole('checkbox', { name: 'Add today’s date beside it' }).check();
+    await placeTyped(page);
+    const stamp = await page.getByText(expected()).boundingBox();
+    const bar = await page.getByRole('toolbar', { name: 'Signature actions' }).boundingBox();
+    if (!stamp || !bar) throw new Error('Not on screen.');
+    const overlaps =
+      stamp.x < bar.x + bar.width &&
+      bar.x < stamp.x + stamp.width &&
+      stamp.y < bar.y + bar.height &&
+      bar.y < stamp.y + stamp.height;
+    expect(overlaps).toBe(false);
+  });
+
   test('can be edited like any other text', async ({ page }) => {
     await openForSigning(page);
     await page.getByRole('checkbox', { name: 'Add today’s date beside it' }).check();

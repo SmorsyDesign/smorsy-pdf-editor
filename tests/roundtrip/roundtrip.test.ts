@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { PDFDocument } from '@cantoo/pdf-lib';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { afterAll, describe, expect, it } from 'vitest';
+import { testPng } from '../helpers/test-png';
 import { openDocument } from '../../src/engine/document';
 import { unchangedCopy } from '../../src/engine/copy';
 import type { TextBox } from '../../src/engine/edits/model';
@@ -145,6 +146,25 @@ describe.each(files)('%s', (name) => {
       await reopened.close();
     },
   );
+
+  it.skipIf(password !== undefined)('survives a placed signature', async () => {
+    const saved = await new PdfEditor(original, fonts).save(
+      [],
+      [
+        {
+          id: 'signed',
+          pageNumber: 1,
+          rect: { x: 72, y: 72, width: 120, height: 60 },
+          angle: 15,
+          image: { id: 'image', png: testPng(40, 20), width: 40, height: 20, ink: null },
+        },
+      ],
+    );
+    const path = join(temp, `signed-${name}`);
+    writeFileSync(path, saved);
+    expect([0, 3]).toContain(qpdfStatus(path));
+    expect(await inspect(saved)).toEqual(await inspect(original));
+  });
 
   it.skipIf(password !== undefined)('survives replacing real text in its own font', async () => {
     const opened = await openDocument(original);

@@ -68,7 +68,7 @@
   flex: 1;
   min-width: 0;
   height: 56px;
-  padding: var(--space-2) 40px var(--space-2) var(--space-3);
+  padding: var(--space-3) 40px var(--space-3) var(--space-3);
   border: 0;
   border-radius: var(--radius-sm);
   background: #ffffff;
@@ -238,6 +238,9 @@
   z-index: 3;
   color-scheme: light dark;
 }
+.placed-bar .count {
+  min-width: 0;
+}
 .float-bar .sep {
   flex: none;
   width: 1px;
@@ -319,6 +322,25 @@
   color: var(--text-muted);
   font-size: var(--text-sm);
   line-height: var(--line-sm);
+}
+.file-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.file-row strong {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-row span {
+  min-width: 0;
+}
+.file-row .btn {
+  flex: none;
 }
 .signature-note {
   margin-top: var(--space-2);

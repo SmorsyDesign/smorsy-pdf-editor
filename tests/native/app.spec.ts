@@ -1,5 +1,7 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { PDFDocument, PDFName, PDFRawStream } from '@cantoo/pdf-lib';
 import { openDocument } from '../../src/engine/document';
+import { testPng } from '../helpers/test-png';
 import { join } from 'node:path';
 import { $, browser, expect } from '@wdio/globals';
 
@@ -7,8 +9,8 @@ const workspace = process.env['SMORSY_E2E_DIR'] ?? '';
 const plainText = join(workspace, '01-plain-text.pdf');
 
 /** Native dialogs can't be automated, so only they are replaced. File access stays real. */
-async function answerDialogs(answers: { open?: string; save?: string }) {
-  await browser.execute((given: { open?: string; save?: string }) => {
+async function answerDialogs(answers: { open?: string; save?: string; image?: string }) {
+  await browser.execute((given: { open?: string; save?: string; image?: string }) => {
     (window as unknown as { smorsyTestDialogs: unknown }).smorsyTestDialogs = given;
   }, answers);
 }
@@ -199,6 +201,52 @@ describe('the built app', () => {
       () => (window as unknown as { cspViolations: string[] }).cspViolations,
     );
     expect(violations).toEqual([]);
+  });
+
+  it('signs with a typed signature and saves it, under the production security policy', async () => {
+    await openFromStartScreen(plainText);
+    await waitForPageDrawn();
+    await $('button=Sign').click();
+    await $('button=Create signature').click();
+    await $('button=Type').click();
+    await $('#signature-name').setValue('Mara Okafor');
+    await $('button=Use signature').click();
+    await $('[data-testid="sign-layer"]').click();
+    await expect($('[data-testid="placed-signature"]')).toBeDisplayed();
+
+    const target = join(workspace, 'Signed copy.pdf');
+    await answerDialogs({ save: target });
+    await $('button=Save a copy').click();
+    await expect($('span=Copy saved')).toBeDisplayed();
+
+    const saved = await PDFDocument.load(new Uint8Array(readFileSync(target)));
+    const images = saved.context
+      .enumerateIndirectObjects()
+      .filter(
+        ([, object]) =>
+          object instanceof PDFRawStream &&
+          object.dict.get(PDFName.of('Subtype')) === PDFName.of('Image'),
+      );
+    expect(images.length).toBeGreaterThan(0);
+    const violations = await browser.execute(
+      () => (window as unknown as { cspViolations: string[] }).cspViolations,
+    );
+    expect(violations).toEqual([]);
+  });
+
+  it('uploads a signature image from disk through the real file permissions', async () => {
+    const image = join(workspace, 'My signature.png');
+    writeFileSync(image, testPng(40, 20));
+    await openFromStartScreen(plainText);
+    await waitForPageDrawn();
+    await $('button=Sign').click();
+    await $('button=Create signature').click();
+    await $('button=Upload').click();
+    await answerDialogs({ image });
+    await $('button=Choose an image').click();
+    await expect($('strong=My signature.png')).toBeDisplayed();
+    await $('button=Use signature').click();
+    await expect($('[aria-label^="Place signature 1"]')).toBeDisplayed();
   });
 
   it('asks before quitting the way the macOS Dock does', async function () {
