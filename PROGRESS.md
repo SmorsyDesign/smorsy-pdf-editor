@@ -105,6 +105,7 @@
 
 ## Phase 8: Release
 
+- [ ] Before anything else, raise code signing with the owner, as they asked: Apple's programme costs about US$99 a year and Windows signing has its own cost; without them, macOS and Windows show security warnings on install
 - [ ] Open via dialog, drag and drop, app icon, "Open with", double-click
 - [ ] Second file opens in the running app (single instance)
 - [ ] Recent files; remember window size and position
