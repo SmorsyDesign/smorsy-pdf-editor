@@ -81,6 +81,17 @@
 - [x] Fill forms; optional flattening
 - [x] Part 7 gates and check-in
 
+## Phase 4b: Organising annotations
+
+Added by the owner after Phase 4. Timing relative to Phase 5 still to be confirmed.
+
+- [ ] Design approval for the new screens
+- [ ] Edit saved annotations after reopening
+- [ ] Comments replace sticky notes, with no author names or replies
+- [ ] Side panel tabs by purpose, and this page or the whole document
+- [ ] Tags such as "Chapter 1", saved in the file
+- [ ] Part 7 gates and check-in
+
 ## Phase 5: Page tools
 
 - [ ] Reorder, rotate, delete, duplicate, insert

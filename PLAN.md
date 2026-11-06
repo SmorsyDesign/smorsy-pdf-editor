@@ -16,6 +16,7 @@ Answered by the owner on 2026-11-05. The Blue Pencil screen set is approved.
 | 6   | Replace and delete               | The patch covers the old text. The interface says so the first time and points to Redact for anything sensitive (Phase 6).                                                                                                                                                                       |
 | 7   | Toolbar                          | **Keep the approved Blue Pencil layout:** one row of modes and a floating format bar, after comparing it with Preview's second row.                                                                                                                                                              |
 | 8   | Saved signatures                 | **Dropped.** Signatures and initials stay in memory while the document is open, and can be placed as often as needed. Nothing is stored on the computer, because the app has no accounts and anyone using it could place a stored signature. For another PDF, upload an image or make a new one. |
+| 9   | Sticky notes or comments         | **Comments replace sticky notes (owner's decision).** No author names, which also means no name gets written into shared files, and no replies. Author names may come after launch.                                                                                                              |
 
 ### What follows from a public repository
 
@@ -212,6 +213,7 @@ Later phases add folders inside `engine/` and `ui/` as they outgrow one level. F
 | 2     | Text editing              | **XL**        |
 | 3     | Signatures                | M             |
 | 4     | Annotations and forms     | L             |
+| 4b    | Organising annotations    | L             |
 | 5     | Page tools                | M             |
 | 6     | Document tools            | L             |
 | 7     | Certificate signing       | M             |

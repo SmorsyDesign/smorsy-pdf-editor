@@ -66,12 +66,16 @@ Build in priority order. Priority 1 must be excellent before Priority 2 starts.
 - Open via native dialog, drag and drop onto the window or app icon, "Open with", or double-click (the default PDF app if the user chooses). A second file opens in the running app, not a new copy.
 - Native menus with standard shortcuts (app menu on macOS, menu bar on Windows); recent files; remember window size and position.
 - Thumbnails, continuous scroll, zoom, search; undo and redo for every edit.
-- Annotations: highlight, underline, strikethrough, pen, shapes, arrows, sticky notes. Images and whiteout boxes.
+- Annotations: highlight, underline, strikethrough, pen, shapes, arrows, comments. Images and whiteout boxes.
+- Comments replace sticky notes: a pin on the page with words, listed in the side panel. No author names and no replies. Typical use is leaving notes for students.
+- Organising annotations: side panel tabs by purpose, this page or the whole document, and tags such as "Chapter 1" saved in the file. Saved annotations can be edited after reopening.
 - Fill forms with optional flattening. Save through the native dialog; warn before closing with unsaved changes.
 
 **P3, page and document tools:** reorder, rotate, delete, duplicate, insert; merge, split, extract; OCR; safe redaction (remove the content beneath, or flatten that page and say so); page numbers, watermarks, headers and footers; compression; metadata removal; set and open passwords.
 
 **Out of scope:** cloud, accounts, collaboration, send-for-signature, Office conversion.
+
+**Possibly after launch:** author names on comments.
 
 ## Part 4: Phase 0, plan and design (no app code)
 
@@ -91,6 +95,7 @@ End every phase with the Part 7 gates and a check-in, then wait for "continue". 
 2. **Text editing:** add, edit, delete; font matching and notices; undo and redo. This phase gets the most care.
 3. **Signatures:** draw, type, upload; reuse within the open document; place, resize, rotate; date stamp.
 4. **Annotations and forms.**
+4b. **Organising annotations:** edit saved annotations after reopening; comments replace sticky notes; side panel tabs and a whole-document view; tags. New screens need design approval first.
 5. **Page tools.**
 6. **Document tools:** OCR, redaction, page numbers, watermarks, headers and footers, compression, metadata, passwords.
 7. **Certificate signing.**
