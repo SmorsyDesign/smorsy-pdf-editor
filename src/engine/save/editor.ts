@@ -26,11 +26,12 @@ import { findEmbeddedFont, type EmbeddedFont } from '../fonts/embedded';
 import { bundledFaceFile } from '../fonts/match';
 import { placementInPdf } from '../signatures/placement';
 import {
+  boundsAround,
   boundsOfPlacement,
   clearFieldsUnder,
   drawSignaturePicture,
   type UserBounds,
-} from './stamp';
+} from './signature-drawing';
 import { FontChooser, systemFontKey, type FontBytes, type FontOutcome } from './choose-font';
 
 export interface SaveReport {
@@ -67,6 +68,28 @@ function pageBoxOf(page: PDFPage): PageBox {
 
 function toRgb({ r, g, b }: Color) {
   return rgb(r, g, b);
+}
+
+/** The space a text box takes up in the PDF, so a solid field there can be dealt with. */
+function textBoxBounds(box: TextBox, pageBox: PageBox): UserBounds {
+  const { x, y, width, height } = box.rect;
+  const radians = (box.angle * Math.PI) / 180;
+  return boundsAround(
+    [
+      [0, 0],
+      [width, 0],
+      [0, height],
+      [width, height],
+    ].map(([across = 0, down = 0]) =>
+      displayToUser(
+        {
+          x: x + across * Math.cos(radians) - down * Math.sin(radians),
+          y: y + across * Math.sin(radians) + down * Math.cos(radians),
+        },
+        pageBox,
+      ),
+    ),
+  );
 }
 
 /** Applies text edits to the original bytes. Every save starts again from those bytes. */
@@ -222,7 +245,7 @@ export class PdfEditor {
     signatures: readonly PlacedSignature[],
     pictures: Map<string, Promise<PDFImage>>,
   ): Promise<void> {
-    const box = pageBoxOf(page);
+    const pageBox = pageBoxOf(page);
     for (const { rect, angle, image } of signatures) {
       // One picture in the file, however many times it's placed.
       let picture = pictures.get(image.id);
@@ -230,40 +253,14 @@ export class PdfEditor {
         picture = doc.embedPng(image.png);
         pictures.set(image.id, picture);
       }
-      drawSignaturePicture(doc, page, await picture, placementInPdf(rect, angle, box));
+      drawSignaturePicture(page, await picture, placementInPdf(rect, angle, pageBox));
     }
-  }
-
-  /** The space a text box takes up in the PDF, so a solid field there can be dealt with. */
-  private textBoxBounds(box: TextBox, pageBox: PageBox): UserBounds {
-    const { x, y, width, height } = box.rect;
-    const radians = (box.angle * Math.PI) / 180;
-    const corners = [
-      [0, 0],
-      [width, 0],
-      [0, height],
-      [width, height],
-    ].map(([across = 0, down = 0]) =>
-      displayToUser(
-        {
-          x: x + across * Math.cos(radians) - down * Math.sin(radians),
-          y: y + across * Math.sin(radians) + down * Math.cos(radians),
-        },
-        pageBox,
-      ),
-    );
-    return {
-      left: Math.min(...corners.map((corner) => corner.x)),
-      right: Math.max(...corners.map((corner) => corner.x)),
-      bottom: Math.min(...corners.map((corner) => corner.y)),
-      top: Math.max(...corners.map((corner) => corner.y)),
-    };
   }
 
   /** Also says how many form fields became part of the page, so the person can be told. */
   async saveWithReport(
     boxes: readonly TextBox[],
-    signatures: readonly PlacedSignature[] = [],
+    signatures: readonly PlacedSignature[],
   ): Promise<SaveReport> {
     const doc = await this.load();
     const embedded = new Map<string, Promise<PDFFont>>();
@@ -276,10 +273,8 @@ export class PdfEditor {
       const onPage = boxes.filter((box) => box.pageNumber === pageNumber);
       const signed = signatures.filter((signature) => signature.pageNumber === pageNumber);
       // First, because anything drawn before a field's looks moved to the page would be under them.
-      fieldsRetired += clearFieldsUnder(doc, page, [
-        ...onPage
-          .filter((box) => box.lines.length > 0)
-          .map((box) => this.textBoxBounds(box, pageBox)),
+      fieldsRetired += clearFieldsUnder(page, [
+        ...onPage.filter((box) => box.lines.length > 0).map((box) => textBoxBounds(box, pageBox)),
         ...signed.map(({ rect, angle }) => boundsOfPlacement(placementInPdf(rect, angle, pageBox))),
       ]);
       // All covers go first, so a patch can never hide another box's new text.

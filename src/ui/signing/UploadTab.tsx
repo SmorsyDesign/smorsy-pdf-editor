@@ -8,7 +8,14 @@ import {
 } from '../../engine/signatures/image';
 import { imageSize } from '../../engine/signatures/imageSize';
 import { FileTooLarge, ReadFailure, type Platform } from '../../platform';
-import { contextOf, pixelsOf, pngOf, SignatureError } from './makeSignature';
+import {
+  contextOf,
+  pixelsOf,
+  pngObjectUrl,
+  pngOf,
+  SignatureError,
+  type SignatureBuild,
+} from './makeSignature';
 
 const MAX_PIXELS = 100_000_000;
 // Larger than a signature ever prints, and keeps the work quick on a phone photo.
@@ -53,7 +60,7 @@ function explain(error: unknown): string {
 
 interface UploadTabProps {
   readonly platform: Platform;
-  readonly onChange: (build: (() => Promise<RgbaImage | null>) | null) => void;
+  readonly onChange: (build: SignatureBuild | null) => void;
 }
 
 export function UploadTab({ platform, onChange }: UploadTabProps) {
@@ -80,7 +87,7 @@ export function UploadTab({ platform, onChange }: UploadTabProps) {
     pngOf(result)
       .then((png) => {
         if (cancelled) return;
-        url = URL.createObjectURL(new Blob([new Uint8Array(png)], { type: 'image/png' }));
+        url = pngObjectUrl(png);
         setPreview(url);
       })
       .catch((error: unknown) => {

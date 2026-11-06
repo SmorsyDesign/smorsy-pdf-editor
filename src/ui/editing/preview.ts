@@ -1,8 +1,8 @@
-import { loadWithinTime } from '../fontLoading';
 import type { CSSProperties } from 'react';
 import type { Color, OriginalFont, Rect, TextStyle } from '../../engine/edits/model';
 import type { MeasureText } from '../../engine/edits/layout';
 import { closestBundled, type BundledFamily } from '../../engine/fonts/match';
+import { loadWithinTime } from '../fontLoading';
 
 const CSS_FAMILY: Readonly<Record<BundledFamily, string>> = {
   sans: 'Doc Sans',

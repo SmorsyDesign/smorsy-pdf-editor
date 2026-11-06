@@ -1,5 +1,11 @@
 import type { PlacedSignature, Rect } from '../../engine/edits/model';
-import { boundsOf, keptOnPage, scaledRect, turnedBy } from '../../engine/signatures/placement';
+import {
+  MIN_SIGNATURE_WIDTH,
+  boundsOf,
+  keptOnPage,
+  scaledRect,
+  turnedBy,
+} from '../../engine/signatures/placement';
 import type { PageSize } from '../../engine/zoom';
 import { Icon } from '../Icon';
 import type { Signing } from './useSigning';
@@ -13,7 +19,6 @@ const CLEAR_BELOW = 48;
 const CLEAR_OF_HANDLE = 24;
 const EDGE = 8;
 const STEP = 1.1;
-const MIN_WIDTH = 24;
 
 interface PlacedToolbarProps {
   readonly placement: PlacedSignature;
@@ -54,7 +59,7 @@ export function PlacedToolbar({
   const resize = (factor: number) => {
     signing.change(
       id,
-      { rect: scaledRect(placement.rect, placement.angle, factor, MIN_WIDTH, page) },
+      { rect: scaledRect(placement.rect, placement.angle, factor, MIN_SIGNATURE_WIDTH, page) },
       `resize-${id}`,
     );
   };

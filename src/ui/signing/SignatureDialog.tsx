@@ -1,16 +1,20 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Color, SignatureImage } from '../../engine/edits/model';
-import type { RgbaImage } from '../../engine/signatures/image';
 import type { Platform } from '../../platform';
 import { Icon } from '../Icon';
 import { DrawTab } from './DrawTab';
-import { INK_BLACK, INK_BLUE, SignatureError, signatureImageFrom } from './makeSignature';
+import {
+  INK_BLACK,
+  INK_BLUE,
+  SignatureError,
+  signatureImageFrom,
+  type SignatureBuild,
+} from './makeSignature';
 import { TypeTab } from './TypeTab';
 import { UploadTab } from './UploadTab';
 import type { SignatureKind } from './useSigning';
 
 type Tab = 'draw' | 'type' | 'upload';
-type Build = () => Promise<RgbaImage | null>;
 
 const TABS: readonly (readonly [Tab, string])[] = [
   ['draw', 'Draw'],
@@ -18,7 +22,7 @@ const TABS: readonly (readonly [Tab, string])[] = [
   ['upload', 'Upload'],
 ];
 
-const NEEDS: Readonly<Record<Tab, string>> = {
+const SLIP_LABELS: Readonly<Record<Tab, string>> = {
   draw: 'Drawn signature',
   type: 'Typed signature',
   upload: 'Uploaded signature',
@@ -36,7 +40,7 @@ export function SignatureDialog({ platform, initialKind, onUse, onCancel }: Sign
   const [tab, setTab] = useState<Tab>('draw');
   const [kind, setKind] = useState(initialKind);
   const [ink, setInk] = useState<Color>(INK_BLUE);
-  const [builds, setBuilds] = useState<Readonly<Record<Tab, Build | null>>>({
+  const [builds, setBuilds] = useState<Readonly<Record<Tab, SignatureBuild | null>>>({
     draw: null,
     type: null,
     upload: null,
@@ -59,27 +63,13 @@ export function SignatureDialog({ platform, initialKind, onUse, onCancel }: Sign
     onCancel();
   };
 
-  const setBuild = useCallback((forTab: Tab, build: Build | null) => {
-    setBuilds((current) => ({ ...current, [forTab]: build }));
+  // Kept the same between renders, because each tab reports again whenever its handler changes.
+  const onBuildChange = useMemo(() => {
+    const forTab = (which: Tab) => (next: SignatureBuild | null) => {
+      setBuilds((current) => ({ ...current, [which]: next }));
+    };
+    return { draw: forTab('draw'), type: forTab('type'), upload: forTab('upload') };
   }, []);
-  const onDrawChange = useCallback(
-    (build: Build | null) => {
-      setBuild('draw', build);
-    },
-    [setBuild],
-  );
-  const onTypeChange = useCallback(
-    (build: Build | null) => {
-      setBuild('type', build);
-    },
-    [setBuild],
-  );
-  const onUploadChange = useCallback(
-    (build: Build | null) => {
-      setBuild('upload', build);
-    },
-    [setBuild],
-  );
 
   const build = builds[tab];
 
@@ -94,7 +84,7 @@ export function SignatureDialog({ platform, initialKind, onUse, onCancel }: Sign
         return;
       }
       const image = await signatureImageFrom(pixels, tab === 'upload' ? null : ink);
-      if (!cancelled.current) onUse(image, kind, NEEDS[tab]);
+      if (!cancelled.current) onUse(image, kind, SLIP_LABELS[tab]);
     } catch (error) {
       console.error(error);
       setProblem(
@@ -144,13 +134,13 @@ export function SignatureDialog({ platform, initialKind, onUse, onCancel }: Sign
       <div className="dialog-body">
         {/* All stay mounted, so moving between them doesn't lose what's been drawn or typed. */}
         <div hidden={tab !== 'draw'}>
-          <DrawTab ink={ink} onChange={onDrawChange} />
+          <DrawTab ink={ink} onChange={onBuildChange.draw} />
         </div>
         <div hidden={tab !== 'type'}>
-          <TypeTab ink={ink} onChange={onTypeChange} />
+          <TypeTab ink={ink} onChange={onBuildChange.type} />
         </div>
         <div hidden={tab !== 'upload'}>
-          <UploadTab platform={platform} onChange={onUploadChange} />
+          <UploadTab platform={platform} onChange={onBuildChange.upload} />
         </div>
         <div className="options">
           <fieldset className="choice-group">

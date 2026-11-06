@@ -4,6 +4,8 @@ import type { PageSize } from '../zoom';
 
 export type Corner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 
+export const MIN_SIGNATURE_WIDTH = 24;
+
 /** Turns a point clockwise, as displayed: y goes down. */
 function turned(x: number, y: number, angle: number) {
   const radians = (angle * Math.PI) / 180;

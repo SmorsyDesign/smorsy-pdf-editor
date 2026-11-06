@@ -19,11 +19,13 @@ import {
 const PDF_FILTER = { name: 'PDF', extensions: ['pdf'] };
 const IMAGE_FILTER = { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] };
 
+type TestDialog = 'open' | 'save' | 'image';
+
 /** Native dialogs can't be automated. Only test builds read answers here: Vite strips it from releases. */
-function testDialogAnswer(dialog: 'open' | 'save' | 'image'): string | undefined {
+function testDialogAnswer(dialog: TestDialog): string | undefined {
   if (import.meta.env.MODE !== 'e2e') return undefined;
   const { smorsyTestDialogs } = window as unknown as {
-    smorsyTestDialogs?: Partial<Record<'open' | 'save' | 'image', string>>;
+    smorsyTestDialogs?: Partial<Record<TestDialog, string>>;
   };
   return smorsyTestDialogs?.[dialog];
 }

@@ -1,12 +1,12 @@
 import {
   useEffect,
   useRef,
-  useState,
   type KeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import type { PlacedSignature } from '../../engine/edits/model';
 import {
+  MIN_SIGNATURE_WIDTH,
   angleToPoint,
   keptOnPage,
   movedRect,
@@ -16,9 +16,9 @@ import {
 } from '../../engine/signatures/placement';
 import type { PageSize } from '../../engine/zoom';
 import { PlacedToolbar } from './PlacedToolbar';
+import { useDragPreview } from './useDragPreview';
 import type { Signing } from './useSigning';
 
-const MIN_WIDTH = 24;
 const KEY_STEP = 4;
 const FINE_KEY_STEP = 1;
 const TURN_STEP = 5;
@@ -39,8 +39,6 @@ const ARROWS: Readonly<Record<string, readonly [number, number]>> = {
   ArrowDown: [0, 1],
 };
 
-type Shape = Pick<PlacedSignature, 'rect' | 'angle'>;
-
 interface PlacedProps {
   readonly placement: PlacedSignature;
   readonly signing: Signing;
@@ -51,13 +49,8 @@ interface PlacedProps {
 }
 
 function Placed({ placement, signing, scale, page, interactive, selected }: PlacedProps) {
-  // While dragging only this preview changes. The edit is recorded once, when it ends.
-  const [preview, setPreview] = useState<Shape | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
-  const endDrag = useRef<(() => void) | null>(null);
   const { id } = placement;
-  const rect = preview?.rect ?? placement.rect;
-  const angle = preview?.angle ?? placement.angle;
 
   const { focusPlacedId, placedFocused } = signing;
   useEffect(() => {
@@ -66,60 +59,11 @@ function Placed({ placement, signing, scale, page, interactive, selected }: Plac
     placedFocused();
   }, [focusPlacedId, id, placedFocused]);
 
-  // Deselecting removes the handles, and a drag held by one would never hear the pointer lift.
-  useEffect(() => {
-    if (!selected) endDrag.current?.();
-  }, [selected]);
-
-  // A drag works in the scale it began at, so a zoom or the page leaving view ends it unrecorded.
-  useEffect(
-    () => () => {
-      endDrag.current?.();
-    },
-    [scale],
-  );
-
-  const trackPointer = (
-    event: ReactPointerEvent<HTMLElement>,
-    update: (move: PointerEvent) => Shape,
-  ) => {
-    event.preventDefault();
-    event.stopPropagation();
-    const target = event.currentTarget;
-    target.setPointerCapture(event.pointerId);
-    let latest: Shape | null = null;
-    const onMove = (move: PointerEvent) => {
-      latest = update(move);
-      setPreview(latest);
-    };
-    // Wherever focus happens to be, Esc takes back the drag and nothing else.
-    const onKey = (key: globalThis.KeyboardEvent) => {
-      if (key.key !== 'Escape') return;
-      key.preventDefault();
-      key.stopPropagation();
-      stop();
-    };
-    const stop = () => {
-      window.removeEventListener('keydown', onKey, true);
-      target.removeEventListener('pointermove', onMove);
-      target.removeEventListener('pointerup', onUp);
-      target.removeEventListener('pointercancel', stop);
-      target.removeEventListener('lostpointercapture', stop);
-      endDrag.current = null;
-      setPreview(null);
-    };
-    const onUp = () => {
-      const finished = latest;
-      stop();
-      if (finished) signing.change(id, finished);
-    };
-    window.addEventListener('keydown', onKey, true);
-    target.addEventListener('pointermove', onMove);
-    target.addEventListener('pointerup', onUp);
-    target.addEventListener('pointercancel', stop);
-    target.addEventListener('lostpointercapture', stop);
-    endDrag.current = stop;
-  };
+  const { preview, trackPointer } = useDragPreview(selected, scale, (shape) => {
+    signing.change(id, shape);
+  });
+  const rect = preview?.rect ?? placement.rect;
+  const angle = preview?.angle ?? placement.angle;
 
   const startMove = (event: ReactPointerEvent<HTMLElement>) => {
     if (event.button !== 0) return;
@@ -149,7 +93,7 @@ function Placed({ placement, signing, scale, page, interactive, selected }: Plac
           corner,
           (move.clientX - clientX) / scale,
           (move.clientY - clientY) / scale,
-          MIN_WIDTH,
+          MIN_SIGNATURE_WIDTH,
         ),
         placement.angle,
         page,
@@ -214,7 +158,7 @@ function Placed({ placement, signing, scale, page, interactive, selected }: Plac
       corner,
       arrow[0] * KEY_STEP,
       arrow[1] * KEY_STEP,
-      MIN_WIDTH,
+      MIN_SIGNATURE_WIDTH,
     );
     signing.change(id, { rect: keptOnPage(resized, placement.angle, page) }, keyGroup('resize'));
   };

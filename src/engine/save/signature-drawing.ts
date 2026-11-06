@@ -18,6 +18,7 @@ import {
   type PDFObject,
   type PDFPage,
 } from '@cantoo/pdf-lib';
+import type { Point } from '../coordinates';
 import type { PdfImagePlacement } from '../signatures/placement';
 
 export interface UserBounds {
@@ -28,11 +29,11 @@ export interface UserBounds {
 }
 
 const HIDDEN_FLAG = 2;
+const PRINT_FLAG = 4;
 const NO_VIEW_FLAG = 32;
 // These draw nothing of their own, so nothing placed beneath them is hidden.
 const PAINTS_NOTHING = new Set(['/Link', '/Popup']);
 const PICTURE_NAME = 'Signature';
-const PRINT_FLAG = 4;
 const MAX_FIELD_DEPTH = 16;
 // Drawing commands that paint an area: fills, shadings and images or nested drawings.
 const PAINTS_AREA = /(^|\s)([fFbB]\*?|sh|Do)(\s|$)/;
@@ -41,18 +42,29 @@ const STRINGS = /\((?:\\.|[^\\()])*\)|<[0-9a-fA-F\s]*>/g;
 
 const name = (text: string) => PDFName.of(text);
 
-function boundsOf({ x, y, width, height, rotate }: PdfImagePlacement): UserBounds {
-  const radians = (rotate * Math.PI) / 180;
-  const cos = Math.cos(radians);
-  const sin = Math.sin(radians);
-  const xs = [0, width * cos, -height * sin, width * cos - height * sin].map((v) => x + v);
-  const ys = [0, width * sin, height * cos, width * sin + height * cos].map((v) => y + v);
+/** The smallest box holding all of these points. */
+export function boundsAround(points: readonly Point[]): UserBounds {
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
   return {
     left: Math.min(...xs),
     bottom: Math.min(...ys),
     right: Math.max(...xs),
     top: Math.max(...ys),
   };
+}
+
+/** A PDF image turns anticlockwise around its lower-left corner, which is where x and y are. */
+export function boundsOfPlacement({ x, y, width, height, rotate }: PdfImagePlacement): UserBounds {
+  const radians = (rotate * Math.PI) / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  return boundsAround([
+    { x, y },
+    { x: x + width * cos, y: y + width * sin },
+    { x: x - height * sin, y: y + height * cos },
+    { x: x + (width * cos - height * sin), y: y + (width * sin + height * cos) },
+  ]);
 }
 
 function numbersIn(context: PDFContext, value: PDFObject | undefined): readonly number[] {
@@ -67,12 +79,10 @@ function numbersIn(context: PDFContext, value: PDFObject | undefined): readonly 
 function rectOf(context: PDFContext, annotation: PDFDict): UserBounds | null {
   const [x1, y1, x2, y2] = numbersIn(context, annotation.get(name('Rect')));
   if (x1 === undefined || y1 === undefined || x2 === undefined || y2 === undefined) return null;
-  return {
-    left: Math.min(x1, x2),
-    bottom: Math.min(y1, y2),
-    right: Math.max(x1, x2),
-    top: Math.max(y1, y2),
-  };
+  return boundsAround([
+    { x: x1, y: y1 },
+    { x: x2, y: y2 },
+  ]);
 }
 
 const overlap = (one: UserBounds, two: UserBounds) =>
@@ -124,13 +134,8 @@ function paintsSolid(context: PDFContext, widget: PDFDict, appearance: PDFRawStr
  * on top of a solid one. So what the field shows moves down into the page, where other things can
  * go over it.
  */
-function moveFieldLooksIntoPage(
-  doc: PDFDocument,
-  page: PDFPage,
-  widget: PDFDict,
-  appearance: PDFRawStream,
-): void {
-  const { context } = doc;
+function moveFieldLooksIntoPage(page: PDFPage, widget: PDFDict, appearance: PDFRawStream): void {
+  const { context } = page.doc;
   const rect = rectOf(context, widget);
   const box = numbersIn(context, appearance.dict.get(name('BBox')));
   const [boxLeft = 0, boxBottom = 0, boxRight = 0, boxTop = 0] = box;
@@ -140,16 +145,14 @@ function moveFieldLooksIntoPage(
     context,
     appearance.dict.get(name('Matrix')),
   );
-  const corners = [
-    [boxLeft, boxBottom],
-    [boxRight, boxBottom],
-    [boxLeft, boxTop],
-    [boxRight, boxTop],
-  ].map(([x = 0, y = 0]) => ({ x: a * x + c * y + e, y: b * x + d * y + f }));
-  const left = Math.min(...corners.map((corner) => corner.x));
-  const right = Math.max(...corners.map((corner) => corner.x));
-  const bottom = Math.min(...corners.map((corner) => corner.y));
-  const top = Math.max(...corners.map((corner) => corner.y));
+  const { left, right, bottom, top } = boundsAround(
+    [
+      [boxLeft, boxBottom],
+      [boxRight, boxBottom],
+      [boxLeft, boxTop],
+      [boxRight, boxTop],
+    ].map(([x = 0, y = 0]) => ({ x: a * x + c * y + e, y: b * x + d * y + f })),
+  );
   const scaleX = (rect.right - rect.left) / (right - left);
   const scaleY = (rect.top - rect.bottom) / (top - bottom);
 
@@ -212,11 +215,8 @@ function retireField(doc: PDFDocument, widget: PDFDict): boolean {
 }
 
 /** Makes solid form fields safe to draw over. Resolves to how many stopped being fields. */
-export function clearFieldsUnder(
-  doc: PDFDocument,
-  page: PDFPage,
-  areas: readonly UserBounds[],
-): number {
+export function clearFieldsUnder(page: PDFPage, areas: readonly UserBounds[]): number {
+  const { doc } = page;
   const { context } = doc;
   const widgets = new Set(
     areas.flatMap((area) =>
@@ -231,7 +231,7 @@ export function clearFieldsUnder(
     const flags = context.lookup(widget.get(name('F')));
     if (!(flags instanceof PDFNumber) || !(flags.asNumber() & PRINT_FLAG)) continue;
     const holdsValue = hasValue(context, widget);
-    moveFieldLooksIntoPage(doc, page, widget, appearance);
+    moveFieldLooksIntoPage(page, widget, appearance);
     if (holdsValue && retireField(doc, widget)) retired += 1;
   }
   return retired;
@@ -239,16 +239,16 @@ export function clearFieldsUnder(
 
 /** Added last, so it's painted after any other annotation beneath it. */
 function addStamp(
-  doc: PDFDocument,
   page: PDFPage,
   picture: PDFImage,
   placed: PdfImagePlacement,
   bounds: UserBounds,
 ): void {
+  const { context } = page.doc;
   const radians = (placed.rotate * Math.PI) / 180;
   const cos = Math.cos(radians);
   const sin = Math.sin(radians);
-  const appearance = doc.context.formXObject(
+  const appearance = context.formXObject(
     [
       pushGraphicsState(),
       concatTransformationMatrix(
@@ -267,14 +267,14 @@ function addStamp(
       Resources: { XObject: { [PICTURE_NAME]: picture.ref } },
     },
   );
-  const annotation = doc.context.obj({
+  const annotation = context.obj({
     Type: 'Annot',
     Subtype: 'Stamp',
     Rect: [bounds.left, bounds.bottom, bounds.right, bounds.top],
     F: PRINT_FLAG,
-    AP: { N: doc.context.register(appearance) },
+    AP: { N: context.register(appearance) },
   });
-  page.node.addAnnot(doc.context.register(annotation));
+  page.node.addAnnot(context.register(annotation));
 }
 
 /**
@@ -282,18 +282,15 @@ function addStamp(
  * paint above the page, but in the order the file lists them, so over those it's added as a stamp.
  */
 export function drawSignaturePicture(
-  doc: PDFDocument,
   page: PDFPage,
   picture: PDFImage,
   placed: PdfImagePlacement,
 ): void {
-  const bounds = boundsOf(placed);
-  const { context } = doc;
+  const bounds = boundsOfPlacement(placed);
+  const { context } = page.doc;
   const overAnnotation = annotationsOver(page, bounds).some(
     (annotation) => !isWidget(context, annotation),
   );
-  if (overAnnotation) addStamp(doc, page, picture, placed, bounds);
+  if (overAnnotation) addStamp(page, picture, placed, bounds);
   else page.drawImage(picture, { ...placed, rotate: degrees(placed.rotate) });
 }
-
-export { boundsOf as boundsOfPlacement };

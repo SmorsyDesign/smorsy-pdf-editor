@@ -7,7 +7,7 @@ import type {
 import { dateStampBox, keptOnPage, newPlacementRect } from '../../engine/signatures/placement';
 import { LETTER_PAGE, type PageSize } from '../../engine/zoom';
 import type { DocumentEditor } from '../editing/useDocumentEditor';
-import { INK_BLACK } from './makeSignature';
+import { INK_BLACK, pngObjectUrl } from './makeSignature';
 
 export type SignatureKind = 'signature' | 'initials';
 
@@ -76,7 +76,7 @@ export function useSigning(
   const urlFor = useCallback((image: SignatureImage) => {
     let url = urls.current.get(image.id);
     if (!url) {
-      url = URL.createObjectURL(new Blob([new Uint8Array(image.png)], { type: 'image/png' }));
+      url = pngObjectUrl(image.png);
       urls.current.set(image.id, url);
     }
     return url;

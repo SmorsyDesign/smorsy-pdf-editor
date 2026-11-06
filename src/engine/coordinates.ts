@@ -10,7 +10,7 @@ export interface PageBox {
   readonly unit?: number;
 }
 
-interface Point {
+export interface Point {
   readonly x: number;
   readonly y: number;
 }

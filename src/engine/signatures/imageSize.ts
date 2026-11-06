@@ -1,4 +1,4 @@
-export interface ImageSize {
+interface ImageSize {
   readonly width: number;
   readonly height: number;
 }
@@ -6,10 +6,11 @@ export interface ImageSize {
 const startsWith = (bytes: Uint8Array, prefix: readonly number[], at = 0) =>
   prefix.every((value, index) => bytes[at + index] === value);
 
-const PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-const RIFF = [0x52, 0x49, 0x46, 0x46];
-const WEBP = [0x57, 0x45, 0x42, 0x50];
 const ascii = (text: string) => Array.from(text, (character) => character.charCodeAt(0));
+
+const PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+const RIFF = ascii('RIFF');
+const WEBP = ascii('WEBP');
 
 function jpegSize(view: DataView): ImageSize | null {
   let at = 2;

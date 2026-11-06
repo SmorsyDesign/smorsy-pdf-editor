@@ -5,6 +5,9 @@ import { loadWithinTime } from '../fontLoading';
 export const INK_BLUE: Color = { r: 28 / 255, g: 42 / 255, b: 90 / 255 };
 export const INK_BLACK: Color = { r: 0, g: 0, b: 0 };
 
+/** Makes the picture from what a tab has so far. Resolves to null if there's no ink in it. */
+export type SignatureBuild = () => Promise<RgbaImage | null>;
+
 /** A failure with a message written for the person, safe to show as it is. */
 export class SignatureError extends Error {
   constructor(message: string, options?: ErrorOptions) {
@@ -38,6 +41,10 @@ export async function pngOf({ width, height, data }: RgbaImage): Promise<Uint8Ar
   });
   if (!blob) throw new SignatureError('This signature couldn’t be turned into an image.');
   return new Uint8Array(await blob.arrayBuffer());
+}
+
+export function pngObjectUrl(png: Uint8Array): string {
+  return URL.createObjectURL(new Blob([new Uint8Array(png)], { type: 'image/png' }));
 }
 
 export async function signatureImageFrom(
@@ -80,7 +87,6 @@ export async function typedPixels(
   canvas.height = TYPED_SIZE * 3;
   context.font = css;
   context.fillStyle = cssInk(ink);
-  context.textBaseline = 'alphabetic';
   context.fillText(name, TYPED_SIZE, TYPED_SIZE * 2);
   return cropToInk(pixelsOf(canvas));
 }

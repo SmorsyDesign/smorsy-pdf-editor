@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Color } from '../../engine/edits/model';
 import { handwritingCovers } from '../../engine/signatures/handwriting';
-import type { RgbaImage } from '../../engine/signatures/image';
-import { cssInk, typedPixels } from './makeSignature';
+import { cssInk, typedPixels, type SignatureBuild } from './makeSignature';
 
 const STYLES = [
   { label: 'Caveat', family: 'Sig Caveat', weight: 500 },
@@ -15,7 +14,7 @@ const MAX_NAME_LENGTH = 60;
 
 interface TypeTabProps {
   readonly ink: Color;
-  readonly onChange: (build: (() => Promise<RgbaImage | null>) | null) => void;
+  readonly onChange: (build: SignatureBuild | null) => void;
 }
 
 export function TypeTab({ ink, onChange }: TypeTabProps) {

@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import SignaturePad from 'signature_pad';
 import type { Color } from '../../engine/edits/model';
-import { cropToInk, type RgbaImage } from '../../engine/signatures/image';
-import { cssInk, pixelsOf } from './makeSignature';
+import { cropToInk } from '../../engine/signatures/image';
+import { cssInk, pixelsOf, type SignatureBuild } from './makeSignature';
 
 interface DrawTabProps {
   readonly ink: Color;
-  readonly onChange: (build: (() => Promise<RgbaImage | null>) | null) => void;
+  readonly onChange: (build: SignatureBuild | null) => void;
 }
 
 // Drawn well above screen resolution, so the signature stays sharp when printed.
@@ -42,11 +42,11 @@ export function DrawTab({ ink, onChange }: DrawTabProps) {
     const fit = () => {
       if (canvas.offsetWidth === 0) return;
       const ratio = Math.max(window.devicePixelRatio, MIN_RESOLUTION);
-      const strokes = pad.toData();
+      const drawn = pad.toData();
       canvas.width = canvas.offsetWidth * ratio;
       canvas.height = canvas.offsetHeight * ratio;
       canvas.getContext('2d')?.scale(ratio, ratio);
-      if (strokes.length > 0) pad.fromData(strokes);
+      if (drawn.length > 0) pad.fromData(drawn);
       else pad.clear();
     };
     const observer = new ResizeObserver(fit);
