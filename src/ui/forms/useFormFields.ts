@@ -34,7 +34,8 @@ export function useFormFields(document: PdfDocument, editor: DocumentEditor) {
   // A signature isn't typed in. It counts once one has been placed over the field.
   const isSigned = (field: FormField) =>
     signatures.some(
-      ({ pageNumber, rect }) =>
+      ({ pageNumber, rect, purpose }) =>
+        purpose !== 'image' &&
         pageNumber === field.pageNumber &&
         rect.x < field.rect.x + field.rect.width &&
         field.rect.x < rect.x + rect.width &&

@@ -118,14 +118,14 @@ export function useAnnotating(
     }
   };
 
-  const remove = (id: string) => {
+  const remove = (id: string, options: { group?: string; focusPages?: boolean } = {}) => {
     if (newNote?.id === id) setNewNote(null);
-    else apply({ kind: 'remove-annotation', id });
+    else apply({ kind: 'remove-annotation', id }, options.group);
     setSelectedId(null);
     setMovingId(null);
     setOpenNoteId(null);
     // What had focus has just gone, so this keeps the keyboard somewhere useful.
-    focusPages();
+    if (options.focusPages !== false) focusPages();
   };
 
   const base = (kind: AnnotationTool, pageNumber: number) => ({

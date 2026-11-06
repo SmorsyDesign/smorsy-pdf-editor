@@ -1,6 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { PDFDict, PDFDocument, PDFHexString, PDFName, PDFStream, PDFString } from '@cantoo/pdf-lib';
+import {
+  PDFArray,
+  PDFDict,
+  PDFDocument,
+  PDFHexString,
+  PDFName,
+  PDFStream,
+  PDFString,
+} from '@cantoo/pdf-lib';
 import { describe, expect, it } from 'vitest';
 import { openDocument } from '../document';
 import { FIELD_PROBLEM, UNSUPPORTED_TEXT } from '../errors';
@@ -151,7 +159,86 @@ describe('same-named boxes with different meanings', () => {
   });
 });
 
+describe('a list with several choices picked', () => {
+  it('keeps their places in number order', async () => {
+    const options = Array.from({ length: 12 }, (_, index) => `Option ${index}`);
+    const form = await blankForm((doc) => {
+      const field = doc.getForm().createOptionList('many');
+      field.addOptions(options);
+      field.enableMultiselect();
+      field.addToPage(doc.getPage(0), box);
+    });
+    const saved = await PDFDocument.load(await fill(form, [['many', ['Option 10', 'Option 2']]]));
+    const places = saved.getForm().getField('many').acroField.dict.lookup(PDFName.of('I'));
+    expect(places).toBeInstanceOf(PDFArray);
+    expect(places?.toString()).toBe('[ 2 10 ]');
+  });
+});
+
 describe('locking answers', () => {
+  it('stops rather than losing an answer it can’t draw', async () => {
+    const plain = await blankForm((doc) => {
+      const field = doc.getForm().createTextField('name');
+      field.setText('Answer');
+      field.addToPage(doc.getPage(0), box);
+    });
+    const broken = await PDFDocument.load(plain);
+    const widget = broken.getForm().getField('name').acroField.getWidgets()[0];
+    const normal = widget?.dict.lookup(PDFName.of('AP'), PDFDict).lookup(PDFName.of('N'));
+    if (!(normal instanceof PDFStream)) throw new Error('No drawing to break.');
+    normal.dict.set(PDFName.of('BBox'), broken.context.obj([0, 0, 0, 0]));
+    await expect(fill(await broken.save(), [], true)).rejects.toThrow(FIELD_PROBLEM);
+  });
+
+  it('doesn’t stop for a field with no size, which nobody can see', async () => {
+    const form = await blankForm((doc) => {
+      const field = doc.getForm().createTextField('tracking');
+      field.setText('Internal');
+      field.addToPage(doc.getPage(0), { x: 0, y: 0, width: 0, height: 0 });
+    });
+    const saved = await PDFDocument.load(await fill(form, [], true));
+    expect(saved.getForm().getFields()).toHaveLength(0);
+  });
+
+  it('draws the words for a choice already in the file with no drawing of its own', async () => {
+    const plain = await blankForm((doc) => {
+      const field = doc.getForm().createDropdown('state');
+      field.addToPage(doc.getPage(0), box);
+      field.acroField.dict.set(
+        PDFName.of('Opt'),
+        doc.context.obj([[PDFHexString.fromText('AK'), PDFHexString.fromText('Alaska')]]),
+      );
+      field.acroField.dict.set(PDFName.of('V'), PDFHexString.fromText('AK'));
+    });
+    const stripped = await PDFDocument.load(plain);
+    stripped.getForm().getField('state').acroField.getWidgets()[0]?.dict.delete(PDFName.of('AP'));
+    // Saved without the library drawing it again, which is the case this is about.
+    const noDrawing = await stripped.save({ updateFieldAppearances: false });
+    const doc = await openDocument(await fill(noDrawing, [], true));
+    const { blocks } = await doc.pageText(1);
+    await doc.close();
+    expect(blocks.map((block) => block.text).join(' ')).toContain('Alaska');
+  });
+
+  it('keeps links a page inherits from further up the file', async () => {
+    const form = await blankForm((doc) => {
+      const { context } = doc;
+      const field = doc.getForm().createTextField('name');
+      field.setText('Answer');
+      field.addToPage(doc.getPage(0), box);
+      const page = doc.getPage(0).node;
+      const link = context.register(
+        context.obj({ Type: 'Annot', Subtype: 'Link', Rect: [0, 0, 1, 1] }),
+      );
+      const own = page.Annots();
+      page.Parent()?.set(PDFName.of('Annots'), context.obj([link, ...(own?.asArray() ?? [])]));
+      page.delete(PDFName.of('Annots'));
+    });
+    const saved = await PDFDocument.load(await fill(form, [], true));
+    const list = saved.getPage(0).node.Annots();
+    expect(list?.size()).toBe(1);
+  });
+
   const pageTextOf = async (bytes: Uint8Array) => {
     const doc = await openDocument(bytes);
     const { blocks } = await doc.pageText(1);

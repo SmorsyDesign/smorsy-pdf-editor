@@ -191,6 +191,18 @@ describe('a list of annotations that pages share', () => {
   });
 });
 
+describe('a note with no words at the moment of saving', () => {
+  it('isn’t written, so old words can’t stay in the file', async () => {
+    const original = await make(() => undefined);
+    const bytes = await new PdfEditor(original, fonts).save([], [], {
+      annotations: [
+        { id: 'n', pageNumber: 1, color: white, kind: 'note', at: { x: 100, y: 100 }, text: '  ' },
+      ],
+    });
+    expect(await annotationCount(bytes)).toBe(0);
+  });
+});
+
 describe('whiteout flags', () => {
   it('doesn’t count a hidden annotation, which nothing paints', async () => {
     const { annotationsRetired, fieldsOnTop } = await whiteOut(

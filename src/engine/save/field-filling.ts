@@ -54,6 +54,14 @@ function setChoices(
   );
   const single = stored.length === 1 ? stored[0] : undefined;
   field.acroField.dict.set(name('V'), single ?? field.doc.context.obj(stored));
+  if (chosen.length > 1) {
+    // The library sorts these as text, putting 10 before 2, where the format needs them in order.
+    const places = chosen.map((text) =>
+      options.findIndex((option) => option.display.decodeText() === text),
+    );
+    const inOrder = places.sort((one, two) => one - two);
+    field.acroField.dict.set(name('I'), field.doc.context.obj(inOrder));
+  }
 }
 
 function fillOne(field: unknown, value: FieldValue, font: PDFFont): boolean {

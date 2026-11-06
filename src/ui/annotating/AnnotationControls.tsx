@@ -156,14 +156,15 @@ function NoteCard({ annotation, annotating, scale, page }: Omit<ControlProps, 'i
         }}
         // As it's typed rather than on leaving, because a shortcut can save without leaving the box.
         onChange={(event) => {
-          // Clearing it is handled on leaving, so one undo can't bring back a note with no words.
-          if (event.target.value.trim() !== '') {
-            annotating.change({ ...annotation, text: event.target.value }, typing);
-          }
+          annotating.change({ ...annotation, text: event.target.value }, typing);
         }}
         onBlur={(event) => {
           // A note with nothing in it would just be a stray mark on the page.
-          if (event.target.value.trim() === '') annotating.remove(annotation.id);
+          // Part of the same undo as the typing, so undoing can't bring back a note with no words.
+          // Focus only needs rescuing when it isn't already on its way somewhere else.
+          if (event.target.value.trim() === '') {
+            annotating.remove(annotation.id, { group: typing, focusPages: !event.relatedTarget });
+          }
           annotating.closeNote();
         }}
       />

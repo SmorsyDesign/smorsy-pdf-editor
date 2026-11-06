@@ -15,7 +15,10 @@ export interface NoteData {
   readonly rect?: readonly number[];
   readonly contentsObj?: { readonly str?: string };
   readonly titleObj?: { readonly str?: string };
+  readonly annotationFlags?: number;
 }
+
+const HIDDEN_OR_NO_VIEW = 2 | 32;
 
 /** Reads a note. Anything else on the page, or a note with no words, gives null. */
 export function noteFromAnnotation(
@@ -24,6 +27,7 @@ export function noteFromAnnotation(
 ): ExistingNote | null {
   const text = data.contentsObj?.str?.trim();
   if (data.subtype !== 'Text' || !text || !data.rect || !data.id) return null;
+  if ((data.annotationFlags ?? 0) & HIDDEN_OR_NO_VIEW) return null;
   const [x1 = 0, y1 = 0, x2 = 0, y2 = 0] = toDisplay(data.rect);
   return {
     id: data.id,

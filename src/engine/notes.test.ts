@@ -35,6 +35,12 @@ describe('reading a note already in a file', () => {
     expect(noteFromAnnotation({ ...note, contentsObj: {} }, flipped)).toBeNull();
   });
 
+  it('skips a note the file has hidden', () => {
+    expect(noteFromAnnotation({ ...note, annotationFlags: 2 }, flipped)).toBeNull();
+    expect(noteFromAnnotation({ ...note, annotationFlags: 32 }, flipped)).toBeNull();
+    expect(noteFromAnnotation({ ...note, annotationFlags: 4 }, flipped)).not.toBeNull();
+  });
+
   it('skips everything that isn’t a note', () => {
     expect(noteFromAnnotation({ ...note, subtype: 'Link' }, flipped)).toBeNull();
     expect(noteFromAnnotation({ ...note, subtype: 'Widget' }, flipped)).toBeNull();

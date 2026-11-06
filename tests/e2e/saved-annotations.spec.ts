@@ -13,6 +13,7 @@ import {
 } from './editing-helpers';
 import { expectOpenDocument, expectPageDrawn, gotoApp, openFixture } from './helpers';
 import { queueImage } from './signing-helpers';
+import { openDocument } from '../../src/engine/document';
 
 const PLAIN = 'test-pdfs/01-plain-text.pdf';
 
@@ -437,6 +438,46 @@ test.describe('whiteout over what viewers paint on top', () => {
   });
 });
 
+test.describe('rewording a note', () => {
+  const makeNote = async (page: Page) => {
+    await openForAnnotating(page);
+    await tool(page, 'Sticky note').click();
+    await clickOnPage(page, [300, 300]);
+    await page.keyboard.type('Private words');
+    await clickOnPage(page, [100, 600]);
+    await page.locator('[data-kind="note"]').click();
+  };
+
+  test('clearing it and saving from inside the box leaves the words out', async ({ page }) => {
+    await makeNote(page);
+    await page.getByRole('textbox', { name: 'Note', exact: true }).fill('');
+    await saveTo(page);
+    const doc = await openDocument(Uint8Array.from((await lastWrite(page))?.bytes ?? []));
+    const notes = await doc.existingNotes(1);
+    await doc.close();
+    expect(notes).toEqual([]);
+  });
+
+  test('new words typed without leaving the box are the ones saved', async ({ page }) => {
+    await makeNote(page);
+    await page.getByRole('textbox', { name: 'Note', exact: true }).fill('Better words');
+    await saveTo(page);
+    const doc = await openDocument(Uint8Array.from((await lastWrite(page))?.bytes ?? []));
+    const notes = await doc.existingNotes(1);
+    await doc.close();
+    expect(notes.map((note) => note.text)).toEqual(['Better words']);
+  });
+
+  test('clearing it removes it, and one undo brings the words back', async ({ page }) => {
+    await makeNote(page);
+    await page.getByRole('textbox', { name: 'Note', exact: true }).fill('');
+    await clickOnPage(page, [100, 600]);
+    await expect(page.locator('[data-kind="note"]')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Undo' }).click();
+    await expect(page.locator('.row-sub')).toContainText('Private words');
+  });
+});
+
 test.describe('a scanned page', () => {
   test('says there’s no text to mark, rather than doing nothing', async ({ page }) => {
     await openForAnnotating(page, 'test-pdfs/09-scanned-image-only.pdf', 1);
@@ -472,6 +513,17 @@ test.describe('keyboard focus', () => {
     await page.keyboard.press('Escape');
     await expect(page.locator('main.canvas')).toBeFocused();
     await expect(page.locator('[data-kind="note"]')).toHaveCount(0);
+  });
+
+  test('leaving an empty note for another control keeps focus on that control', async ({
+    page,
+  }) => {
+    await openForAnnotating(page);
+    await tool(page, 'Sticky note').click();
+    await clickOnPage(page, [300, 300]);
+    await page.getByRole('button', { name: 'Undo' }).or(tool(page, 'Pen')).last().focus();
+    await expect(page.locator('main.canvas')).not.toBeFocused();
+    await expect(tool(page, 'Pen')).toBeFocused();
   });
 
   test('a list row takes you to its annotation', async ({ page }) => {

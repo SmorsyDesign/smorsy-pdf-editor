@@ -1,6 +1,7 @@
 import {
   PDFButton,
   PDFDropdown,
+  PDFOptionList,
   PDFSignature,
   PDFTextField,
   type PDFDocument,
@@ -12,7 +13,7 @@ import { FIELD_PROBLEM } from '../errors';
 import { friendlyName } from '../forms/fields';
 import { checkCharacters } from './field-filling';
 import { currentLook, drawLooksIntoPage, hasValue } from './form-fields';
-import { isShown, name } from './page-annotations';
+import { isShown, name, rectOf } from './page-annotations';
 
 function pageOfWidget(doc: PDFDocument, field: PDFField, index: number): PDFPage | undefined {
   const widget = field.acroField.getWidgets()[index];
@@ -25,10 +26,22 @@ function pageOfWidget(doc: PDFDocument, field: PDFField, index: number): PDFPage
 }
 
 /** Regenerated looks use this font, which would otherwise draw missing letters as empty boxes. */
-function checkLooksCanBeDrawn(field: PDFField, font: PDFFont): void {
+function prepareLooks(field: PDFField, font: PDFFont): void {
   if (!field.needsAppearancesUpdate()) return;
   if (field instanceof PDFTextField) checkCharacters(field.getText() ?? '', font);
-  if (field instanceof PDFDropdown) checkCharacters(field.getSelected().join(''), font);
+  if (field instanceof PDFDropdown || field instanceof PDFOptionList) {
+    // A new drawing shows whatever the field holds, which can be a code rather than the words.
+    const options = field.acroField.getOptions();
+    const shown = field
+      .getSelected()
+      .map(
+        (stored) =>
+          options.find((option) => option.value.decodeText() === stored)?.display.decodeText() ??
+          stored,
+      );
+    checkCharacters(shown.join(''), font);
+    if (shown.length > 0) field.select(shown);
+  }
 }
 
 function paintWidgets(doc: PDFDocument, field: PDFField): void {
@@ -36,11 +49,13 @@ function paintWidgets(doc: PDFDocument, field: PDFField): void {
   field.acroField.getWidgets().forEach((widget, index) => {
     // Whoever made the form chose not to show these, so they shouldn't appear once locked.
     if (!isShown(context, widget.dict)) return;
-    const look = currentLook(context, widget.dict);
     const page = pageOfWidget(doc, field, index);
-    if (look && page) {
-      drawLooksIntoPage(page, widget.dict, look);
-    } else if (hasValue(context, widget.dict)) {
+    const rect = rectOf(context, widget.dict);
+    // With no place on any page, or no size, nobody can see this one anyway.
+    if (!page || !rect || rect.left === rect.right || rect.bottom === rect.top) return;
+    const look = currentLook(context, widget.dict);
+    const painted = look !== null && drawLooksIntoPage(page, widget.dict, look);
+    if (!painted && hasValue(context, widget.dict)) {
       throw new Error(
         `${FIELD_PROBLEM}The answer in “${friendlyName(field.getName())}” couldn’t be made part of the page, so nothing was saved. Try saving without locking answers.`,
       );
@@ -56,7 +71,7 @@ function paintWidgets(doc: PDFDocument, field: PDFField): void {
 export function lockAnswers(doc: PDFDocument, font: PDFFont): void {
   const form = doc.getForm();
   const fields = form.getFields();
-  for (const field of fields) checkLooksCanBeDrawn(field, font);
+  for (const field of fields) prepareLooks(field, font);
   form.updateFieldAppearances(font);
   for (const field of fields) {
     // A signature is proof rather than an answer, and an empty one can still be signed.

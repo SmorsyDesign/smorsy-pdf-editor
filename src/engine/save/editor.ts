@@ -235,9 +235,15 @@ export class PdfEditor {
   async saveWithReport(
     boxes: readonly TextBox[],
     signatures: readonly PlacedSignature[],
-    { annotations = [], answers = [], lock = false }: SaveExtras = {},
+    { annotations: allAnnotations = [], answers = [], lock = false }: SaveExtras = {},
   ): Promise<SaveReport> {
+    // A note being retyped can be empty at the moment of saving, and it's no note until it has words.
+    const annotations = allAnnotations.filter(
+      (annotation) => annotation.kind !== 'note' || annotation.text.trim() !== '',
+    );
     const doc = await this.load();
+    // Before anything else touches a page, because filling and locking change these lists too.
+    for (const page of doc.getPages()) giveOwnAnnotationList(page);
     const embedded = new Map<string, Promise<PDFFont>>();
     const pictures = new Map<string, Promise<PDFImage>>();
     // First, so that a field's looks are up to date when anything else needs to move them.
@@ -259,7 +265,6 @@ export class PdfEditor {
       const signed = signatures.filter((signature) => signature.pageNumber === pageNumber);
       const marks = annotations.filter((annotation) => annotation.pageNumber === pageNumber);
       const whiteouts = marks.filter((mark) => mark.kind === 'whiteout');
-      giveOwnAnnotationList(page);
       const beneath = clearForWhiteout(
         page,
         whiteouts.map((mark) => boundsOfWhiteout(mark, pageBox)),
