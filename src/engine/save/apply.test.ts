@@ -5,7 +5,8 @@ import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { describe, expect, it } from 'vitest';
 import { openDocument } from '../document';
 import type { Cover, TextBox, TextStyle } from '../edits/model';
-import { PdfEditor, type FontBytes } from './editor';
+import type { FontBytes } from './choose-font';
+import { PdfEditor } from './editor';
 
 const original = (name: string) => new Uint8Array(readFileSync(join('test-pdfs', name)));
 

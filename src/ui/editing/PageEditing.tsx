@@ -59,8 +59,8 @@ export function PageEditing({
         session.deleteBlock(block, element, scale, page);
       }}
       onOpenBox={session.openBox}
-      onAddAt={(number, x, y) => {
-        session.clickEmptyPage(number, x, y, page);
+      onAddAt={(x, y) => {
+        session.clickEmptyPage(pageNumber, x, y, page);
       }}
     >
       {draft?.pageNumber === pageNumber && (

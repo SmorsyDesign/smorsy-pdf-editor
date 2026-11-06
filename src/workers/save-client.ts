@@ -1,5 +1,5 @@
 import type { TextBox } from '../engine/edits/model';
-import type { FontOutcome, SystemFontStyle } from '../engine/save/editor';
+import type { FontOutcome, SystemFontStyle } from '../engine/save/choose-font';
 import type { SaveRequest, SaveResponse } from './save-worker';
 
 type Pending = (response: SaveResponse) => void;
@@ -21,8 +21,7 @@ export class SaveClient {
     };
     this.worker.onerror = (event) => {
       this.failure = event.message || 'The save worker stopped.';
-      for (const [id, reply] of this.pending) reply({ id, ok: false, error: this.failure });
-      this.pending.clear();
+      this.failPending(this.failure);
     };
     const init: SaveRequest = { type: 'init', bytes: bytes.slice(), systemFonts };
     this.worker.postMessage(init);
@@ -61,7 +60,11 @@ export class SaveClient {
   close(): void {
     this.worker.terminate();
     this.failure ??= 'The document was closed.';
-    for (const [id, reply] of this.pending) reply({ id, ok: false, error: this.failure });
+    this.failPending(this.failure);
+  }
+
+  private failPending(error: string): void {
+    for (const [id, reply] of this.pending) reply({ id, ok: false, error });
     this.pending.clear();
   }
 }

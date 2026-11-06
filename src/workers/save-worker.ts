@@ -1,5 +1,6 @@
 import type { TextBox } from '../engine/edits/model';
-import { PdfEditor, type FontOutcome, type SystemFontStyle } from '../engine/save/editor';
+import type { FontOutcome, SystemFontStyle } from '../engine/save/choose-font';
+import { PdfEditor } from '../engine/save/editor';
 
 export type SaveRequest =
   | {

@@ -16,9 +16,9 @@ import {
   type TextBox,
 } from '../../engine/edits/model';
 import { embeddingAllowed } from '../../engine/fonts/embedded';
-import type { FontOutcome } from '../../engine/save/editor';
+import type { FontOutcome, SystemFontStyle } from '../../engine/save/choose-font';
 import { unchangedCopy } from '../../engine/copy';
-import type { OpenedFile, Platform, SystemFontStyle } from '../../platform';
+import type { OpenedFile, Platform } from '../../platform';
 import { SaveClient } from '../../workers/save-client';
 
 const SYSTEM_STYLES: readonly SystemFontStyle[] = ['regular', 'bold', 'italic', 'bold-italic'];
@@ -29,7 +29,7 @@ export interface FontNoticeState {
 }
 
 /** What a save produced, and the exact state it contains. */
-export interface BuiltFile {
+interface BuiltFile {
   readonly bytes: Uint8Array;
   readonly edited: boolean;
   readonly entry: EditEntry | undefined;

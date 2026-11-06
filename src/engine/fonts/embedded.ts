@@ -10,7 +10,7 @@ import {
   type PDFPage,
 } from '@cantoo/pdf-lib';
 
-export interface CharacterCode {
+interface CharacterCode {
   readonly code: number;
   readonly bytes: number;
 }

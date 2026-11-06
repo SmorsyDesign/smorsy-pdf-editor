@@ -7,6 +7,7 @@ import { SelectLayer } from '../SelectLayer';
 import type { EditorMode } from '../TopBar';
 import { EditedBoxes } from './EditedBoxes';
 import { EditLayer } from './EditLayer';
+import { placedOnPage } from './preview';
 
 interface PageOverlayProps {
   readonly document: PdfDocument;
@@ -23,7 +24,7 @@ interface PageOverlayProps {
   readonly onOpenBlock: (block: TextBlock, pageElement: HTMLElement) => void;
   readonly onDeleteBlock: (block: TextBlock, pageElement: HTMLElement) => void;
   readonly onOpenBox: (box: TextBox) => void;
-  readonly onAddAt: (pageNumber: number, x: number, y: number) => void;
+  readonly onAddAt: (x: number, y: number) => void;
   readonly children: ReactNode;
 }
 
@@ -81,9 +82,7 @@ export function PageOverlay({
           scale={scale}
           onOpenBlock={onOpenBlock}
           onDeleteBlock={onDeleteBlock}
-          onAddAt={(x, y) => {
-            onAddAt(pageNumber, x, y);
-          }}
+          onAddAt={onAddAt}
         />
       )}
       <EditedBoxes
@@ -97,13 +96,7 @@ export function PageOverlay({
         <div
           key={index}
           className={match === currentMatch ? 'search-hit search-hit-current' : 'search-hit'}
-          style={{
-            left: match.rect.x * scale,
-            top: match.rect.y * scale,
-            width: match.rect.width * scale,
-            height: match.rect.height * scale,
-            transform: `rotate(${match.angle}deg)`,
-          }}
+          style={placedOnPage(match.rect, match.angle, scale)}
         />
       ))}
       {children}

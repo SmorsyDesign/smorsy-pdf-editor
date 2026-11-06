@@ -23,7 +23,7 @@ import { Thumbnails } from './Thumbnails';
 import { TopBar, type EditorMode } from './TopBar';
 import { usePageSizes } from './usePageSizes';
 import { usePageText } from './usePageText';
-import { useSearch } from './useSearch';
+import { useDocumentSearch } from './useSearch';
 import { useZoom } from './useZoom';
 
 export interface DocumentViewHandle {
@@ -78,16 +78,12 @@ export function DocumentView({
   const [isProtected] = useState(() => isEncrypted(file.bytes));
   const [signedLocked, setSignedLocked] = useState(() => hasDigitalSignature(file.bytes));
   const [signedWarning, setSignedWarning] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [matchIndex, setMatchIndex] = useState(0);
   const scrollToPageRef = useRef<((pageNumber: number, yOffset?: number) => void) | null>(null);
   const session = useTextSession(editor);
   const { draft, finishOpenEdit } = session;
   const pageText = usePageText(pdf);
   const scan = useScanCheck(mode, currentPage, pageText);
-  const readForSearch = useCallback((page: number) => pdf.searchableText(page), [pdf]);
-  const search = useSearch(pdf.pageCount, readForSearch);
-  const currentMatch = search.matches[Math.min(matchIndex, search.matches.length - 1)] ?? null;
+  const search = useDocumentSearch(pdf, scrollToPageRef);
 
   const changeMode = useCallback(
     (next: EditorMode) => {
@@ -145,7 +141,7 @@ export function DocumentView({
           else session.redo();
           break;
         case 'find':
-          setSearchOpen(true);
+          search.show();
           break;
         case 'add-text':
           if (!isProtected) addTextToCurrentPage();
@@ -168,17 +164,6 @@ export function DocumentView({
     [onUnsavedWorkChange],
   );
 
-  useEffect(() => {
-    if (currentMatch) {
-      scrollToPageRef.current?.(currentMatch.pageNumber, currentMatch.rect.y);
-    }
-  }, [currentMatch]);
-
-  const stepMatch = (direction: 1 | -1) => {
-    const count = search.matches.length;
-    if (count > 0) setMatchIndex((index) => (index + direction + count) % count);
-  };
-
   const stateLabel = () => {
     if (editor.changes > 0) {
       return editor.changes === 1 ? '1 unsaved change' : `${editor.changes} unsaved changes`;
@@ -200,9 +185,7 @@ export function DocumentView({
         canRedo={editor.canRedo}
         saveLabel={saveLabel}
         onModeChange={changeMode}
-        onSearch={() => {
-          setSearchOpen(true);
-        }}
+        onSearch={search.show}
         onUndo={session.undo}
         onRedo={session.redo}
         onSave={onSave}
@@ -249,31 +232,13 @@ export function DocumentView({
                 mode={mode}
                 editor={editor}
                 session={session}
-                matches={
-                  searchOpen ? search.matches.filter((m) => m.pageNumber === pageNumber) : []
-                }
-                currentMatch={currentMatch}
+                matches={search.matchesOn(pageNumber)}
+                currentMatch={search.currentMatch}
                 pageText={pageText}
               />
             )}
           />
-          {searchOpen && (
-            <SearchBar
-              query={search.query}
-              current={Math.min(matchIndex, search.matches.length - 1)}
-              total={search.matches.length}
-              searching={search.searching}
-              onQueryChange={(query) => {
-                setMatchIndex(0);
-                search.setQuery(query);
-              }}
-              onStep={stepMatch}
-              onClose={() => {
-                setSearchOpen(false);
-                search.setQuery('');
-              }}
-            />
-          )}
+          {search.open && <SearchBar {...search.barProps} />}
           <EditToasts editor={editor} session={session} />
           {scan.showScanCard && !draft && (
             <ScanCard

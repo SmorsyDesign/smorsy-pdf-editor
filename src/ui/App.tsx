@@ -39,8 +39,9 @@ export function App({ platform }: { platform: Platform }) {
   const sessionCounter = useRef(0);
   const hasDocumentRef = useRef(false);
   hasDocumentRef.current = session.status === 'open';
+  const dialogIsOpen = dialog !== null;
   const dialogOpenRef = useRef(false);
-  dialogOpenRef.current = dialog !== null;
+  dialogOpenRef.current = dialogIsOpen;
 
   const openFile = session.status === 'open' ? session.file : null;
   const editor = useDocumentEditor(openFile, platform);
@@ -158,8 +159,6 @@ export function App({ platform }: { platform: Platform }) {
     platform.setWindowTitle(title).catch(logProblem);
     platform.setDocumentOpen(session.status === 'open').catch(logProblem);
   }, [platform, session]);
-
-  const dialogIsOpen = dialog !== null;
 
   useEffect(() => {
     const onCommand = (command: MenuCommand) => {

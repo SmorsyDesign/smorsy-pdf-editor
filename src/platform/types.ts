@@ -1,3 +1,5 @@
+import type { SystemFontStyle } from '../engine/save/choose-font';
+
 export type OsFamily = 'mac' | 'win';
 
 export function detectOs(): OsFamily {
@@ -18,8 +20,6 @@ export type MenuCommand =
   | 'zoom-out'
   | 'zoom-actual'
   | 'zoom-fit';
-
-export type SystemFontStyle = 'regular' | 'bold' | 'italic' | 'bold-italic';
 
 export interface OpenedFile {
   readonly path: string;

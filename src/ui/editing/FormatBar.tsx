@@ -1,6 +1,7 @@
 import type { Alignment, Color, FontId, OriginalFont, TextStyle } from '../../engine/edits/model';
 import { cleanFontName } from '../../engine/fonts/match';
 import { Icon, type IconName } from '../Icon';
+import { FAMILY_NAMES } from './preview';
 import { SizeInput } from './SizeInput';
 
 interface FormatBarProps {
@@ -11,14 +12,6 @@ interface FormatBarProps {
   readonly onChange: (style: TextStyle) => void;
   readonly onDelete: () => void;
 }
-
-const FONT_LABELS: readonly (readonly [FontId, string])[] = [
-  ['sans', 'Liberation Sans'],
-  ['serif', 'Liberation Serif'],
-  ['mono', 'Liberation Mono'],
-  ['carlito', 'Carlito'],
-  ['caladea', 'Caladea'],
-];
 
 const ALIGNMENTS: readonly (readonly [Alignment, IconName, string])[] = [
   ['left', 'left', 'Align left'],
@@ -74,7 +67,7 @@ export function FormatBar({
         {original && (
           <option value="original">{cleanFontName(original.name) || 'Original font'}</option>
         )}
-        {FONT_LABELS.map(([id, label]) => (
+        {Object.entries(FAMILY_NAMES).map(([id, label]) => (
           <option key={id} value={id}>
             {label}
           </option>

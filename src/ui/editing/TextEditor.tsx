@@ -12,7 +12,7 @@ import type { Rect, TextStyle } from '../../engine/edits/model';
 import type { PageSize } from '../../engine/zoom';
 import { Icon } from '../Icon';
 import { FormatBar } from './FormatBar';
-import { previewFamily } from './preview';
+import { previewTextStyle } from './preview';
 import type { TextDraft } from './drafts';
 
 export interface TextEditorHandle {
@@ -177,13 +177,8 @@ export function TextEditor({
         value={text}
         rows={1}
         style={{
-          color: `rgb(${style.color.r * 255} ${style.color.g * 255} ${style.color.b * 255})`,
-          fontFamily: `"${previewFamily(style, draft.original)}"`,
-          fontSize: style.size * scale,
-          fontWeight: style.bold ? 700 : 400,
-          fontStyle: style.italic ? 'italic' : 'normal',
+          ...previewTextStyle(style, draft.original, scale),
           lineHeight: `${draft.lineHeight * (style.size / draft.style.size) * scale}px`,
-          textAlign: style.align,
         }}
         onChange={(event) => {
           setText(event.target.value);

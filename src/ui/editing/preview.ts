@@ -1,14 +1,39 @@
-import type { FontId, OriginalFont, TextStyle } from '../../engine/edits/model';
+import type { CSSProperties } from 'react';
+import type { Color, OriginalFont, Rect, TextStyle } from '../../engine/edits/model';
 import type { MeasureText } from '../../engine/edits/layout';
-import { closestBundled } from '../../engine/fonts/match';
+import { closestBundled, type BundledFamily } from '../../engine/fonts/match';
 
-const CSS_FAMILY: Readonly<Record<Exclude<FontId, 'original' | 'times-new-roman'>, string>> = {
+const CSS_FAMILY: Readonly<Record<BundledFamily, string>> = {
   sans: 'Doc Sans',
   serif: 'Doc Serif',
   mono: 'Doc Mono',
   carlito: 'Doc Carlito',
   caladea: 'Doc Caladea',
 };
+
+/** The names people see for the fonts that ship with the app. */
+export const FAMILY_NAMES: Readonly<Record<BundledFamily, string>> = {
+  sans: 'Liberation Sans',
+  serif: 'Liberation Serif',
+  mono: 'Liberation Mono',
+  carlito: 'Carlito',
+  caladea: 'Caladea',
+};
+
+export function cssColor({ r, g, b }: Color): string {
+  return `rgb(${Math.round(r * 255)} ${Math.round(g * 255)} ${Math.round(b * 255)})`;
+}
+
+/** Puts an element where a rectangle in page points falls on the drawn page. */
+export function placedOnPage(rect: Rect, angle: number, scale: number): CSSProperties {
+  return {
+    left: rect.x * scale,
+    top: rect.y * scale,
+    width: rect.width * scale,
+    height: rect.height * scale,
+    transform: `rotate(${angle}deg)`,
+  };
+}
 
 /**
  * Previews use a bundled font, because the file's own fonts live in a worker. Lines break where
@@ -30,6 +55,22 @@ export function previewFont(
   const weight = style.bold ? '700' : '400';
   const slant = style.italic ? 'italic' : 'normal';
   return `${slant} ${weight} ${sizeInPixels}px "${previewFamily(style, original)}"`;
+}
+
+/** Shared by the finished box and the open editor, so text doesn't shift when it's opened. */
+export function previewTextStyle(
+  style: TextStyle,
+  original: OriginalFont | null,
+  scale: number,
+): CSSProperties {
+  return {
+    color: cssColor(style.color),
+    fontFamily: `"${previewFamily(style, original)}"`,
+    fontSize: style.size * scale,
+    fontWeight: style.bold ? 700 : 400,
+    fontStyle: style.italic ? 'italic' : 'normal',
+    textAlign: style.align,
+  };
 }
 
 const measuringContext = document.createElement('canvas').getContext('2d');

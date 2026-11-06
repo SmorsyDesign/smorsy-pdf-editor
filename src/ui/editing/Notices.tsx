@@ -2,16 +2,8 @@ import { nameCharacter } from '../../engine/errors';
 import { cleanFontName } from '../../engine/fonts/match';
 import { AlertDialog } from '../AlertDialog';
 import { Icon } from '../Icon';
-import { previewFamily } from './preview';
+import { FAMILY_NAMES, previewFamily } from './preview';
 import type { FontNoticeState } from './useDocumentEditor';
-
-const FAMILY_NAMES = {
-  sans: 'Liberation Sans',
-  serif: 'Liberation Serif',
-  mono: 'Liberation Mono',
-  carlito: 'Carlito',
-  caladea: 'Caladea',
-} as const;
 
 const listed = (characters: readonly string[]) =>
   characters.slice(0, 6).map(nameCharacter).join(' ');

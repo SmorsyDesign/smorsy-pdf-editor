@@ -1,6 +1,6 @@
 import type { Color } from './edits/model';
 
-export interface PixelRegion {
+interface PixelRegion {
   readonly x: number;
   readonly y: number;
   readonly width: number;

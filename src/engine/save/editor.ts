@@ -23,9 +23,7 @@ import type { Color, TextBox } from '../edits/model';
 import { UNSUPPORTED_TEXT, nameCharacter } from '../errors';
 import { findEmbeddedFont, type EmbeddedFont } from '../fonts/embedded';
 import { bundledFaceFile } from '../fonts/match';
-import { FontChooser, type FontBytes, type FontOutcome, type SystemFontStyle } from './choose-font';
-
-export type { FontBytes, FontOutcome, SystemFontStyle } from './choose-font';
+import { FontChooser, systemFontKey, type FontBytes, type FontOutcome } from './choose-font';
 
 type DrawFont =
   | { readonly kind: 'pdf-font'; readonly font: PDFFont }
@@ -55,12 +53,6 @@ function pageBoxOf(page: PDFPage): PageBox {
 
 function toRgb({ r, g, b }: Color) {
   return rgb(r, g, b);
-}
-
-function systemStyle(bold: boolean, italic: boolean): SystemFontStyle {
-  if (bold && italic) return 'bold-italic';
-  if (bold) return 'bold';
-  return italic ? 'italic' : 'regular';
 }
 
 /** Applies text edits to the original bytes. Every save starts again from those bytes. */
@@ -116,8 +108,7 @@ export class PdfEditor {
     if (outcome.used === 'system') {
       const bytes = await this.chooser.systemFontBytes(box);
       if (bytes) {
-        const key = `system-${systemStyle(box.style.bold, box.style.italic)}`;
-        const font = await once(key, () => doc.embedFont(bytes, { subset: true }));
+        const font = await once(systemFontKey(box), () => doc.embedFont(bytes, { subset: true }));
         return { kind: 'pdf-font', font };
       }
     }

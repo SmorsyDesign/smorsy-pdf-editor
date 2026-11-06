@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type RefObject } from 'react';
+import type { PdfDocument } from '../engine/document';
 import type { TextBlock } from '../engine/extract';
 import { findMatches, type SearchMatch } from '../engine/search';
 
@@ -12,7 +13,7 @@ interface SearchState {
 }
 
 /** Goes through pages in the background, showing matches as they're found. */
-export function useSearch(
+function useSearch(
   pageCount: number,
   readPage: (pageNumber: number) => Promise<readonly TextBlock[]>,
 ): SearchState {
@@ -58,4 +59,51 @@ export function useSearch(
   }, [pageCount, pages, query, readPage]);
 
   return { query, setQuery, matches, searching };
+}
+
+/** The search bar's state for one document, and scrolling to whichever match is current. */
+export function useDocumentSearch(
+  pdf: PdfDocument,
+  scrollToPageRef: RefObject<((pageNumber: number, yOffset?: number) => void) | null>,
+) {
+  const [open, setOpen] = useState(false);
+  const [matchIndex, setMatchIndex] = useState(0);
+  const readPage = useCallback((page: number) => pdf.searchableText(page), [pdf]);
+  const { query, setQuery, matches, searching } = useSearch(pdf.pageCount, readPage);
+  const current = Math.min(matchIndex, matches.length - 1);
+  const currentMatch = matches[current] ?? null;
+
+  useEffect(() => {
+    if (currentMatch) {
+      scrollToPageRef.current?.(currentMatch.pageNumber, currentMatch.rect.y);
+    }
+  }, [currentMatch, scrollToPageRef]);
+
+  return {
+    open,
+    show: () => {
+      setOpen(true);
+    },
+    currentMatch,
+    matchesOn: (pageNumber: number) =>
+      open ? matches.filter((match) => match.pageNumber === pageNumber) : [],
+    barProps: {
+      query,
+      current,
+      total: matches.length,
+      searching,
+      onQueryChange: (next: string) => {
+        setMatchIndex(0);
+        setQuery(next);
+      },
+      onStep: (direction: 1 | -1) => {
+        const count = matches.length;
+        if (count > 0) setMatchIndex((index) => (index + direction + count) % count);
+      },
+      onClose: () => {
+        setOpen(false);
+        setQuery('');
+      },
+    },
+  };
 }

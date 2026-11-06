@@ -9,6 +9,7 @@ const FALLBACK: SampleResult = {
 
 // Enough surroundings to judge the background without reaching the next line of text.
 const RING_POINTS = 3;
+const PAGE_DRAW_TIMEOUT_MS = 3000;
 
 function boundsOf(rect: Rect, angle: number): Rect {
   const radians = (angle * Math.PI) / 180;
@@ -27,7 +28,7 @@ function boundsOf(rect: Rect, angle: number): Rect {
 }
 
 /** Resolves true once the page has been drawn, or false if that hasn't happened in time. */
-export function whenPageDrawn(pageElement: HTMLElement, timeoutMs = 3000): Promise<boolean> {
+export function whenPageDrawn(pageElement: HTMLElement): Promise<boolean> {
   const canvas = pageElement.querySelector('canvas');
   if (!canvas) return Promise.resolve(false);
   if (canvas.dataset.drawn === 'true') return Promise.resolve(true);
@@ -42,7 +43,7 @@ export function whenPageDrawn(pageElement: HTMLElement, timeoutMs = 3000): Promi
     });
     const timer = window.setTimeout(() => {
       finish(false);
-    }, timeoutMs);
+    }, PAGE_DRAW_TIMEOUT_MS);
     observer.observe(canvas, { attributes: true, attributeFilter: ['data-drawn'] });
   });
 }

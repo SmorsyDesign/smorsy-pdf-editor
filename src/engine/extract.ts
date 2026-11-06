@@ -14,9 +14,9 @@ export interface FontFacts extends OriginalFont {
   readonly descent: number;
 }
 
-export type ReadOnlyReason = 'skewed' | 'complex-script' | null;
+type ReadOnlyReason = 'skewed' | 'complex-script' | null;
 
-export interface TextLine {
+interface TextLine {
   readonly text: string;
   /** Top left of the line as displayed, before its angle is applied. */
   readonly rect: Rect;
@@ -96,7 +96,6 @@ function placeItem(item: RawTextItem): PlacedItem {
 }
 
 interface WorkingLine {
-  readonly items: PlacedItem[];
   text: string;
   start: number;
   end: number;
@@ -110,7 +109,6 @@ interface WorkingLine {
 
 function startLine(item: PlacedItem): WorkingLine {
   return {
-    items: [item],
     text: item.text,
     start: item.along,
     end: item.along + item.width,
@@ -127,7 +125,6 @@ function extendLine(line: WorkingLine, item: PlacedItem): void {
   const gap = item.along - line.end;
   const needsSpace =
     gap > line.size * WORD_GAP && !line.text.endsWith(' ') && !item.text.startsWith(' ');
-  line.items.push(item);
   line.text += (needsSpace ? ' ' : '') + item.text;
   line.end = Math.max(line.end, item.along + item.width);
   line.skewed ||= item.skewed;

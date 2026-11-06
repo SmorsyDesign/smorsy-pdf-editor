@@ -1,5 +1,12 @@
+import type { CSSProperties } from 'react';
 import type { TextBox } from '../../engine/edits/model';
-import { baselineWithinLine, previewFamily, previewFont } from './preview';
+import {
+  baselineWithinLine,
+  cssColor,
+  placedOnPage,
+  previewFont,
+  previewTextStyle,
+} from './preview';
 
 interface EditedBoxesProps {
   readonly boxes: readonly TextBox[];
@@ -10,9 +17,6 @@ interface EditedBoxesProps {
   readonly onOpen: ((box: TextBox) => void) | null;
 }
 
-const cssColor = ({ r, g, b }: { r: number; g: number; b: number }) =>
-  `rgb(${Math.round(r * 255)} ${Math.round(g * 255)} ${Math.round(b * 255)})`;
-
 /** Draws edits over the untouched page: the patches first, then the new text. */
 export function EditedBoxes({ boxes, scale, hiddenId, flaggedId, onOpen }: EditedBoxesProps) {
   return (
@@ -22,14 +26,7 @@ export function EditedBoxes({ boxes, scale, hiddenId, flaggedId, onOpen }: Edite
           <div
             key={`${box.id}-cover-${index}`}
             className="edit-cover"
-            style={{
-              left: rect.x * scale,
-              top: rect.y * scale,
-              width: rect.width * scale,
-              height: rect.height * scale,
-              background: cssColor(color),
-              transform: `rotate(${angle}deg)`,
-            }}
+            style={{ ...placedOnPage(rect, angle, scale), background: cssColor(color) }}
           />
         )),
       )}
@@ -49,20 +46,12 @@ export function EditedBoxes({ boxes, scale, hiddenId, flaggedId, onOpen }: Edite
               {line}
             </span>
           ));
-          const style = {
-            left: box.rect.x * scale,
-            top: box.rect.y * scale,
-            width: box.rect.width * scale,
+          const style: CSSProperties = {
+            ...placedOnPage(box.rect, box.angle, scale),
+            ...previewTextStyle(box.style, box.original, scale),
             height: box.lines.length * lineHeight + Math.max(0, shift),
-            color: cssColor(box.style.color),
-            fontFamily: `"${previewFamily(box.style, box.original)}"`,
-            fontSize: box.style.size * scale,
-            fontWeight: box.style.bold ? 700 : 400,
-            fontStyle: box.style.italic ? 'italic' : 'normal',
             lineHeight: `${lineHeight}px`,
-            textAlign: box.style.align,
-            transform: `rotate(${box.angle}deg)`,
-          } as const;
+          };
           return onOpen ? (
             <button
               key={box.id}

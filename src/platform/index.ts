@@ -13,12 +13,5 @@ export async function createPlatform(): Promise<Platform> {
   throw new Error('Smorsy PDF Editor must run as the desktop app.');
 }
 
-export type {
-  MenuCommand,
-  OpenedFile,
-  OsFamily,
-  Platform,
-  SaveFailureKind,
-  SystemFontStyle,
-} from './types';
+export type { MenuCommand, OpenedFile, OsFamily, Platform, SaveFailureKind } from './types';
 export { ReadFailure, SaveFailure } from './types';

@@ -4,7 +4,7 @@ import { styleFromName } from '../../engine/fonts/match';
 import type { PageSize } from '../../engine/zoom';
 import { samplePageColours } from './samplePage';
 
-export type DraftKind = 'add' | 'replace' | 'update';
+type DraftKind = 'add' | 'replace' | 'update';
 
 /** What the editor is working on, before it becomes an edit. */
 export interface TextDraft {

@@ -2,7 +2,7 @@ import type { OriginalFont } from '../edits/model';
 
 export type BundledFamily = 'sans' | 'serif' | 'mono' | 'carlito' | 'caladea';
 
-export interface BundledMatch {
+interface BundledMatch {
   readonly family: BundledFamily;
   /** True when the bundled font was designed to match the original's letter widths. */
   readonly sameWidths: boolean;

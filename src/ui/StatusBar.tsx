@@ -31,7 +31,7 @@ export function StatusBar({
     <footer className="status">
       <div className="status-part">
         <span data-testid="page-indicator">{page}</span>
-        {hint && <span className="status-hint">{hint}</span>}
+        <span className="status-hint">{hint}</span>
         {fontsReplaced > 0 && (
           <span className="status-caution">
             <Icon name="warn" />

@@ -64,7 +64,7 @@ export interface TextBox {
   readonly original: OriginalFont | null;
 }
 
-export type TextBoxChanges = Partial<
+type TextBoxChanges = Partial<
   Pick<TextBox, 'rect' | 'text' | 'lines' | 'style' | 'firstBaseline' | 'lineHeight'>
 >;
 

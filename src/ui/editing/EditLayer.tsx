@@ -1,6 +1,7 @@
 import type { MouseEvent } from 'react';
 import type { TextBox } from '../../engine/edits/model';
 import type { PageText, TextBlock } from '../../engine/extract';
+import { placedOnPage } from './preview';
 
 interface EditLayerProps {
   readonly text: PageText | null;
@@ -49,13 +50,7 @@ export function EditLayer({
               className={reason ? 'text-block text-block-locked' : 'text-block'}
               aria-label={reason ?? `Edit text: ${block.text.slice(0, 60)}`}
               {...(reason ? { 'aria-disabled': true, title: reason } : {})}
-              style={{
-                left: block.rect.x * scale,
-                top: block.rect.y * scale,
-                width: block.rect.width * scale,
-                height: block.rect.height * scale,
-                transform: `rotate(${block.angle}deg)`,
-              }}
+              style={placedOnPage(block.rect, block.angle, scale)}
               onClick={(event) => {
                 event.stopPropagation();
                 const page = pageOf(event.currentTarget);

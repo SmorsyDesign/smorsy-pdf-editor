@@ -11,8 +11,8 @@ import {
   type BundledFamily,
 } from '../fonts/match';
 
-export type FontUsed = 'embedded' | 'standard' | 'system' | 'bundled';
-export type FontMatch = 'exact' | 'same-widths' | 'closest';
+type FontUsed = 'embedded' | 'standard' | 'system' | 'bundled';
+type FontMatch = 'exact' | 'same-widths' | 'closest';
 
 export interface FontOutcome {
   readonly used: FontUsed;
@@ -49,6 +49,11 @@ function systemStyle(bold: boolean, italic: boolean): SystemFontStyle {
   if (bold && italic) return 'bold-italic';
   if (bold) return 'bold';
   return italic ? 'italic' : 'regular';
+}
+
+/** Tells a system face apart from the others, so each is only read and embedded once. */
+export function systemFontKey(box: TextBox): string {
+  return `system-${systemStyle(box.style.bold, box.style.italic)}`;
 }
 
 const uniqueCharacters = (text: string) => [...new Set(Array.from(text))];
@@ -117,8 +122,9 @@ export class FontChooser {
     bytes: Uint8Array,
     missing: readonly string[],
   ): Promise<FontOutcome> {
-    const key = `system-${systemStyle(box.style.bold, box.style.italic)}`;
-    const uncovered = await this.uncoveredBy(box.lines.join(''), key, () => Promise.resolve(bytes));
+    const uncovered = await this.uncoveredBy(box.lines.join(''), systemFontKey(box), () =>
+      Promise.resolve(bytes),
+    );
     return { used: 'system', match: 'exact', missing, uncovered };
   }
 
