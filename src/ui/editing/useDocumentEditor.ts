@@ -37,6 +37,8 @@ interface BuiltFile {
   readonly entry: EditEntry | undefined;
   /** Filled-in form fields under an edit, which are now simply part of the page. */
   readonly fieldsRetired: number;
+  /** Form fields left in place that could still hide an edit beneath them. */
+  readonly fieldsOnTop: number;
 }
 
 export interface DocumentEditor {
@@ -169,7 +171,13 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
     const placed = deriveSignatures(activeEdits(current));
     if (active.length === 0 && placed.length === 0) {
       if (!file) throw new Error('The document closed before it could be saved.');
-      return { bytes: unchangedCopy(file.bytes), edited: false, entry, fieldsRetired: 0 };
+      return {
+        bytes: unchangedCopy(file.bytes),
+        edited: false,
+        entry,
+        fieldsRetired: 0,
+        fieldsOnTop: 0,
+      };
     }
     let client = await clientRef.current;
     if (!client) throw new Error('The document closed before it could be saved.');
@@ -179,8 +187,8 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
       clientRef.current = createClientRef.current();
       client = await clientRef.current;
     }
-    const { bytes, fieldsRetired } = await client.save(active, placed);
-    return { bytes, edited: true, entry, fieldsRetired };
+    const report = await client.save(active, placed);
+    return { ...report, edited: true, entry };
   }, [file]);
 
   const markSaved = useCallback((entry: EditEntry | undefined) => {

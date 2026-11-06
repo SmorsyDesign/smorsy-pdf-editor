@@ -58,6 +58,26 @@ export function explainOpenFailure(error: unknown): OpenProblem {
   return { ...UNEXPECTED_OPEN_FAILURE, technical: String(error) };
 }
 
+/** What the person should know about a save that worked, or null if there's nothing to add. */
+export function explainFormChanges(retired: number, onTop: number): string | null {
+  const notes: string[] = [];
+  if (retired === 1) {
+    notes.push(
+      'A filled-in form field under your edit is now part of the page, so it can’t be changed in the saved file.',
+    );
+  } else if (retired > 1) {
+    notes.push(
+      `${retired} filled-in form fields under your edits are now part of the page, so they can’t be changed in the saved file.`,
+    );
+  }
+  if (onTop > 0) {
+    notes.push(
+      'A form field or button could still cover part of your edit in the saved file. Check it, or move your edit away from the field.',
+    );
+  }
+  return notes.length > 0 ? notes.join(' ') : null;
+}
+
 export function explainSaveFailure(kind: SaveFailureKind, detail = ''): string {
   switch (kind) {
     case 'unsupported-text':

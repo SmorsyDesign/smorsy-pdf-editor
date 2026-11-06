@@ -94,6 +94,19 @@ export function AppDialogs<LeaveAction>({
           onCancel={onClose}
         />
       );
+    case 'save-note':
+      return (
+        <AlertDialog
+          icon="info"
+          title="Your file was saved"
+          message={dialog.message}
+          cancelLabel="OK"
+          onCancel={() => {
+            onClose();
+            dialog.then();
+          }}
+        />
+      );
     case 'unplaced':
       return (
         <AlertDialog

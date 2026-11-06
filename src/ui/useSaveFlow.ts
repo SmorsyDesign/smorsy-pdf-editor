@@ -4,10 +4,13 @@ import { UNSUPPORTED_TEXT } from '../engine/errors';
 import { openDocument } from '../engine/document';
 import { SaveFailure, type OpenedFile, type Platform, type SaveFailureKind } from '../platform';
 import type { DocumentEditor } from './editing/useDocumentEditor';
+import { explainFormChanges } from './messages';
 
 export type SaveDialog =
   | { readonly kind: 'confirm-replace'; readonly file: OpenedFile; readonly path: string }
-  | { readonly kind: 'save-failed'; readonly failure: SaveFailureKind; readonly detail: string };
+  | { readonly kind: 'save-failed'; readonly failure: SaveFailureKind; readonly detail: string }
+  /** Something to know about a save that worked, before going on to close or quit. */
+  | { readonly kind: 'save-note'; readonly message: string; readonly then: () => void };
 
 /** 'asking' means a dialog will decide, so anything waiting on the save keeps waiting. */
 type Outcome = 'saved' | 'asking' | 'stopped';
@@ -57,6 +60,7 @@ export function useSaveFlow({
     readonly originalChanged: boolean;
   } | null>(null);
   const afterSave = useRef<(() => void) | null>(null);
+  const saveNote = useRef<string | null>(null);
   const current = saved?.file === file ? saved : null;
   const savedPath = current?.path ?? null;
 
@@ -71,21 +75,28 @@ export function useSaveFlow({
       if (outcome === 'asking') return;
       const next = afterSave.current;
       afterSave.current = null;
-      if (outcome !== 'saved' || !next) return;
-      // Anything added while saving isn't in the file, so carrying on would lose it.
-      if (isDirty() || hasUnfinishedEdit()) {
+      const note = saveNote.current;
+      saveNote.current = null;
+      if (outcome !== 'saved') return;
+      if (!next) {
+        if (note) reportProblem(note);
+      } else if (isDirty() || hasUnfinishedEdit()) {
+        // Anything added while saving isn't in the file, so carrying on would lose it.
         reportProblem('You kept editing during the save, so nothing was closed. Save again first.');
+      } else if (note) {
+        // On the way out, because a note on the page would close along with it unread.
+        showDialog({ kind: 'save-note', message: note, then: next });
       } else {
         next();
       }
     },
-    [hasUnfinishedEdit, isDirty, reportProblem],
+    [hasUnfinishedEdit, isDirty, reportProblem, showDialog],
   );
 
   const writeTo = useCallback(
     async (target: OpenedFile, path: string, overOriginal: boolean): Promise<Outcome> => {
       try {
-        const { bytes, edited, entry, fieldsRetired } = await buildBytes();
+        const { bytes, edited, entry, fieldsRetired, fieldsOnTop } = await buildBytes();
         if (edited) {
           // Proves the result opens, before it can replace anything on disk.
           const check = await openDocument(bytes);
@@ -93,13 +104,7 @@ export function useSaveFlow({
         }
         await platform.writeFile(path, bytes);
         markSaved(entry);
-        if (fieldsRetired > 0) {
-          reportProblem(
-            fieldsRetired === 1
-              ? 'A filled-in form field under your edit is now part of the page, so it can’t be changed in the saved file.'
-              : `${fieldsRetired} filled-in form fields under your edits are now part of the page, so they can’t be changed in the saved file.`,
-          );
-        }
+        saveNote.current = explainFormChanges(fieldsRetired, fieldsOnTop);
         setSaved((previous) => ({
           file: target,
           path,

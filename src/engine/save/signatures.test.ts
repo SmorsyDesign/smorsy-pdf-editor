@@ -1,6 +1,16 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { PDFDict, PDFDocument, PDFName, PDFRawStream, degrees } from '@cantoo/pdf-lib';
+import {
+  PDFArray,
+  PDFDict,
+  PDFDocument,
+  PDFHexString,
+  PDFName,
+  PDFRawStream,
+  StandardFonts,
+  degrees,
+  rgb,
+} from '@cantoo/pdf-lib';
 import { OPS, getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { describe, expect, it } from 'vitest';
 import { testPng } from '../../../tests/helpers/test-png';
@@ -366,6 +376,104 @@ describe('saving a placed signature', () => {
       );
       expect(report.fieldsRetired).toBe(0);
       expect((await PDFDocument.load(report.bytes)).getForm().getFields()).toHaveLength(1);
+    });
+  });
+
+  describe('awkward form fields', () => {
+    const onField = () => placed({ rect: { x: 100, y: 200, width: 200, height: 40 } });
+    const widgetOf = (doc: PDFDocument, field: string) => {
+      const [widget] = doc.getForm().getTextField(field).acroField.getWidgets();
+      if (!widget) throw new Error('The field has no widget.');
+      return widget;
+    };
+    const filledForm = async (change: (doc: PDFDocument) => void = () => undefined) => {
+      const doc = await PDFDocument.load(original('22-form-filled-value.pdf'));
+      change(doc);
+      return doc.save();
+    };
+
+    it('a malformed form doesn’t stop the save', async () => {
+      const bytes = await filledForm((doc) => {
+        const form = doc.catalog.getAcroForm();
+        const fields = form?.dict.lookup(PDFName.of('Fields'));
+        if (fields instanceof PDFArray) fields.push(doc.context.obj(5));
+      });
+      const report = await new PdfEditor(bytes, fontBytes).saveWithReport([], [onField()]);
+      expect(report.fieldsRetired).toBe(0);
+      expect(await imagesOn(report.bytes, 1)).toHaveLength(1);
+    });
+
+    it('a solid field that doesn’t print still moves, so the signature shows', async () => {
+      const bytes = await filledForm((doc) => {
+        widgetOf(doc, 'name').dict.set(PDFName.of('F'), doc.context.obj(0));
+      });
+      const report = await new PdfEditor(bytes, fontBytes).saveWithReport([], [onField()]);
+      expect(report.fieldsOnTop).toBe(0);
+      expect(report.fieldsRetired).toBe(1);
+    });
+
+    it('a form’s own button stays working, and the person is told', async () => {
+      const doc = await PDFDocument.create();
+      const page = doc.addPage([612, 792]);
+      const font = await doc.embedFont(StandardFonts.Helvetica);
+      const button = doc.getForm().createButton('submit');
+      button.addToPage('Submit', page, {
+        x: 100,
+        y: 552,
+        width: 200,
+        height: 40,
+        font,
+        backgroundColor: rgb(0.8, 0.8, 0.8),
+      });
+      const report = await new PdfEditor(await doc.save(), fontBytes).saveWithReport(
+        [],
+        [onField()],
+      );
+      expect(report.fieldsOnTop).toBe(1);
+      expect((await PDFDocument.load(report.bytes)).getForm().getFields()).toHaveLength(1);
+    });
+
+    it('a field whose looks can’t be moved stays, and the person is told', async () => {
+      const bytes = await filledForm((doc) => {
+        const appearance = widgetOf(doc, 'name').getNormalAppearance();
+        const stream = doc.context.lookup(appearance);
+        if (stream instanceof PDFRawStream) {
+          stream.dict.set(PDFName.of('BBox'), doc.context.obj([0, 0, 0, 0]));
+        }
+      });
+      const report = await new PdfEditor(bytes, fontBytes).saveWithReport([], [onField()]);
+      expect(report.fieldsRetired).toBe(0);
+      expect(report.fieldsOnTop).toBe(1);
+      expect((await PDFDocument.load(report.bytes)).getForm().getFields()).toHaveLength(1);
+    });
+
+    it('text that looks like a drawing command doesn’t count as solid', async () => {
+      const doc = await PDFDocument.create();
+      const page = doc.addPage([612, 792]);
+      const field = doc.getForm().createTextField('clear');
+      field.addToPage(page, { x: 100, y: 552, width: 200, height: 40, borderWidth: 0 });
+      const widget = widgetOf(doc, 'clear');
+      const looks = doc.context.flateStream('BT (see (b) or f more) Tj ET', {
+        BBox: [0, 0, 200, 40],
+        Subtype: 'Form',
+      });
+      widget.dict.set(PDFName.of('AP'), doc.context.obj({ N: doc.context.register(looks) }));
+      const report = await new PdfEditor(await doc.save(), fontBytes).saveWithReport(
+        [],
+        [onField()],
+      );
+      expect(report.fieldsRetired).toBe(0);
+      const saved = await PDFDocument.load(report.bytes);
+      expect(saved.getForm().getFields()).toHaveLength(1);
+    });
+
+    it('a choice list holding several values counts as filled in', async () => {
+      const bytes = await filledForm((doc) => {
+        const { dict } = widgetOf(doc, 'name');
+        dict.set(PDFName.of('V'), doc.context.obj(['One', 'Two'].map(PDFHexString.fromText)));
+      });
+      const report = await new PdfEditor(bytes, fontBytes).saveWithReport([], [onField()]);
+      expect(report.fieldsRetired).toBe(1);
     });
   });
 

@@ -170,6 +170,27 @@ test.describe('a filled-in field under a signature', () => {
   });
 });
 
+test.describe('leaving after saving over a filled-in field', () => {
+  test('says what happened before closing, rather than losing the message', async ({ page }) => {
+    await openForSigning(page, 'test-pdfs/22-form-filled-value.pdf', 1);
+    await createTyped(page);
+    const sheet = await pageElement(page, 1).boundingBox();
+    const scale = (sheet?.width ?? 612) / 612;
+    await signLayer(page).click({ position: { x: 200 * scale, y: 220 * scale } });
+    await page.keyboard.press('ControlOrMeta+w');
+    await queueSavePath(page, '/Users/test/Kept.pdf');
+    await page
+      .getByRole('alertdialog', { name: 'Save your changes to Lease.pdf?' })
+      .getByRole('button', { name: 'Save', exact: true })
+      .click();
+    const note = page.getByRole('alertdialog', { name: 'Your file was saved' });
+    await expect(note).toContainText('now part of the page');
+    await expect(page.getByRole('heading', { name: 'Open a PDF' })).toHaveCount(0);
+    await note.getByRole('button', { name: 'OK' }).click();
+    await expect(page.getByRole('heading', { name: 'Open a PDF' })).toBeVisible();
+  });
+});
+
 test.describe('focus', () => {
   test('comes back when the create window is cancelled', async ({ page }) => {
     await openForSigning(page);

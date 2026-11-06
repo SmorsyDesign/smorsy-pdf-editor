@@ -25,19 +25,17 @@ import { UNSUPPORTED_TEXT, nameCharacter } from '../errors';
 import { findEmbeddedFont, type EmbeddedFont } from '../fonts/embedded';
 import { bundledFaceFile } from '../fonts/match';
 import { placementInPdf } from '../signatures/placement';
-import {
-  boundsAround,
-  boundsOfPlacement,
-  clearFieldsUnder,
-  drawSignaturePicture,
-  type UserBounds,
-} from './signature-drawing';
+import { clearFieldsUnder } from './form-fields';
+import { boundsAround, type UserBounds } from './page-annotations';
+import { boundsOfPlacement, drawSignaturePicture } from './signature-drawing';
 import { FontChooser, systemFontKey, type FontBytes, type FontOutcome } from './choose-font';
 
 export interface SaveReport {
   readonly bytes: Uint8Array;
   /** Filled-in form fields under an edit, which are now simply part of the page. */
   readonly fieldsRetired: number;
+  /** Form fields left in place that could still hide an edit beneath them. */
+  readonly fieldsOnTop: number;
 }
 
 type DrawFont =
@@ -267,16 +265,19 @@ export class PdfEditor {
     const pictures = new Map<string, Promise<PDFImage>>();
     const pageNumbers = new Set([...boxes, ...signatures].map((item) => item.pageNumber));
     let fieldsRetired = 0;
+    let fieldsOnTop = 0;
     for (const pageNumber of pageNumbers) {
       const page = doc.getPage(pageNumber - 1);
       const pageBox = pageBoxOf(page);
       const onPage = boxes.filter((box) => box.pageNumber === pageNumber);
       const signed = signatures.filter((signature) => signature.pageNumber === pageNumber);
       // First, because anything drawn before a field's looks moved to the page would be under them.
-      fieldsRetired += clearFieldsUnder(page, [
+      const cleared = clearFieldsUnder(page, [
         ...onPage.filter((box) => box.lines.length > 0).map((box) => textBoxBounds(box, pageBox)),
         ...signed.map(({ rect, angle }) => boundsOfPlacement(placementInPdf(rect, angle, pageBox))),
       ]);
+      fieldsRetired += cleared.retired;
+      fieldsOnTop += cleared.onTop;
       // All covers go first, so a patch can never hide another box's new text.
       for (const box of onPage) this.drawCovers(page, box);
       for (const box of onPage) {
@@ -287,7 +288,7 @@ export class PdfEditor {
       // Last, because the screen shows signatures on top of everything else on the page.
       await this.drawSignatures(doc, page, signed, pictures);
     }
-    return { bytes: await doc.save({ updateFieldAppearances: false }), fieldsRetired };
+    return { bytes: await doc.save({ updateFieldAppearances: false }), fieldsRetired, fieldsOnTop };
   }
 
   async save(
