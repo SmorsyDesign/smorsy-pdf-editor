@@ -77,6 +77,8 @@ export interface Platform {
   /** The guard answers whether the window may close. If not, it arranges what happens instead. */
   setCloseGuard(guard: () => boolean): void;
   closeWindow(): Promise<void>;
+  /** Tells the system side, so a quit it can't otherwise see waits only when it needs to. */
+  setUnsavedWork(unsaved: boolean): Promise<void>;
   setDocumentOpen(open: boolean): Promise<void>;
   /** Returns a function that stops listening. */
   onCommand(listener: (command: MenuCommand) => void): Promise<() => void>;

@@ -62,9 +62,10 @@ export function useSaveFlow({
 
   /** Runs once the save has let go of the app, because what's next may need a turn of its own. */
   const settle = useCallback(
-    (outcome: Outcome | undefined) => {
+    (outcome: Outcome | undefined, waiting = false) => {
       if (outcome === undefined) {
-        reportProblem('The app is still busy with another file. Try again in a moment.');
+        // A plain save dropped during another one does no harm, but this one was meant to lead on.
+        if (waiting) reportProblem('The app is still busy. Try again in a moment.');
         return;
       }
       if (outcome === 'asking') return;
@@ -145,7 +146,7 @@ export function useSaveFlow({
         afterSave.current = next ?? null;
         return (await flush()) ? writeTo(file, savedPath, overOriginal) : 'stopped';
       });
-      settle(outcome);
+      settle(outcome, next !== undefined);
     },
     [current?.overOriginal, exclusively, file, flush, savedPath, saveCopy, settle, writeTo],
   );

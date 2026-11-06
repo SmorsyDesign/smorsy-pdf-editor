@@ -40,6 +40,7 @@ interface DocumentViewProps {
   readonly os: OsFamily;
   readonly announcement: string;
   readonly originalNote: string | null;
+  readonly onUnsavedWorkChange: (unsaved: boolean) => void;
   readonly editor: DocumentEditor;
   readonly saveLabel: string;
   readonly onSave: () => void;
@@ -63,6 +64,7 @@ export function DocumentView({
   os,
   announcement,
   originalNote,
+  onUnsavedWorkChange,
   editor,
   saveLabel,
   onSave,
@@ -153,6 +155,18 @@ export function DocumentView({
       }
     },
   }));
+
+  const hasUnsavedWork = draft !== null || editor.changes > 0;
+  useEffect(() => {
+    onUnsavedWorkChange(hasUnsavedWork);
+  }, [hasUnsavedWork, onUnsavedWorkChange]);
+  // Closing the document, or a crash, leaves nothing to protect.
+  useEffect(
+    () => () => {
+      onUnsavedWorkChange(false);
+    },
+    [onUnsavedWorkChange],
+  );
 
   useEffect(() => {
     if (currentMatch) {

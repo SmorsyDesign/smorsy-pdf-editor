@@ -21,6 +21,7 @@ interface MockControls {
   documentOpen: boolean;
   closeGuard: (() => boolean) | null;
   windowClosed: boolean;
+  unsavedWork: boolean;
   os: OsFamily;
 }
 
@@ -58,6 +59,7 @@ export function createMockPlatform(): Platform {
     documentOpen: false,
     closeGuard: null,
     windowClosed: false,
+    unsavedWork: false,
     os: detectOs(),
   };
   window.smorsyMock = controls;
@@ -85,6 +87,10 @@ export function createMockPlatform(): Platform {
     },
     closeWindow() {
       controls.windowClosed = true;
+      return Promise.resolve();
+    },
+    setUnsavedWork(unsaved) {
+      controls.unsavedWork = unsaved;
       return Promise.resolve();
     },
     isSameFile(first, second) {

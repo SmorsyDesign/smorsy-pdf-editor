@@ -56,7 +56,7 @@ export function PageEditing({
         void session.openBlock(block, element, scale, page);
       }}
       onDeleteBlock={(block, element) => {
-        void session.deleteBlock(block, element, scale, page);
+        session.deleteBlock(block, element, scale, page);
       }}
       onOpenBox={session.openBox}
       onAddAt={(number, x, y) => {

@@ -164,15 +164,24 @@ export async function createTauriPlatform(): Promise<Platform> {
   const os = detectOs();
   const listeners = new Set<(command: MenuCommand) => void>();
   const send = (command: MenuCommand) => {
+    // With nothing listening, the app has crashed to its error screen, which says to quit.
+    if (command === 'quit' && listeners.size === 0) {
+      void getCurrentWindow().destroy();
+      return;
+    }
     listeners.forEach((listener) => {
       listener(command);
     });
   };
-  const documentItems = await buildMenu(os, send);
   // macOS can quit from the Dock or at logout. It's held off in Rust, and asks here instead.
   await listen('quit-requested', () => {
     send('quit');
   });
+  let closeGuard = () => true;
+  await getCurrentWindow().onCloseRequested((event) => {
+    if (!closeGuard()) event.preventDefault();
+  });
+  const documentItems = await buildMenu(os, send);
 
   return {
     os,
@@ -202,9 +211,10 @@ export async function createTauriPlatform(): Promise<Platform> {
       }
     },
     setCloseGuard(guard) {
-      void getCurrentWindow().onCloseRequested((event) => {
-        if (!guard()) event.preventDefault();
-      });
+      closeGuard = guard;
+    },
+    async setUnsavedWork(unsaved) {
+      await invoke('set_unsaved_work', { unsaved });
     },
     async closeWindow() {
       await getCurrentWindow().destroy();

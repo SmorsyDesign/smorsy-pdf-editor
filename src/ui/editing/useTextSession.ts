@@ -214,26 +214,39 @@ export function useTextSession(editor: DocumentEditor) {
     }
   };
 
-  const deleteBlock = async (
+  const deleting = useRef(new Set<string>());
+  const deleteBlock = (
     block: TextBlock,
     pageElement: HTMLElement,
     scale: number,
     page: PageSize,
   ) => {
+    if (deleting.current.has(block.id)) return;
+    deleting.current.add(block.id);
     finishOpenEdit();
-    try {
-      const drawn = await whenPageDrawn(pageElement);
-      const target = draftForBlock(block, page, pageElement, scale);
-      commitDraft(target, '', target.rect, target.style);
-      if (!drawn || target.backgroundNotFlat) {
-        reportProblem(
-          'The background here isn’t a single colour, so the patch over the deleted text may be visible. You can undo this.',
-        );
-      }
-    } catch (error) {
-      console.error(error);
-      reportProblem('That text couldn’t be deleted. Try again, or zoom out and retry.');
-    }
+    commitsInProgress.current += 1;
+    // In the same queue as other edits, so saving or leaving waits for it.
+    pendingCommit.current = pendingCommit.current
+      .then(async () => {
+        // Text that failed to apply comes back first, and deleting mustn't get ahead of it.
+        if (commitFailed.current) return;
+        const drawn = await whenPageDrawn(pageElement);
+        const target = draftForBlock(block, page, pageElement, scale);
+        apply(await editFromDraft(target, '', target.rect, target.style));
+        if (!drawn || target.backgroundNotFlat) {
+          reportProblem(
+            'The background here isn’t a single colour, so the patch over the deleted text may be visible. You can undo this.',
+          );
+        }
+      })
+      .catch((error: unknown) => {
+        console.error(error);
+        reportProblem('That text couldn’t be deleted. Try again, or zoom out and retry.');
+      })
+      .finally(() => {
+        deleting.current.delete(block.id);
+        commitsInProgress.current -= 1;
+      });
   };
 
   return {

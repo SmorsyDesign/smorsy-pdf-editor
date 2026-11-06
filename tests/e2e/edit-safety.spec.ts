@@ -57,6 +57,31 @@ test.describe('quitting', () => {
   });
 });
 
+test.describe('telling the system about unsaved work', () => {
+  const unsavedWork = (page: Page) => mockState(page, (mock) => mock.unsavedWork);
+
+  test('follows open text, edits and saving', async ({ page }) => {
+    await openForEditing(page);
+    expect(await unsavedWork(page)).toBe(false);
+    await block(page, HEADING).click();
+    await expect.poll(() => unsavedWork(page)).toBe(true);
+    await page.keyboard.press('Escape');
+    await expect.poll(() => unsavedWork(page)).toBe(false);
+    await replaceHeading(page, 'Changed');
+    await expect.poll(() => unsavedWork(page)).toBe(true);
+    await saveTo(page);
+    await expect.poll(() => unsavedWork(page)).toBe(false);
+  });
+
+  test('clears when the document closes without saving', async ({ page }) => {
+    await openForEditing(page);
+    await replaceHeading(page, 'Discarded');
+    await page.keyboard.press('ControlOrMeta+w');
+    await unsavedDialog(page).getByRole('button', { name: 'Don’t save' }).click();
+    await expect.poll(() => unsavedWork(page)).toBe(false);
+  });
+});
+
 test.describe('saving from the unsaved changes prompt', () => {
   test('Open, then Save, goes on to open the next file', async ({ page }) => {
     await openForEditing(page);
@@ -418,6 +443,22 @@ test.describe('keyboard', () => {
     await block(page, HEADING).focus();
     await page.keyboard.press('Delete');
     await expect(page.locator('main.canvas')).toBeFocused();
+  });
+
+  test('a delete still being recorded counts as unsaved when leaving', async ({ page }) => {
+    await openForEditing(page);
+    await block(page, HEADING).focus();
+    await page.keyboard.press('Delete');
+    await page.keyboard.press('ControlOrMeta+w');
+    await expect(unsavedDialog(page)).toBeVisible();
+  });
+
+  test('pressing Delete twice records one change', async ({ page }) => {
+    await openForEditing(page);
+    await block(page, HEADING).focus();
+    await page.keyboard.press('Delete');
+    await page.keyboard.press('Delete');
+    await expect(page.getByText('1 unsaved change')).toBeVisible();
   });
 
   test('the size can be typed one digit at a time', async ({ page }) => {

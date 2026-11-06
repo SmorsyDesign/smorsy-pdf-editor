@@ -122,6 +122,13 @@ export function App({ platform }: { platform: Platform }) {
     [carryOut, flush],
   );
 
+  const onUnsavedWorkChange = useCallback(
+    (unsaved: boolean) => {
+      platform.setUnsavedWork(unsaved).catch(logProblem);
+    },
+    [platform],
+  );
+
   const openDocumentInUse = session.status === 'open' ? session.document : null;
 
   // Runs after the view has unmounted, so nothing is still drawing from a closed document.
@@ -140,6 +147,10 @@ export function App({ platform }: { platform: Platform }) {
       if (!dialogOpenRef.current) void leaveDocument('quit');
       return false;
     });
+    // After a crash there's nothing left to ask, and the window has to be able to close.
+    return () => {
+      platform.setCloseGuard(() => true);
+    };
   }, [leaveDocument, platform]);
 
   useEffect(() => {
@@ -195,6 +206,7 @@ export function App({ platform }: { platform: Platform }) {
           os={platform.os}
           announcement={saving.announcement}
           originalNote={saving.originalNote}
+          onUnsavedWorkChange={onUnsavedWorkChange}
           editor={editor}
           saveLabel={saving.saveLabel}
           onSave={() => {

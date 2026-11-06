@@ -1,8 +1,6 @@
+mod quit;
 mod save;
 mod system_font;
-
-#[cfg(target_os = "macos")]
-mod quit;
 
 pub fn run() {
     let builder = tauri::Builder::default()
@@ -17,19 +15,13 @@ pub fn run() {
             Ok(())
         });
 
-    #[cfg(not(all(feature = "e2e", target_os = "macos")))]
-    let builder = builder.invoke_handler(tauri::generate_handler![
-        save::write_file_atomic,
-        save::is_same_file,
-        system_font::read_system_font
-    ]);
-
-    #[cfg(all(feature = "e2e", target_os = "macos"))]
     let builder = builder.invoke_handler(tauri::generate_handler![
         save::write_file_atomic,
         save::is_same_file,
         system_font::read_system_font,
-        quit::e2e_request_terminate
+        quit::set_unsaved_work,
+        #[cfg(all(feature = "e2e", target_os = "macos"))]
+        quit::macos::e2e_request_terminate
     ]);
 
     #[cfg(feature = "e2e")]
