@@ -244,9 +244,16 @@ describe('the built app', () => {
     await $('button=Upload').click();
     await answerDialogs({ image });
     await $('button=Choose an image').click();
-    await expect($('strong=My signature.png')).toBeDisplayed();
+    await expect($('.file-row strong')).toHaveText('My signature.png');
     await $('button=Use signature').click();
     await expect($('[aria-label^="Place signature 1"]')).toBeDisplayed();
+    await $('[data-testid="sign-layer"]').click();
+    await expect($('[data-testid="placed-signature"]')).toBeDisplayed();
+    const target = join(workspace, 'Uploaded copy.pdf');
+    await answerDialogs({ save: target });
+    await $('button=Save a copy').click();
+    await expect($('span=Copy saved')).toBeDisplayed();
+    expect(readFileSync(target).equals(readFileSync(plainText))).toBe(false);
   });
 
   it('asks before quitting the way the macOS Dock does', async function () {

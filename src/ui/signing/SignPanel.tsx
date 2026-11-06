@@ -79,14 +79,20 @@ export function SignPanel({ signing, currentPage, onClose }: SignPanelProps) {
                   onPointerDown={(event) => {
                     startDrag(event, slip);
                   }}
-                  onClick={(event) => {
-                    if (dragged.current) {
-                      dragged.current = false;
-                      return;
+                  ref={(button) => {
+                    if (button && signing.focusSlipId === slip.image.id) {
+                      button.focus();
+                      signing.slipFocused();
                     }
+                  }}
+                  onClick={(event) => {
                     // A click from the keyboard has no pointer, so it can't say where it goes.
-                    if (event.detail === 0) signing.placeInView(slip, currentPage);
-                    else signing.pick(signing.pickedId === slip.image.id ? null : slip.image.id);
+                    if (event.detail === 0) {
+                      signing.placeInView(slip, currentPage);
+                    } else if (!dragged.current) {
+                      signing.pick(signing.pickedId === slip.image.id ? null : slip.image.id);
+                    }
+                    dragged.current = false;
                   }}
                 >
                   <img src={signing.urlFor(slip.image)} alt="" draggable={false} />
@@ -129,7 +135,7 @@ export function SignPanel({ signing, currentPage, onClose }: SignPanelProps) {
         </button>
       </div>
       <p className="hint" role="status">
-        {signing.picked
+        {signing.picked || signing.moving
           ? 'Click where it goes on the page. Press Esc to cancel.'
           : 'Drag one onto the page, or select it and click where it goes.'}
       </p>

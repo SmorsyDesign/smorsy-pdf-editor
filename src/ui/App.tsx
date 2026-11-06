@@ -75,6 +75,15 @@ export function App({ platform }: { platform: Platform }) {
   });
   const { save, saveCopy, replaceOriginal, keepOriginal } = saving;
 
+  /** A save that reports success with the signature missing would be worse than asking. */
+  const askToSave = useCallback(
+    (copy: boolean) => {
+      if (viewRef.current?.hasPendingPlacement()) setDialog({ kind: 'unplaced', copy });
+      else void (copy ? saveCopy() : save());
+    },
+    [save, saveCopy],
+  );
+
   const chooseAndOpen = useCallback(
     () =>
       exclusively(async () => {
@@ -170,10 +179,10 @@ export function App({ platform }: { platform: Platform }) {
           if (!busyRef.current) void leaveDocument('open');
           break;
         case 'save':
-          void save();
+          askToSave(false);
           break;
         case 'save-copy':
-          void saveCopy();
+          askToSave(true);
           break;
         case 'close-document':
           if (!busyRef.current) void leaveDocument('close');
@@ -194,7 +203,7 @@ export function App({ platform }: { platform: Platform }) {
         })
         .catch(logProblem);
     };
-  }, [dialogIsOpen, leaveDocument, platform, save, saveCopy]);
+  }, [askToSave, dialogIsOpen, leaveDocument, platform]);
 
   return (
     <>
@@ -210,7 +219,7 @@ export function App({ platform }: { platform: Platform }) {
           editor={editor}
           saveLabel={saving.saveLabel}
           onSave={() => {
-            void save();
+            askToSave(false);
           }}
           handleRef={viewRef}
           platform={platform}
@@ -246,6 +255,9 @@ export function App({ platform }: { platform: Platform }) {
           });
         }}
         onLeaveWithoutSaving={carryOut}
+        onSaveWithoutPlacing={(copy) => {
+          void (copy ? saveCopy() : save());
+        }}
       />
     </>
   );

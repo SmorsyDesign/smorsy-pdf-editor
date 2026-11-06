@@ -25,6 +25,7 @@ import { UNSUPPORTED_TEXT, nameCharacter } from '../errors';
 import { findEmbeddedFont, type EmbeddedFont } from '../fonts/embedded';
 import { bundledFaceFile } from '../fonts/match';
 import { placementInPdf } from '../signatures/placement';
+import { drawSignaturePicture } from './stamp';
 import { FontChooser, systemFontKey, type FontBytes, type FontOutcome } from './choose-font';
 
 type DrawFont =
@@ -218,8 +219,7 @@ export class PdfEditor {
         picture = doc.embedPng(image.png);
         pictures.set(image.id, picture);
       }
-      const placed = placementInPdf(rect, angle, box);
-      page.drawImage(await picture, { ...placed, rotate: degrees(placed.rotate) });
+      drawSignaturePicture(doc, page, await picture, placementInPdf(rect, angle, box));
     }
   }
 
@@ -241,7 +241,7 @@ export class PdfEditor {
           this.drawLines(page, box, await this.drawFont(doc, page, box, embedded));
         }
       }
-      // Last, because the screen shows signatures on top of everything else.
+      // Last, because the screen shows signatures on top of everything else on the page.
       await this.drawSignatures(
         doc,
         page,

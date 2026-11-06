@@ -69,12 +69,43 @@ export function turnedBy(angle: number, change: number): number {
   return (((angle + change) % 360) + 360) % 360;
 }
 
-/** Drags a signature, keeping its middle on the page so it can always be reached again. */
-export function movedRect(rect: Rect, dx: number, dy: number, page: PageSize): Rect {
+/**
+ * Keeps all of a signature on the page, however it's turned. A PDF cuts off anything past the
+ * page's edge, so what's on screen has to stay inside it for the saved file to match.
+ */
+export function keptOnPage(rect: Rect, angle: number, page: PageSize): Rect {
+  const bounds = boundsOf(rect, angle);
+  const fit = Math.min(1, page.width / bounds.width, page.height / bounds.height);
+  const halfWidth = (bounds.width * fit) / 2;
+  const halfHeight = (bounds.height * fit) / 2;
   const middle = middleOf(rect);
-  const x = Math.min(page.width, Math.max(0, middle.x + dx));
-  const y = Math.min(page.height, Math.max(0, middle.y + dy));
-  return { ...rect, x: x - rect.width / 2, y: y - rect.height / 2 };
+  const width = rect.width * fit;
+  const height = rect.height * fit;
+  const centreX = Math.min(page.width - halfWidth, Math.max(halfWidth, middle.x));
+  const centreY = Math.min(page.height - halfHeight, Math.max(halfHeight, middle.y));
+  return { x: centreX - width / 2, y: centreY - height / 2, width, height };
+}
+
+export function movedRect(rect: Rect, angle: number, dx: number, dy: number, page: PageSize): Rect {
+  return keptOnPage({ ...rect, x: rect.x + dx, y: rect.y + dy }, angle, page);
+}
+
+/** Grows or shrinks around the middle, for when dragging a corner isn't an option. */
+export function scaledRect(
+  rect: Rect,
+  angle: number,
+  scale: number,
+  minWidth: number,
+  page: PageSize,
+): Rect {
+  const width = Math.max(minWidth, rect.width * scale);
+  const height = width * (rect.height / rect.width);
+  const middle = middleOf(rect);
+  return keptOnPage(
+    { x: middle.x - width / 2, y: middle.y - height / 2, width, height },
+    angle,
+    page,
+  );
 }
 
 const SNAP_DEGREES = 2;
@@ -153,19 +184,26 @@ export function dateStampBox(
   const taken = boundsOf(signature, angle);
   const right = taken.x + taken.width;
   const bottom = taken.y + taken.height;
-  const fitsBeside = right + STAMP_GAP + STAMP_WIDTH <= page.width;
-  const x = fitsBeside ? right + STAMP_GAP : taken.x;
-  const y = fitsBeside ? bottom - STAMP_LINE_HEIGHT : bottom + STAMP_GAP_BELOW;
+  const fitsWidth = (x: number) => x >= 0 && x + STAMP_WIDTH <= page.width;
+  const fitsHeight = (y: number) => y >= 0 && y + STAMP_LINE_HEIGHT <= page.height;
+  const level = Math.max(0, Math.min(page.height - STAMP_LINE_HEIGHT, bottom - STAMP_LINE_HEIGHT));
+  const under = Math.min(page.width - STAMP_WIDTH, Math.max(0, taken.x));
+  // Beside it first, then wherever there's room that doesn't overlap the signature.
+  const spots: readonly (readonly [number, number])[] = [
+    [right + STAMP_GAP, level],
+    [under, bottom + STAMP_GAP_BELOW],
+    [under, taken.y - STAMP_GAP_BELOW - STAMP_LINE_HEIGHT],
+    [taken.x - STAMP_GAP - STAMP_WIDTH, level],
+  ];
+  const [x, y] = spots.find(([spotX, spotY]) => fitsWidth(spotX) && fitsHeight(spotY)) ?? [
+    under,
+    level,
+  ];
   const text = formatStampDate(date);
   return {
     id,
     pageNumber,
-    rect: {
-      x: Math.max(0, Math.min(page.width - STAMP_WIDTH, x)),
-      y: Math.max(0, Math.min(page.height - STAMP_LINE_HEIGHT, y)),
-      width: STAMP_WIDTH,
-      height: STAMP_LINE_HEIGHT,
-    },
+    rect: { x, y, width: STAMP_WIDTH, height: STAMP_LINE_HEIGHT },
     angle: 0,
     text,
     lines: [text],

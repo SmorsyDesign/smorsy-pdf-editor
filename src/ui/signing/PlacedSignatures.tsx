@@ -8,6 +8,7 @@ import {
 import type { PlacedSignature } from '../../engine/edits/model';
 import {
   angleToPoint,
+  keptOnPage,
   movedRect,
   resizeFromCorner,
   turnedBy,
@@ -21,6 +22,8 @@ const MIN_WIDTH = 24;
 const KEY_STEP = 4;
 const FINE_KEY_STEP = 1;
 const TURN_STEP = 5;
+// The handle stands this far above the signature, which needs room on the page.
+const HANDLE_ROOM = 44;
 
 const CORNERS: readonly (readonly [Corner, string, string])[] = [
   ['top-left', 'h-tl', 'Resize from top left'],
@@ -36,6 +39,8 @@ const ARROWS: Readonly<Record<string, readonly [number, number]>> = {
   ArrowDown: [0, 1],
 };
 
+type Shape = Pick<PlacedSignature, 'rect' | 'angle'>;
+
 interface PlacedProps {
   readonly placement: PlacedSignature;
   readonly signing: Signing;
@@ -47,48 +52,70 @@ interface PlacedProps {
 
 function Placed({ placement, signing, scale, page, interactive, selected }: PlacedProps) {
   // While dragging only this preview changes. The edit is recorded once, when it ends.
-  const [preview, setPreview] = useState<Pick<PlacedSignature, 'rect' | 'angle'> | null>(null);
+  const [preview, setPreview] = useState<Shape | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const endDrag = useRef<(() => void) | null>(null);
   const { id } = placement;
   const rect = preview?.rect ?? placement.rect;
   const angle = preview?.angle ?? placement.angle;
 
-  // Selecting moves focus here, so the arrow keys work straight away.
+  const { focusPlacedId, placedFocused } = signing;
   useEffect(() => {
-    if (selected) rootRef.current?.focus();
-  }, [selected]);
+    if (focusPlacedId !== id) return;
+    rootRef.current?.focus();
+    placedFocused();
+  }, [focusPlacedId, id, placedFocused]);
+
+  // A drag works in the scale it began at, so a zoom or the page leaving view ends it unrecorded.
+  useEffect(
+    () => () => {
+      endDrag.current?.();
+    },
+    [scale],
+  );
 
   const trackPointer = (
     event: ReactPointerEvent<HTMLElement>,
-    update: (move: PointerEvent) => Pick<PlacedSignature, 'rect' | 'angle'>,
+    update: (move: PointerEvent) => Shape,
   ) => {
     event.preventDefault();
     event.stopPropagation();
     const target = event.currentTarget;
     target.setPointerCapture(event.pointerId);
-    let latest: Pick<PlacedSignature, 'rect' | 'angle'> | null = null;
+    let latest: Shape | null = null;
     const onMove = (move: PointerEvent) => {
       latest = update(move);
       setPreview(latest);
     };
-    const onEnd = () => {
+    const stop = () => {
       target.removeEventListener('pointermove', onMove);
-      target.removeEventListener('pointerup', onEnd);
-      target.removeEventListener('pointercancel', onEnd);
-      if (latest) signing.change(id, latest);
+      target.removeEventListener('pointerup', onUp);
+      target.removeEventListener('pointercancel', stop);
+      target.removeEventListener('lostpointercapture', stop);
+      endDrag.current = null;
       setPreview(null);
     };
+    const onUp = () => {
+      const finished = latest;
+      stop();
+      if (finished) signing.change(id, finished);
+    };
     target.addEventListener('pointermove', onMove);
-    target.addEventListener('pointerup', onEnd);
-    target.addEventListener('pointercancel', onEnd);
+    target.addEventListener('pointerup', onUp);
+    target.addEventListener('pointercancel', stop);
+    target.addEventListener('lostpointercapture', stop);
+    endDrag.current = stop;
   };
 
   const startMove = (event: ReactPointerEvent<HTMLElement>) => {
+    if (event.button !== 0) return;
     signing.select(id);
+    rootRef.current?.focus({ preventScroll: true });
     const { clientX, clientY } = event;
     trackPointer(event, (move) => ({
       rect: movedRect(
         placement.rect,
+        placement.angle,
         (move.clientX - clientX) / scale,
         (move.clientY - clientY) / scale,
         page,
@@ -98,29 +125,42 @@ function Placed({ placement, signing, scale, page, interactive, selected }: Plac
   };
 
   const startResize = (event: ReactPointerEvent<HTMLElement>, corner: Corner) => {
+    if (event.button !== 0) return;
     const { clientX, clientY } = event;
     trackPointer(event, (move) => ({
-      rect: resizeFromCorner(
-        placement.rect,
+      rect: keptOnPage(
+        resizeFromCorner(
+          placement.rect,
+          placement.angle,
+          corner,
+          (move.clientX - clientX) / scale,
+          (move.clientY - clientY) / scale,
+          MIN_WIDTH,
+        ),
         placement.angle,
-        corner,
-        (move.clientX - clientX) / scale,
-        (move.clientY - clientY) / scale,
-        MIN_WIDTH,
+        page,
       ),
       angle: placement.angle,
     }));
   };
 
-  const startTurn = (event: ReactPointerEvent<HTMLElement>) => {
+  const middleOnScreen = () => {
     const box = rootRef.current?.getBoundingClientRect();
-    if (!box) return;
-    const middleX = box.left + box.width / 2;
-    const middleY = box.top + box.height / 2;
-    trackPointer(event, (move) => ({
-      rect: placement.rect,
-      angle: angleToPoint(move.clientX - middleX, move.clientY - middleY),
-    }));
+    return box ? { x: box.left + box.width / 2, y: box.top + box.height / 2 } : null;
+  };
+
+  // Near the top of the page the handle goes underneath, so it can always be reached.
+  const handleBelow = placement.rect.y * scale < HANDLE_ROOM;
+
+  const startTurn = (event: ReactPointerEvent<HTMLElement>) => {
+    if (event.button !== 0) return;
+    const middle = middleOnScreen();
+    if (!middle) return;
+    const side = handleBelow ? -1 : 1;
+    trackPointer(event, (move) => {
+      const next = angleToPoint(side * (move.clientX - middle.x), side * (move.clientY - middle.y));
+      return { angle: next, rect: keptOnPage(placement.rect, next, page) };
+    });
   };
 
   // A run of key presses undoes together, so holding an arrow isn't dozens of undo steps.
@@ -132,11 +172,14 @@ function Placed({ placement, signing, scale, page, interactive, selected }: Plac
     if (arrow) {
       event.preventDefault();
       const step = event.shiftKey ? FINE_KEY_STEP : KEY_STEP;
-      signing.change(
-        id,
-        { rect: movedRect(placement.rect, arrow[0] * step, arrow[1] * step, page) },
-        keyGroup('move'),
+      const moved = movedRect(
+        placement.rect,
+        placement.angle,
+        arrow[0] * step,
+        arrow[1] * step,
+        page,
       );
+      signing.change(id, { rect: moved }, keyGroup('move'));
     } else if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault();
       signing.remove(id);
@@ -151,7 +194,7 @@ function Placed({ placement, signing, scale, page, interactive, selected }: Plac
     if (!arrow) return;
     event.preventDefault();
     event.stopPropagation();
-    const rectNext = resizeFromCorner(
+    const resized = resizeFromCorner(
       placement.rect,
       placement.angle,
       corner,
@@ -159,7 +202,7 @@ function Placed({ placement, signing, scale, page, interactive, selected }: Plac
       arrow[1] * KEY_STEP,
       MIN_WIDTH,
     );
-    signing.change(id, { rect: rectNext }, keyGroup('resize'));
+    signing.change(id, { rect: keptOnPage(resized, placement.angle, page) }, keyGroup('resize'));
   };
 
   const onTurnKey = (event: KeyboardEvent) => {
@@ -167,10 +210,10 @@ function Placed({ placement, signing, scale, page, interactive, selected }: Plac
     if (!arrow) return;
     event.preventDefault();
     event.stopPropagation();
-    const direction = arrow[0] + arrow[1];
+    const next = turnedBy(placement.angle, (arrow[0] + arrow[1]) * TURN_STEP);
     signing.change(
       id,
-      { angle: turnedBy(placement.angle, direction * TURN_STEP) },
+      { angle: next, rect: keptOnPage(placement.rect, next, page) },
       keyGroup('turn'),
     );
   };
@@ -222,10 +265,10 @@ function Placed({ placement, signing, scale, page, interactive, selected }: Plac
                 }}
               />
             ))}
-            <span className="h-stem" />
+            <span className={handleBelow ? 'h-stem is-below' : 'h-stem'} />
             <button
               type="button"
-              className="handle h-rot"
+              className={handleBelow ? 'handle h-rot is-below' : 'handle h-rot'}
               aria-label="Rotate signature"
               onPointerDown={startTurn}
               onKeyDown={onTurnKey}

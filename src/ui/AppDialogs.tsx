@@ -6,7 +6,8 @@ import type { SaveDialog } from './useSaveFlow';
 export type Dialog<LeaveAction> =
   | SaveDialog
   | { readonly kind: 'open-failed'; readonly fileName: string; readonly problem: OpenProblem }
-  | { readonly kind: 'unsaved'; readonly fileName: string; readonly then: LeaveAction };
+  | { readonly kind: 'unsaved'; readonly fileName: string; readonly then: LeaveAction }
+  | { readonly kind: 'unplaced'; readonly copy: boolean };
 
 interface AppDialogsProps<LeaveAction> {
   readonly dialog: Dialog<LeaveAction> | null;
@@ -17,6 +18,7 @@ interface AppDialogsProps<LeaveAction> {
   readonly onChooseAnother: () => void;
   readonly onSaveAndLeave: (then: LeaveAction) => void;
   readonly onLeaveWithoutSaving: (then: LeaveAction) => void;
+  readonly onSaveWithoutPlacing: (copy: boolean) => void;
 }
 
 export function AppDialogs<LeaveAction>({
@@ -28,6 +30,7 @@ export function AppDialogs<LeaveAction>({
   onChooseAnother,
   onSaveAndLeave,
   onLeaveWithoutSaving,
+  onSaveWithoutPlacing,
 }: AppDialogsProps<LeaveAction>) {
   switch (dialog?.kind) {
     case 'confirm-replace':
@@ -87,6 +90,21 @@ export function AppDialogs<LeaveAction>({
           onConfirm={() => {
             onClose();
             onChooseAnother();
+          }}
+          onCancel={onClose}
+        />
+      );
+    case 'unplaced':
+      return (
+        <AlertDialog
+          icon="warn"
+          title="Your signature isn’t on the page yet"
+          message="You’ve made a signature but haven’t placed it, so this save won’t include it."
+          cancelLabel="Go back"
+          confirmLabel="Save without it"
+          onConfirm={() => {
+            onClose();
+            onSaveWithoutPlacing(dialog.copy);
           }}
           onCancel={onClose}
         />

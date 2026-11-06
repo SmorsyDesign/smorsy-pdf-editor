@@ -3,7 +3,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'n
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PDFDocument } from '@cantoo/pdf-lib';
-import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { OPS, getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { afterAll, describe, expect, it } from 'vitest';
 import { testPng } from '../helpers/test-png';
 import { openDocument } from '../../src/engine/document';
@@ -41,7 +41,8 @@ async function inspect(bytes: Uint8Array, password?: string): Promise<Inspection
   for (let number = 1; number <= document.numPages; number += 1) {
     const page = await document.getPage(number);
     const found = (await page.getAnnotations()) as { subtype?: string }[];
-    annotations += found.length;
+    // A signature over a form field is saved as a stamp, which is checked separately.
+    annotations += found.filter((annotation) => annotation.subtype !== 'Stamp').length;
     links += found.filter((annotation) => annotation.subtype === 'Link').length;
     page.cleanup();
   }
@@ -55,6 +56,18 @@ async function inspect(bytes: Uint8Array, password?: string): Promise<Inspection
   };
   await task.destroy();
   return result;
+}
+
+/** Whether page 1 shows a picture or stamp beyond those the original already had. */
+async function signaturesOnFirstPage(bytes: Uint8Array): Promise<number> {
+  const task = getDocument({ data: bytes.slice() });
+  const page = await (await task.promise).getPage(1);
+  const { fnArray } = await page.getOperatorList();
+  const found = (await page.getAnnotations()) as { subtype?: string }[];
+  const pictures = fnArray.filter((op) => op === OPS.paintImageXObject).length;
+  const stamps = found.filter((annotation) => annotation.subtype === 'Stamp').length;
+  await task.destroy();
+  return pictures + stamps;
 }
 
 /** qpdf exits 0 for clean files, 3 for warnings it can repair, and 2 for real errors. */
@@ -164,6 +177,10 @@ describe.each(files)('%s', (name) => {
     writeFileSync(path, saved);
     expect([0, 3]).toContain(qpdfStatus(path));
     expect(await inspect(saved)).toEqual(await inspect(original));
+    // Over a form field it's a stamp, and otherwise a picture on the page. Either way it's there.
+    expect(await signaturesOnFirstPage(saved)).toBeGreaterThan(
+      await signaturesOnFirstPage(original),
+    );
   });
 
   it.skipIf(password !== undefined)('survives replacing real text in its own font', async () => {

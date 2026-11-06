@@ -4,7 +4,7 @@ import type { RgbaImage } from '../../engine/signatures/image';
 import type { Platform } from '../../platform';
 import { Icon } from '../Icon';
 import { DrawTab } from './DrawTab';
-import { INK_BLACK, INK_BLUE, signatureImageFrom } from './makeSignature';
+import { INK_BLACK, INK_BLUE, SignatureError, signatureImageFrom } from './makeSignature';
 import { TypeTab } from './TypeTab';
 import { UploadTab } from './UploadTab';
 import type { SignatureKind } from './useSigning';
@@ -43,6 +43,7 @@ export function SignatureDialog({ platform, initialKind, onUse, onCancel }: Sign
   });
   const [working, setWorking] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const cancelled = useRef(false);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -51,6 +52,12 @@ export function SignatureDialog({ platform, initialKind, onUse, onCancel }: Sign
       dialog?.close();
     };
   }, []);
+
+  const cancel = () => {
+    // Making a signature takes a moment, and it mustn't turn up after being cancelled.
+    cancelled.current = true;
+    onCancel();
+  };
 
   const setBuild = useCallback((forTab: Tab, build: Build | null) => {
     setBuilds((current) => ({ ...current, [forTab]: build }));
@@ -87,10 +94,14 @@ export function SignatureDialog({ platform, initialKind, onUse, onCancel }: Sign
         return;
       }
       const image = await signatureImageFrom(pixels, tab === 'upload' ? null : ink);
-      onUse(image, kind, NEEDS[tab]);
+      if (!cancelled.current) onUse(image, kind, NEEDS[tab]);
     } catch (error) {
       console.error(error);
-      setProblem('That signature couldn’t be made. Try again, or use another way to create it.');
+      setProblem(
+        error instanceof SignatureError
+          ? error.message
+          : 'That signature couldn’t be made. Try again, or use another way to create it.',
+      );
     } finally {
       setWorking(false);
     }
@@ -103,14 +114,14 @@ export function SignatureDialog({ platform, initialKind, onUse, onCancel }: Sign
       aria-labelledby="signature-title"
       onCancel={(event) => {
         event.preventDefault();
-        onCancel();
+        cancel();
       }}
     >
       <div className="dialog-head">
         <h2 id="signature-title">
           {initialKind === 'initials' ? 'Create initials' : 'Create a signature'}
         </h2>
-        <button type="button" className="icon-btn" aria-label="Close" onClick={onCancel}>
+        <button type="button" className="icon-btn" aria-label="Close" onClick={cancel}>
           <Icon name="close" />
         </button>
       </div>
@@ -197,7 +208,7 @@ export function SignatureDialog({ platform, initialKind, onUse, onCancel }: Sign
           Kept until you close this PDF, and never stored on this computer.
         </p>
         <div className="foot-actions">
-          <button type="button" className="btn" onClick={onCancel}>
+          <button type="button" className="btn" onClick={cancel}>
             Cancel
           </button>
           <button

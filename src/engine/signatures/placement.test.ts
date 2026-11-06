@@ -8,7 +8,9 @@ import {
   resizeFromCorner,
   turnedBy,
   angleToPoint,
+  keptOnPage,
   movedRect,
+  scaledRect,
 } from './placement';
 
 const LETTER = { width: 612, height: 792 };
@@ -89,17 +91,67 @@ describe('turnedBy', () => {
   });
 });
 
+describe('keptOnPage', () => {
+  it('leaves what’s already on the page alone', () => {
+    const rect = { x: 100, y: 100, width: 200, height: 100 };
+    expect(keptOnPage(rect, 0, LETTER)).toEqual(rect);
+  });
+
+  it('brings back anything past an edge', () => {
+    const next = keptOnPage({ x: -50, y: 760, width: 200, height: 100 }, 0, LETTER);
+    expect(next.x).toBe(0);
+    expect(next.y + next.height).toBe(792);
+  });
+
+  it('allows for the space a turned signature really takes up', () => {
+    // Turned a quarter, this is 100 wide and 200 tall around its middle.
+    const next = keptOnPage({ x: 0, y: 0, width: 200, height: 100 }, 90, LETTER);
+    const middle = { x: next.x + next.width / 2, y: next.y + next.height / 2 };
+    expect(middle.x).toBeCloseTo(100);
+    expect(middle.y).toBeCloseTo(100);
+  });
+
+  it('shrinks what can’t fit at all, keeping its shape', () => {
+    const next = keptOnPage({ x: 0, y: 0, width: 1000, height: 100 }, 0, LETTER);
+    expect(next.width).toBeCloseTo(612);
+    expect(next.height).toBeCloseTo(61.2);
+  });
+});
+
 describe('movedRect', () => {
   const rect = { x: 100, y: 100, width: 200, height: 100 };
 
   it('moves by what was dragged', () => {
-    expect(movedRect(rect, 10, -20, LETTER)).toEqual({ ...rect, x: 110, y: 80 });
+    expect(movedRect(rect, 0, 10, -20, LETTER)).toEqual({ ...rect, x: 110, y: 80 });
   });
 
-  it('keeps the middle on the page, so it can always be reached', () => {
-    const next = movedRect(rect, -5000, 5000, LETTER);
-    expect(next.x + next.width / 2).toBe(0);
-    expect(next.y + next.height / 2).toBe(792);
+  it('stops at the page’s edge, because the file would cut off anything past it', () => {
+    const next = movedRect(rect, 0, -5000, 5000, LETTER);
+    expect(next.x).toBe(0);
+    expect(next.y + next.height).toBe(792);
+  });
+});
+
+describe('scaledRect', () => {
+  const rect = { x: 100, y: 100, width: 200, height: 100 };
+
+  it('grows around the middle, keeping the shape', () => {
+    expect(scaledRect(rect, 0, 1.5, 24, LETTER)).toEqual({
+      x: 50,
+      y: 75,
+      width: 300,
+      height: 150,
+    });
+  });
+
+  it('stops at the smallest size', () => {
+    expect(scaledRect(rect, 0, 0.01, 24, LETTER).width).toBe(24);
+  });
+
+  it('stays on the page', () => {
+    const next = scaledRect({ x: 500, y: 700, width: 100, height: 50 }, 0, 3, 24, LETTER);
+    expect(next.x + next.width).toBeLessThanOrEqual(612);
+    expect(next.y + next.height).toBeLessThanOrEqual(792);
   });
 });
 
@@ -206,6 +258,19 @@ describe('the date stamp', () => {
     const stamp = dateStampBox('stamp', 1, corner, 0, LETTER, ink, day);
     expect(stamp.rect.x + stamp.rect.width).toBeLessThanOrEqual(612);
     expect(stamp.rect.y + stamp.rect.height).toBeLessThanOrEqual(792);
+  });
+
+  it('never lands on the signature, even in the bottom right corner', () => {
+    const corner = { x: 440, y: 742, width: 172, height: 50 };
+    const stamp = dateStampBox('stamp', 1, corner, 0, LETTER, ink, day);
+    expect(stamp.rect.y + stamp.rect.height).toBeLessThanOrEqual(corner.y);
+  });
+
+  it('goes to the left if that’s the only room there is', () => {
+    const page = { width: 612, height: 60 };
+    const tall = { x: 480, y: 0, width: 132, height: 60 };
+    const stamp = dateStampBox('stamp', 1, tall, 0, page, ink, day);
+    expect(stamp.rect.x + stamp.rect.width).toBeLessThanOrEqual(tall.x);
   });
 
   it('allows for a turned signature, using the space it really takes up', () => {

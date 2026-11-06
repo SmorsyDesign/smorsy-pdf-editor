@@ -1,15 +1,24 @@
 import type { Color, SignatureImage } from '../../engine/edits/model';
 import { cropToInk, type RgbaImage } from '../../engine/signatures/image';
+import { loadWithinTime } from '../fontLoading';
 
 export const INK_BLUE: Color = { r: 28 / 255, g: 42 / 255, b: 90 / 255 };
 export const INK_BLACK: Color = { r: 0, g: 0, b: 0 };
 
+/** A failure with a message written for the person, safe to show as it is. */
+export class SignatureError extends Error {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = 'SignatureError';
+  }
+}
+
 export const cssInk = ({ r, g, b }: Color) =>
   `rgb(${Math.round(r * 255)} ${Math.round(g * 255)} ${Math.round(b * 255)})`;
 
-function contextOf(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
+export function contextOf(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
   const context = canvas.getContext('2d', { willReadFrequently: true });
-  if (!context) throw new Error('This computer couldn’t set up a drawing surface.');
+  if (!context) throw new SignatureError('This computer couldn’t set up a drawing surface.');
   return context;
 }
 
@@ -19,22 +28,16 @@ export function pixelsOf(canvas: HTMLCanvasElement): RgbaImage {
 }
 
 /** Encodes pixels as a new PNG, which also leaves behind any metadata an upload came with. */
-export function pngOf({ width, height, data }: RgbaImage): Promise<Uint8Array> {
+export async function pngOf({ width, height, data }: RgbaImage): Promise<Uint8Array> {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
   contextOf(canvas).putImageData(new ImageData(new Uint8ClampedArray(data), width, height), 0, 0);
-  return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (blob) {
-        blob.arrayBuffer().then((buffer) => {
-          resolve(new Uint8Array(buffer));
-        }, reject);
-      } else {
-        reject(new Error('This signature couldn’t be turned into an image.'));
-      }
-    }, 'image/png');
+  const blob = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob(resolve, 'image/png');
   });
+  if (!blob) throw new SignatureError('This signature couldn’t be turned into an image.');
+  return new Uint8Array(await blob.arrayBuffer());
 }
 
 export async function signatureImageFrom(
@@ -51,6 +54,8 @@ export async function signatureImageFrom(
 }
 
 const TYPED_SIZE = 96;
+const STYLE_FAILED =
+  'This handwriting style didn’t load. Try another style, or draw or upload one.';
 
 /** Draws a name large and trims it, so it stays sharp when it's enlarged on the page. */
 export async function typedPixels(
@@ -59,7 +64,14 @@ export async function typedPixels(
   ink: Color,
 ): Promise<RgbaImage | null> {
   const css = `${font.weight} ${TYPED_SIZE}px "${font.family}"`;
-  await document.fonts.load(css, name);
+  let faces: readonly FontFace[];
+  try {
+    faces = await loadWithinTime(css, name);
+  } catch (error) {
+    throw new SignatureError(STYLE_FAILED, { cause: error });
+  }
+  // With no face loaded the canvas would quietly draw in a system font instead.
+  if (faces.length === 0) throw new SignatureError(STYLE_FAILED);
   const canvas = document.createElement('canvas');
   const context = contextOf(canvas);
   context.font = css;

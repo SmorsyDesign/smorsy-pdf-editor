@@ -10,6 +10,8 @@ const PAPER_MARGIN = 16;
 const EDGE_SOFTNESS = 48;
 // Paper fills most of a signature photo, so the brightest quarter of pixels shows its colour.
 const PAPER_PERCENTILE = 0.75;
+// Paper photographed or scanned is solid. This much clear means the background is already gone.
+const ALREADY_CUT_OUT = 0.05;
 
 const luminance = (r: number, g: number, b: number) => 0.299 * r + 0.587 * g + 0.114 * b;
 
@@ -36,6 +38,8 @@ function paperLevel({ data }: RgbaImage): number {
  * so a stroke doesn't carry a pale halo onto whatever page it's placed on.
  */
 export function removeWhiteBackground(image: RgbaImage): RgbaImage {
+  // Treating ink as paper would erase a signature that's already been cut out.
+  if (1 - inkCoverage(image) > ALREADY_CUT_OUT) return image;
   const paper = paperLevel(image);
   const data = new Uint8ClampedArray(image.data);
   for (let at = 0; at < data.length; at += 4) {

@@ -4,7 +4,12 @@ import type {
   PlacedSignatureChanges,
   SignatureImage,
 } from '../../engine/edits/model';
-import { dateStampBox, newPlacementRect } from '../../engine/signatures/placement';
+import {
+  dateStampBox,
+  formatStampDate,
+  keptOnPage,
+  newPlacementRect,
+} from '../../engine/signatures/placement';
 import { LETTER_PAGE, type PageSize } from '../../engine/zoom';
 import type { DocumentEditor } from '../editing/useDocumentEditor';
 import { INK_BLACK } from './makeSignature';
@@ -20,38 +25,56 @@ export interface SignatureSlip {
 const START_WIDTH: Readonly<Record<SignatureKind, number>> = { signature: 168, initials: 72 };
 const DUPLICATE_OFFSET = 16;
 
+const focusPages = () => {
+  document.querySelector<HTMLElement>('main.canvas')?.focus({ preventScroll: true });
+};
+
 /** Signatures made for this document, and which is being placed. Everything stays in memory. */
 export function useSigning(
   editor: DocumentEditor,
   active: boolean,
   pageSizes: readonly (PageSize | undefined)[],
 ) {
-  const { apply, signatures: placed } = editor;
+  const { apply, signatures: placed, boxes } = editor;
   const [slips, setSlips] = useState<readonly SignatureSlip[]>([]);
   const [pickedId, setPickedId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [movingId, setMovingId] = useState<string | null>(null);
   const [addDate, setAddDate] = useState(false);
   const [creating, setCreating] = useState<SignatureKind | null>(null);
+  // Asked for once, because focusing whenever a page reappears would steal it and move the view.
+  const [focusPlacedId, setFocusPlacedId] = useState<string | null>(null);
+  const [focusSlipId, setFocusSlipId] = useState<string | null>(null);
   const urls = useRef(new Map<string, string>());
+  const opener = useRef<HTMLElement | null>(null);
+  const wasActive = useRef(active);
 
-  // Leaving Sign mode shouldn't leave a click on the page waiting to place something.
+  // Leaving Sign mode shouldn't leave a click on the page waiting to do something.
   useEffect(() => {
-    if (active) return;
+    if (active) {
+      wasActive.current = true;
+      return;
+    }
     setPickedId(null);
     setSelectedId(null);
+    setMovingId(null);
+    if (wasActive.current && document.activeElement === document.body) focusPages();
+    wasActive.current = false;
   }, [active]);
 
-  const placing = pickedId !== null;
+  const waiting = pickedId !== null || movingId !== null;
   useEffect(() => {
-    if (!placing) return;
+    if (!waiting) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setPickedId(null);
+      if (event.key !== 'Escape') return;
+      setPickedId(null);
+      setMovingId(null);
     };
     window.addEventListener('keydown', onKey);
     return () => {
       window.removeEventListener('keydown', onKey);
     };
-  }, [placing]);
+  }, [waiting]);
 
   const urlFor = useCallback((image: SignatureImage) => {
     let url = urls.current.get(image.id);
@@ -103,6 +126,7 @@ export function useSigning(
     }
     setPickedId(null);
     setSelectedId(id);
+    setFocusPlacedId(id);
   };
 
   /** For a keyboard, where there's no pointer to say where it goes. */
@@ -126,34 +150,68 @@ export function useSigning(
     apply({ kind: 'update-signature', id, changes }, group);
   };
 
+  /** Moves the chosen signature here, for anyone who can't drag it. */
+  const moveHere = (
+    signature: PlacedSignature,
+    pageNumber: number,
+    centreX: number,
+    centreY: number,
+    page: PageSize,
+  ) => {
+    const { rect, angle } = signature;
+    const moved = { ...rect, x: centreX - rect.width / 2, y: centreY - rect.height / 2 };
+    change(signature.id, { pageNumber, rect: keptOnPage(moved, angle, page) });
+    setMovingId(null);
+    setFocusPlacedId(signature.id);
+  };
+
   const duplicate = (signature: PlacedSignature, page: PageSize) => {
     const id = crypto.randomUUID();
-    const { rect } = signature;
+    const { rect, angle } = signature;
+    const offset = { ...rect, x: rect.x + DUPLICATE_OFFSET, y: rect.y + DUPLICATE_OFFSET };
     apply({
       kind: 'place-signature',
-      placement: {
-        ...signature,
-        id,
-        rect: {
-          ...rect,
-          x: Math.min(page.width - rect.width, rect.x + DUPLICATE_OFFSET),
-          y: Math.min(page.height - rect.height, rect.y + DUPLICATE_OFFSET),
-        },
-      },
+      placement: { ...signature, id, rect: keptOnPage(offset, angle, page) },
     });
     setSelectedId(id);
+    setFocusPlacedId(id);
   };
 
   const remove = (id: string) => {
-    apply({ kind: 'remove-signature', id });
+    apply({ kind: 'remove-signature', id }, `removed-${id}`);
+    // A date that came with it goes too, unless it's been reworded and so is the person's own text.
+    const stampId = `date-${id}`;
+    const stamp = boxes.find((box) => box.id === stampId);
+    if (stamp?.text === formatStampDate(new Date())) {
+      apply({ kind: 'remove-text', id: stampId }, `removed-${id}`);
+    }
     setSelectedId(null);
+    setMovingId(null);
+    focusPages();
+  };
+
+  const startCreating = (kind: SignatureKind) => {
+    opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setCreating(kind);
+  };
+
+  const stopCreating = () => {
+    setCreating(null);
+    // Taken from the dialog as it closes, and handed back to where the person was.
+    window.setTimeout(() => {
+      opener.current?.focus();
+      opener.current = null;
+    }, 0);
   };
 
   const addSlip = (image: SignatureImage, kind: SignatureKind, label: string) => {
     setSlips((current) => [...current, { image, kind, label }]);
     setPickedId(image.id);
     setSelectedId(null);
+    setMovingId(null);
     setCreating(null);
+    opener.current = null;
+    setFocusSlipId(image.id);
   };
 
   const removeSlip = (id: string) => {
@@ -161,17 +219,28 @@ export function useSigning(
     setPickedId((current) => (current === id ? null : current));
   };
 
+  const selected = placed.find((signature) => signature.id === selectedId) ?? null;
+
   return {
     slips,
     pickedId,
     picked: slips.find((slip) => slip.image.id === pickedId) ?? null,
-    pick: setPickedId,
-    selected: placed.find((signature) => signature.id === selectedId) ?? null,
+    pick: (id: string | null) => {
+      setPickedId(id);
+      setMovingId(null);
+    },
+    selected,
     select: setSelectedId,
+    moving: selected && movingId === selected.id ? selected : null,
+    toggleMoving: (id: string) => {
+      setPickedId(null);
+      setMovingId((current) => (current === id ? null : id));
+    },
     addDate,
     setAddDate,
     creating,
-    startCreating: setCreating,
+    startCreating,
+    stopCreating,
     addSlip,
     removeSlip,
     urlFor,
@@ -179,8 +248,17 @@ export function useSigning(
     placeInView,
     dropAt,
     change,
+    moveHere,
     duplicate,
     remove,
+    focusPlacedId,
+    placedFocused: () => {
+      setFocusPlacedId(null);
+    },
+    focusSlipId,
+    slipFocused: () => {
+      setFocusSlipId(null);
+    },
   };
 }
 

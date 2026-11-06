@@ -1,3 +1,4 @@
+import { loadWithinTime } from '../fontLoading';
 import type { CSSProperties } from 'react';
 import type { Color, OriginalFont, Rect, TextStyle } from '../../engine/edits/model';
 import type { MeasureText } from '../../engine/edits/layout';
@@ -74,23 +75,6 @@ export function previewTextStyle(
 }
 
 const measuringContext = document.createElement('canvas').getContext('2d');
-
-const FONT_LOAD_LIMIT_MS = 5000;
-
-/** Edits wait in line for this, so a load that never finished would hold up every later edit. */
-async function loadWithinTime(font: string): Promise<void> {
-  let timer = 0;
-  const tooSlow = new Promise<never>((_, reject) => {
-    timer = window.setTimeout(() => {
-      reject(new Error(`This font took too long to load: ${font}`));
-    }, FONT_LOAD_LIMIT_MS);
-  });
-  try {
-    await Promise.race([document.fonts.load(font), tooSlow]);
-  } finally {
-    window.clearTimeout(timer);
-  }
-}
 
 /** Loads the face first: measuring before it's ready would measure a fallback font instead. */
 export async function preparedMeasure(

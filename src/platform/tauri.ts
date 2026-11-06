@@ -3,8 +3,10 @@ import { listen } from '@tauri-apps/api/event';
 import { Menu, MenuItem, PredefinedMenuItem, Submenu } from '@tauri-apps/api/menu';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { open, save } from '@tauri-apps/plugin-dialog';
-import { readFile } from '@tauri-apps/plugin-fs';
+import { readFile, stat } from '@tauri-apps/plugin-fs';
 import {
+  FileTooLarge,
+  MAX_IMAGE_BYTES,
   ReadFailure,
   SAVE_FAILURE_KINDS,
   SaveFailure,
@@ -204,6 +206,14 @@ export async function createTauriPlatform(): Promise<Platform> {
         (await open({ multiple: false, directory: false, filters: [IMAGE_FILTER] }));
       if (path === null) return null;
       const name = fileNameOf(path);
+      let size: number;
+      try {
+        ({ size } = await stat(path));
+      } catch (error) {
+        throw new ReadFailure(name, { cause: error });
+      }
+      // Checked first, because reading it would put the whole file in memory.
+      if (size > MAX_IMAGE_BYTES) throw new FileTooLarge(name);
       try {
         return { name, bytes: await readFile(path) };
       } catch (error) {

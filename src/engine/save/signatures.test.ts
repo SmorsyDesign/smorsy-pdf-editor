@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { PDFDocument, PDFName, PDFRawStream } from '@cantoo/pdf-lib';
+import { PDFDict, PDFDocument, PDFName, PDFRawStream, degrees } from '@cantoo/pdf-lib';
 import { OPS, getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { describe, expect, it } from 'vitest';
 import { testPng } from '../../../tests/helpers/test-png';
@@ -118,6 +118,107 @@ describe('saving a placed signature', () => {
     expect(middleOf(drawn).y).toBeCloseTo(792 - 230);
   });
 
+  describe('matches the screen, corner by corner', () => {
+    const rect = { x: 100, y: 120, width: 120, height: 60 };
+
+    /** Where each corner of a signature shows on screen, from its rectangle and turn. */
+    function screenCorners(angle: number) {
+      const radians = (angle * Math.PI) / 180;
+      const middle = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+      return [
+        [-rect.width / 2, rect.height / 2],
+        [rect.width / 2, rect.height / 2],
+        [-rect.width / 2, -rect.height / 2],
+        [rect.width / 2, -rect.height / 2],
+      ].map(([x = 0, y = 0]) => [
+        middle.x + x * Math.cos(radians) - y * Math.sin(radians),
+        middle.y + x * Math.sin(radians) + y * Math.cos(radians),
+      ]);
+    }
+
+    async function pageWith(rotation: number, unit: number, cropped: boolean) {
+      const doc = await PDFDocument.create();
+      const page = doc.addPage([612, 792]);
+      page.setMediaBox(30, 40, 612, 792);
+      if (cropped) page.setCropBox(50, 70, 500, 600);
+      page.setRotation(degrees(rotation));
+      if (unit !== 1) page.node.set(PDFName.of('UserUnit'), doc.context.obj(unit));
+      return doc.save();
+    }
+
+    for (const rotation of [0, 90, 180, 270]) {
+      for (const angle of [0, 30, 90, 200]) {
+        for (const unit of [1, 2]) {
+          for (const cropped of [false, true]) {
+            const name = `page ${rotation}, signature ${angle}, unit ${unit}, crop ${cropped}`;
+            it(name, async () => {
+              const bytes = await pageWith(rotation, unit, cropped);
+              const saved = await new PdfEditor(bytes, fontBytes).save(
+                [],
+                [placed({ rect, angle })],
+              );
+              const task = getDocument({ data: saved.slice() });
+              const doc = await task.promise;
+              const page = await doc.getPage(1);
+              const viewport = page.getViewport({ scale: 1 });
+              await task.destroy();
+              const [drawn] = await imagesOn(saved, 1);
+              if (!drawn) throw new Error('The signature wasn’t drawn.');
+              // The image's unit square, in the order that screenCorners lists them.
+              const unitCorners = [
+                [0, 0],
+                [1, 0],
+                [0, 1],
+                [1, 1],
+              ];
+              const expected = screenCorners(angle);
+              unitCorners.forEach(([u = 0, v = 0], index) => {
+                const x = drawn[0] * u + drawn[2] * v + drawn[4];
+                const y = drawn[1] * u + drawn[3] * v + drawn[5];
+                const [screenX, screenY] = viewport.convertToViewportPoint(x, y) as [
+                  number,
+                  number,
+                ];
+                expect(screenX).toBeCloseTo(expected[index]?.[0] ?? NaN, 3);
+                expect(screenY).toBeCloseTo(expected[index]?.[1] ?? NaN, 3);
+              });
+            });
+          }
+        }
+      }
+    }
+  });
+
+  it('draws two on one page, each with its own picture, where each was placed', async () => {
+    const other: SignatureImage = { ...image, id: 'other', png: testPng(60, 20), width: 60 };
+    const saved = await new PdfEditor(original('01-plain-text.pdf'), fontBytes).save(
+      [],
+      [
+        placed(),
+        placed({
+          id: 'second',
+          image: other,
+          rect: { x: 300, y: 500, width: 90, height: 30 },
+        }),
+      ],
+    );
+    const drawn = await imagesOn(saved, 1);
+    expect(drawn).toHaveLength(2);
+    expect(middleOf(drawn[0] as Matrix).x).toBeCloseTo(160);
+    expect(middleOf(drawn[1] as Matrix).x).toBeCloseTo(345);
+    expect(middleOf(drawn[1] as Matrix).y).toBeCloseTo(792 - 515);
+    const doc = await PDFDocument.load(saved);
+    const pictures = doc.context
+      .enumerateIndirectObjects()
+      .filter(
+        ([, object]) =>
+          object instanceof PDFRawStream &&
+          object.dict.get(PDFName.of('Subtype')) === PDFName.of('Image') &&
+          object.dict.has(PDFName.of('SMask')),
+      );
+    expect(pictures).toHaveLength(2);
+  });
+
   it('stores one picture however many times it’s placed', async () => {
     const three = await new PdfEditor(original('01-plain-text.pdf'), fontBytes).save(
       [],
@@ -167,6 +268,112 @@ describe('saving a placed signature', () => {
     expect(fnArray.lastIndexOf(OPS.paintImageXObject)).toBeGreaterThan(
       fnArray.lastIndexOf(OPS.showText),
     );
+  });
+
+  describe('over a form field', () => {
+    const name = '21-form-filled-field.pdf';
+    const onField = () => placed({ rect: { x: 100, y: 200, width: 200, height: 40 } });
+    const annotationsOn = async (bytes: Uint8Array) => {
+      const task = getDocument({ data: bytes.slice() });
+      const doc = await task.promise;
+      const annotations = (await (await doc.getPage(1)).getAnnotations()) as {
+        subtype: string;
+        fieldType?: string;
+        rect: number[];
+      }[];
+      await task.destroy();
+      return annotations;
+    };
+
+    it('stays part of the page, with no stamp that fields would paint over', async () => {
+      const saved = await new PdfEditor(original(name), fontBytes).save([], [onField()]);
+      const annotations = await annotationsOn(saved);
+      expect(annotations.filter((item) => item.subtype === 'Stamp')).toHaveLength(0);
+    });
+
+    it('leaves the field in place and fillable', async () => {
+      const saved = await new PdfEditor(original(name), fontBytes).save([], [onField()]);
+      const doc = await PDFDocument.load(saved);
+      const fields = doc.getForm().getFields();
+      expect(fields.map((field) => field.getName())).toEqual(['signature-line']);
+      doc.getForm().getTextField('signature-line').setText('Still works');
+      expect(doc.getForm().getTextField('signature-line').getText()).toBe('Still works');
+    });
+
+    it('moves the field’s background out of the field, so it can’t cover anything', async () => {
+      const saved = await new PdfEditor(original(name), fontBytes).save([], [onField()]);
+      const doc = await PDFDocument.load(saved);
+      const [widget] = doc.getForm().getTextField('signature-line').acroField.getWidgets();
+      const looks = doc.context.lookup(widget?.dict.get(PDFName.of('MK')));
+      expect(looks instanceof PDFDict && looks.has(PDFName.of('BG'))).toBe(false);
+    });
+
+    it('leaves a field alone when the signature is elsewhere', async () => {
+      const elsewhere = placed({ rect: { x: 100, y: 500, width: 200, height: 40 } });
+      const saved = await new PdfEditor(original(name), fontBytes).save([], [elsewhere]);
+      const doc = await PDFDocument.load(saved);
+      const [widget] = doc.getForm().getTextField('signature-line').acroField.getWidgets();
+      const looks = doc.context.lookup(widget?.dict.get(PDFName.of('MK')));
+      expect(looks instanceof PDFDict && looks.has(PDFName.of('BG'))).toBe(true);
+    });
+
+    it('leaves a see-through field as it is', async () => {
+      const doc = await PDFDocument.create();
+      const page = doc.addPage([612, 792]);
+      doc.getForm().createTextField('clear').addToPage(page, {
+        x: 100,
+        y: 552,
+        width: 200,
+        height: 40,
+        borderWidth: 0,
+      });
+      const saved = await new PdfEditor(await doc.save(), fontBytes).save([], [onField()]);
+      const appearance = (await PDFDocument.load(saved))
+        .getForm()
+        .getTextField('clear')
+        .acroField.getWidgets()[0]
+        ?.getNormalAppearance();
+      expect(appearance).toBeDefined();
+      expect(await imagesOn(saved, 1)).toHaveLength(1);
+    });
+  });
+
+  it('becomes a stamp over other annotations, whose order viewers respect', async () => {
+    const doc = await PDFDocument.create();
+    const page = doc.addPage([612, 792]);
+    const note = doc.context.obj({
+      Type: 'Annot',
+      Subtype: 'Square',
+      Rect: [100, 552, 300, 592],
+      F: 4,
+    });
+    page.node.addAnnot(doc.context.register(note));
+    const saved = await new PdfEditor(await doc.save(), fontBytes).save(
+      [],
+      [placed({ rect: { x: 100, y: 200, width: 200, height: 40 } })],
+    );
+    const task = getDocument({ data: saved.slice() });
+    const reopened = await task.promise;
+    const annotations = (await (await reopened.getPage(1)).getAnnotations()) as {
+      subtype: string;
+      rect: number[];
+    }[];
+    await task.destroy();
+    expect(annotations.at(-1)?.subtype).toBe('Stamp');
+    expect(annotations.at(-1)?.rect[0]).toBeCloseTo(100);
+    expect(annotations.at(-1)?.rect[3]).toBeCloseTo(792 - 200);
+  });
+
+  it('isn’t treated as under a link, which paints nothing', async () => {
+    const name = '11-annotations-links.pdf';
+    const doc = await PDFDocument.load(original(name));
+    const links = doc.getPage(0).node.Annots();
+    expect(links?.size()).toBeGreaterThan(0);
+    const saved = await new PdfEditor(original(name), fontBytes).save(
+      [],
+      [placed({ rect: { x: 0, y: 700, width: 60, height: 30 } })],
+    );
+    expect(await imagesOn(saved, 1)).toHaveLength(1);
   });
 
   it('keeps forms and page count', async () => {

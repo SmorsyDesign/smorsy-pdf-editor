@@ -50,6 +50,16 @@ export class SaveFailure extends Error {
   }
 }
 
+/** Larger than a signature image could sensibly be, so it isn't read into memory at all. */
+export const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
+
+export class FileTooLarge extends Error {
+  constructor(fileName: string) {
+    super(`${fileName} is too large`);
+    this.name = 'FileTooLarge';
+  }
+}
+
 export class ReadFailure extends Error {
   readonly fileName: string;
 
@@ -70,7 +80,7 @@ export interface Platform {
   readonly os: OsFamily;
   /** Resolves to null when the person cancels. Rejects with ReadFailure if the file can't be read. */
   chooseFileToOpen(): Promise<OpenedFile | null>;
-  /** Resolves to null when the person cancels. Rejects with ReadFailure if it can't be read. */
+  /** Resolves to null when the person cancels. Rejects with FileTooLarge or ReadFailure. */
   chooseImage(): Promise<PickedImage | null>;
   /** Resolves to null when the person cancels. */
   chooseSaveLocation(suggestedName: string): Promise<string | null>;

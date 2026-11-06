@@ -89,7 +89,9 @@ export interface PlacedSignature {
   readonly image: SignatureImage;
 }
 
-export type PlacedSignatureChanges = Partial<Pick<PlacedSignature, 'rect' | 'angle'>>;
+export type PlacedSignatureChanges = Partial<
+  Pick<PlacedSignature, 'rect' | 'angle' | 'pageNumber'>
+>;
 
 export type Edit =
   | { readonly kind: 'add-text'; readonly box: TextBox }

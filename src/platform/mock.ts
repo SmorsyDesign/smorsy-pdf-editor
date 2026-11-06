@@ -1,4 +1,6 @@
 import {
+  FileTooLarge,
+  MAX_IMAGE_BYTES,
   ReadFailure,
   SaveFailure,
   detectOs,
@@ -81,6 +83,9 @@ export function createMockPlatform(): Platform {
       const next = controls.nextImage;
       controls.nextImage = null;
       if (next === 'read-failure') return Promise.reject(new ReadFailure('Unreadable.png'));
+      if (next && next.bytes.length > MAX_IMAGE_BYTES) {
+        return Promise.reject(new FileTooLarge(next.name));
+      }
       return Promise.resolve(next);
     },
     chooseSaveLocation() {

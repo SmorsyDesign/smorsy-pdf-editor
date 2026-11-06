@@ -1,0 +1,111 @@
+/* On the page. Pages keep one look in dark mode. */
+.sign-layer {
+  position: absolute;
+  inset: 0;
+}
+.sign-layer.is-placing {
+  cursor: copy;
+}
+.placed-signature {
+  position: absolute;
+  z-index: 1;
+  cursor: move;
+  touch-action: none;
+}
+.placed-signature > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.overlay .placed-signature:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.placed-signature.is-selected {
+  outline: 1px solid var(--mark);
+}
+.handle {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.handle::after {
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--mark);
+  border-radius: 2px;
+  background: #ffffff;
+  content: '';
+}
+.handle:focus-visible::after {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+.h-tl {
+  top: -12px;
+  left: -12px;
+  cursor: nwse-resize;
+}
+.h-tr {
+  top: -12px;
+  right: -12px;
+  cursor: nesw-resize;
+}
+.h-bl {
+  bottom: -12px;
+  left: -12px;
+  cursor: nesw-resize;
+}
+.h-br {
+  right: -12px;
+  bottom: -12px;
+  cursor: nwse-resize;
+}
+.h-rot {
+  top: -40px;
+  left: 50%;
+  margin-left: -12px;
+  cursor: grab;
+}
+.h-rot::after {
+  border-radius: 4px;
+  background: var(--mark);
+}
+.h-rot.is-below {
+  top: auto;
+  bottom: -40px;
+}
+.h-stem {
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  width: 1px;
+  height: 20px;
+  background: var(--mark);
+}
+.h-stem.is-below {
+  top: auto;
+  bottom: -20px;
+}
+.placed-bar {
+  position: absolute;
+  z-index: 3;
+  color-scheme: light dark;
+}
+.placed-bar .count {
+  min-width: 0;
+}
+.float-bar .sep {
+  flex: none;
+  width: 1px;
+  height: 20px;
+  margin: 0 var(--space-1);
+  background: var(--line);
+}

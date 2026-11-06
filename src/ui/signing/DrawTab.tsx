@@ -16,15 +16,23 @@ export function DrawTab({ ink, onChange }: DrawTabProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const padRef = useRef<SignaturePad | null>(null);
   const [strokes, setStrokes] = useState(0);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const pad = new SignaturePad(canvas, {
-      minWidth: 1,
-      maxWidth: 3,
-      backgroundColor: 'rgba(0,0,0,0)',
-    });
+    let pad: SignaturePad;
+    try {
+      pad = new SignaturePad(canvas, {
+        minWidth: 1,
+        maxWidth: 3,
+        backgroundColor: 'rgba(0,0,0,0)',
+      });
+    } catch (error) {
+      console.error(error);
+      setFailed(true);
+      return;
+    }
     padRef.current = pad;
     const count = () => {
       setStrokes(pad.toData().length);
@@ -90,6 +98,11 @@ export function DrawTab({ ink, onChange }: DrawTabProps) {
         </span>
         <canvas ref={canvasRef} data-testid="signature-pad" aria-label="Draw your signature here" />
       </div>
+      {failed && (
+        <p className="signature-problem" role="alert">
+          Drawing couldn’t start on this computer. Choose Type or Upload instead.
+        </p>
+      )}
       <div className="pad-tools">
         <div>
           <button type="button" className="btn" disabled={strokes === 0} onClick={undoStroke}>

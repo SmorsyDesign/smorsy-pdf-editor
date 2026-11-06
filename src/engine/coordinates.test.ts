@@ -25,6 +25,15 @@ describe('displayToUser', () => {
   });
 });
 
+describe('pages that don’t start at zero', () => {
+  it('honours the offset at every rotation', () => {
+    const offset = (rotation: number) => letter(rotation, 10, 20);
+    expect(displayToUser({ x: 72, y: 100 }, offset(90))).toEqual({ x: 110, y: 92 });
+    expect(displayToUser({ x: 72, y: 100 }, offset(180))).toEqual({ x: 550, y: 120 });
+    expect(displayToUser({ x: 72, y: 100 }, offset(270))).toEqual({ x: 522, y: 740 });
+  });
+});
+
 describe('pages with a larger unit', () => {
   it('scales positions down to PDF units', () => {
     expect(displayToUser({ x: 72, y: 100 }, { ...letter(0), unit: 2 })).toEqual({ x: 36, y: 742 });

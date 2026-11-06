@@ -98,6 +98,7 @@ export function DocumentView({
   useDocumentCommands({
     handleRef,
     session,
+    hasPendingPlacement: () => signing.picked !== null,
     percent,
     applyZoom,
     fit,
@@ -122,8 +123,9 @@ export function DocumentView({
   const hintFor = () => {
     if (mode === 'edit') return 'Click a line to edit it, or click an empty area to add text';
     if (mode === 'select') return 'Drag across text to select it';
+    if (signing.picked || signing.moving) return 'Click where it goes on the page';
     if (signing.selected) return 'Drag the corners to resize, or the top handle to rotate';
-    return signing.picked ? 'Click where it goes on the page' : 'Create a signature to place it';
+    return 'Create a signature to place it';
   };
 
   const stateLabel = () => {
@@ -249,9 +251,7 @@ export function DocumentView({
           platform={platform}
           initialKind={signing.creating}
           onUse={signing.addSlip}
-          onCancel={() => {
-            signing.startCreating(null);
-          }}
+          onCancel={signing.stopCreating}
         />
       )}
 

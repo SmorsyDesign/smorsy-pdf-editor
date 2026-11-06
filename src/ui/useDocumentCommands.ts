@@ -9,20 +9,25 @@ export interface DocumentViewHandle {
   flush(): Promise<boolean>;
   /** True while text is being typed or an edit is still being recorded. */
   hasUnfinishedEdit(): boolean;
+  /** True when a signature has been made, but saving now would leave it out of the file. */
+  hasPendingPlacement(): boolean;
 }
 
-/** Fields have their own undo, which comes first. A colour picker has none. */
+const TEXT_INPUTS = new Set(['text', 'search', 'number']);
+
+/** Fields you type in have their own undo, which comes first. Checkboxes and the like have none. */
 const isTyping = () => {
   const active = document.activeElement;
   return (
     active instanceof HTMLTextAreaElement ||
-    (active instanceof HTMLInputElement && active.type !== 'color')
+    (active instanceof HTMLInputElement && TEXT_INPUTS.has(active.type))
   );
 };
 
 interface DocumentCommands {
   readonly handleRef: RefObject<DocumentViewHandle | null>;
   readonly session: TextSession;
+  readonly hasPendingPlacement: () => boolean;
   readonly percent: number;
   readonly applyZoom: (percent: number) => void;
   readonly fit: () => void;
@@ -34,6 +39,7 @@ interface DocumentCommands {
 export function useDocumentCommands({
   handleRef,
   session,
+  hasPendingPlacement,
   percent,
   applyZoom,
   fit,
@@ -43,6 +49,7 @@ export function useDocumentCommands({
   useImperativeHandle(handleRef, () => ({
     flush: session.flush,
     hasUnfinishedEdit: session.hasUnfinishedEdit,
+    hasPendingPlacement,
     command(command) {
       switch (command) {
         case 'zoom-in':

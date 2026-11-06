@@ -12,5 +12,6 @@ describe('handwritingCovers', () => {
     expect(handwritingCovers('Данило')).toBe(false);
     expect(handwritingCovers('山田')).toBe(false);
     expect(handwritingCovers('Łukasz')).toBe(false);
+    expect(handwritingCovers('Oʼbrien')).toBe(false);
   });
 });

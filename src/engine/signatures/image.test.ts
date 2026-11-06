@@ -76,6 +76,23 @@ describe('removeWhiteBackground', () => {
     expect(pixelAt(result, 2, 2)[3]).toBe(0);
   });
 
+  it('leaves an image that’s already cut out alone, rather than erasing its ink', () => {
+    const clear: Pixel = [0, 0, 0, 0];
+    const rows = Array.from({ length: 8 }, (_, y) =>
+      Array.from({ length: 8 }, (__, x): Pixel => (y === 4 ? [10 + x * 14, 10, 40] : clear)),
+    );
+    const source = imageOf(rows);
+    const result = removeWhiteBackground(source);
+    expect(pixelAt(result, 3, 4)).toEqual(pixelAt(source, 3, 4));
+    expect(pixelAt(result, 7, 4)[3]).toBe(255);
+    expect(pixelAt(result, 0, 0)[3]).toBe(0);
+  });
+
+  it('still treats an image with a few stray clear pixels as paper', () => {
+    const result = removeWhiteBackground(paper(16, 255, { '2,2': [0, 0, 0, 0] }));
+    expect(pixelAt(result, 8, 8)[3]).toBe(0);
+  });
+
   it('doesn’t change the image it was given', () => {
     const source = paper(4, 255, {});
     removeWhiteBackground(source);

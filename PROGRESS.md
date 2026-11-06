@@ -112,6 +112,7 @@
 - [ ] Warn before closing with unsaved changes (if not already delivered)
 - [ ] Auto-updates via `latest.json`; prompt first, never restart mid-edit
 - [ ] Universal `.dmg`; NSIS `.exe` that installs WebView2 if missing
+- [ ] Ship third-party notices for every bundled library, such as `signature_pad`. Font licences already ship from `assets/fonts`
 - [ ] `DEPLOY.md`
 - [ ] `FAMILY-GUIDE.md` and short in-app help
 - [ ] Retina, Windows 125% and 150%, pinch zoom, unusual file names

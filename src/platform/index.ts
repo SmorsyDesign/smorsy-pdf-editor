@@ -14,4 +14,4 @@ export async function createPlatform(): Promise<Platform> {
 }
 
 export type { MenuCommand, OpenedFile, OsFamily, Platform, SaveFailureKind } from './types';
-export { ReadFailure, SaveFailure } from './types';
+export { FileTooLarge, ReadFailure, SaveFailure } from './types';

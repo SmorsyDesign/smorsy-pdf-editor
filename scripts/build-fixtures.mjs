@@ -255,6 +255,24 @@ function annotation(doc, fields) {
   return doc.context.register(doc.context.obj({ Type: 'Annot', ...fields }));
 }
 
+/** A signature line that's a form field with a solid background, which would hide page content. */
+async function formWithFilledField() {
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const page = doc.addPage([612, 792]);
+  page.drawText('Sign on the line below', { x: 100, y: 620, size: 14, font });
+  const field = doc.getForm().createTextField('signature-line');
+  field.addToPage(page, {
+    x: 100,
+    y: 552,
+    width: 200,
+    height: 40,
+    backgroundColor: rgb(0.85, 0.9, 1),
+    borderWidth: 0,
+  });
+  writeFileSync(join(out, '21-form-filled-field.pdf'), await doc.save());
+}
+
 async function annotationsAndLinks() {
   const doc = await newDoc('Annotations and links');
   const font = await doc.embedFont(StandardFonts.Helvetica);
@@ -456,6 +474,7 @@ await fillableForm();
 await scanned();
 await passwordProtected();
 await annotationsAndLinks();
+await formWithFilledField();
 await bookmarks();
 await largeDocument();
 await imagesAndText();
