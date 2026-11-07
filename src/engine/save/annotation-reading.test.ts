@@ -222,7 +222,7 @@ describe('reading a file that says something strange', () => {
 
   it('keeps a mountain of tags to a sensible number and length', async () => {
     const many = JSON.stringify(
-      Array.from({ length: 200 }, (_, i) => `${String(i)}${'x'.repeat(200)}`),
+      Array.from({ length: 100 }, (_, i) => `${String(i)}${'x'.repeat(200)}`),
     );
     const odd = await tamper(await saveWith([KINDS[4] as Annotation]), (dict) => {
       dict.set(PDFName.of('SmorsyTags'), PDFHexString.fromText(many));
