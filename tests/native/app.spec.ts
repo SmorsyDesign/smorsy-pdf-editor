@@ -271,6 +271,34 @@ describe('the built app', () => {
     expect(saved.getPage(0).node.Annots()?.size()).toBe(1);
   });
 
+  it('reopens a saved comment with its tag, and changes it, through the real app', async () => {
+    await openFromStartScreen(plainText);
+    await waitForPageDrawn();
+    await $('button=Annotate').click();
+    await $('[aria-label="Comment"]').click();
+    await $('[data-testid="draw-layer"]').click();
+    await $('textarea[aria-label="Comment"]').setValue('Please check this');
+    await $('button.row-text').click();
+    await $('input[aria-label="Add a tag"]').setValue('Chapter 1\n');
+    const first = join(workspace, 'Commented copy.pdf');
+    await answerDialogs({ save: first });
+    await $('button=Save a copy').click();
+    await expect($('span=Copy saved')).toBeDisplayed();
+
+    await openFromStartScreen(first);
+    await waitForPageDrawn();
+    await $('button=Annotate').click();
+    await expect($('.row-words')).toHaveText('Please check this');
+    await expect($('.tag-filters button')).toHaveText('Chapter 1');
+    await $('[aria-label="Delete comment"]').click();
+    const second = join(workspace, 'Comment removed copy.pdf');
+    await answerDialogs({ save: second });
+    await $('button=Save a copy').click();
+    await expect($('span=Copy saved')).toBeDisplayed();
+    const saved = await PDFDocument.load(new Uint8Array(readFileSync(second)));
+    expect(saved.getPage(0).node.Annots()?.size() ?? 0).toBe(0);
+  });
+
   it('fills in a form and saves it through the real app', async () => {
     const form = join(workspace, '08-fillable-form.pdf');
     await openFromStartScreen(form);

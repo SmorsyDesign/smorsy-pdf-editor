@@ -44,6 +44,25 @@ export function displayToUser(point: Point, box: PageBox): Point {
   }
 }
 
+/** Converts from PDF space back to the page as displayed, undoing `displayToUser`. */
+export function userToDisplay(point: Point, box: PageBox): Point {
+  const unit = box.unit ?? 1;
+  const fromLeft = point.x - box.x;
+  const fromRight = box.x + box.width - point.x;
+  const fromBottom = point.y - box.y;
+  const fromTop = box.y + box.height - point.y;
+  switch (box.rotation) {
+    case 90:
+      return { x: fromBottom * unit, y: fromLeft * unit };
+    case 180:
+      return { x: fromRight * unit, y: fromBottom * unit };
+    case 270:
+      return { x: fromTop * unit, y: fromRight * unit };
+    default:
+      return { x: fromLeft * unit, y: fromTop * unit };
+  }
+}
+
 /** Display angles run clockwise and PDF angles anticlockwise. */
 export function userAngle(displayAngle: number, rotation: number): number {
   return rotation - displayAngle;

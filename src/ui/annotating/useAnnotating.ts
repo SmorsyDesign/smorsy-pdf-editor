@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   LINE_WIDTH,
+  PIN_SIZE,
+  boundsOfAnnotation,
+  canRecolour,
   WHITE,
   annotationMovedTo,
+  movedAnnotation,
   defaultRect,
   mergedLines,
   type Annotation,
@@ -54,13 +58,20 @@ export function useAnnotating(
   const [swatch, setSwatch] = useState<Swatch>(SWATCHES[0] as Swatch);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [movingId, setMovingId] = useState<string | null>(null);
-  const [openNoteId, setOpenNoteId] = useState<string | null>(null);
+  const [openCommentId, setOpenCommentId] = useState<string | null>(null);
   // Kept out of the edit log until it has words, so one left empty changes nothing about the file.
-  const [newNote, setNewNote] = useState<Annotation | null>(null);
+  const [newComment, setNewComment] = useState<Annotation | null>(null);
   // Asked for once, because focusing whenever a page reappears would steal it and move the view.
   const [focusId, setFocusId] = useState<string | null>(null);
 
-  const shown = newNote ? [...annotations, newNote] : annotations;
+  const shown = newComment ? [...annotations, newComment] : annotations;
+  // A picked tool stops clicks reaching what's on the page, and with annotations already there,
+  // the likeliest first thing is to click one.
+  const hasSavedAnnotations = annotations.some((annotation) => annotation.saved);
+  useEffect(() => {
+    if (hasSavedAnnotations) setTool(null);
+  }, [hasSavedAnnotations]);
+
   const selected = shown.find((annotation) => annotation.id === selectedId) ?? null;
   const moving = selected && movingId === selected.id ? selected : null;
 
@@ -68,8 +79,8 @@ export function useAnnotating(
     if (active) return;
     setSelectedId(null);
     setMovingId(null);
-    setOpenNoteId(null);
-    setNewNote(null);
+    setOpenCommentId(null);
+    setNewComment(null);
   }, [active]);
 
   useEffect(() => {
@@ -87,7 +98,7 @@ export function useAnnotating(
 
   const colorFor = (kind: AnnotationTool, from: Swatch = swatch): Color => {
     if (kind === 'whiteout') return WHITE;
-    return kind === 'highlight' || kind === 'note' ? from.marker : from.ink;
+    return kind === 'highlight' || kind === 'comment' ? from.marker : from.ink;
   };
 
   const add = (annotation: Annotation, focus = false) => {
@@ -99,31 +110,31 @@ export function useAnnotating(
   };
 
   /** A note opens to be typed in. Its own text box takes focus, so nothing else should ask for it. */
-  const startNote = (note: Annotation) => {
-    setNewNote(note);
-    setOpenNoteId(note.id);
+  const startComment = (note: Annotation) => {
+    setNewComment(note);
+    setOpenCommentId(note.id);
     setSelectedId(note.id);
     // One note at a time: a click on the page shouldn't leave another one behind this one.
     setTool(null);
   };
 
   const change = (annotation: Annotation, group?: string) => {
-    if (newNote?.id !== annotation.id) {
+    if (newComment?.id !== annotation.id) {
       apply({ kind: 'change-annotation', annotation }, group);
-    } else if (annotation.kind === 'note' && annotation.text.trim() !== '') {
+    } else if (annotation.kind === 'comment' && annotation.text.trim() !== '') {
       apply({ kind: 'add-annotation', annotation }, group);
-      setNewNote(null);
+      setNewComment(null);
     } else {
-      setNewNote(annotation);
+      setNewComment(annotation);
     }
   };
 
   const remove = (id: string, options: { group?: string; focusPages?: boolean } = {}) => {
-    if (newNote?.id === id) setNewNote(null);
+    if (newComment?.id === id) setNewComment(null);
     else apply({ kind: 'remove-annotation', id }, options.group);
     setSelectedId(null);
     setMovingId(null);
-    setOpenNoteId(null);
+    setOpenCommentId(null);
     // What had focus has just gone, so this keeps the keyboard somewhere useful.
     if (options.focusPages !== false) focusPages();
   };
@@ -154,13 +165,13 @@ export function useAnnotating(
         to: { x: centre.x + ARROW_LENGTH / 2, y: centre.y },
         width: LINE_WIDTH,
       };
-    } else if (kind === 'note') {
-      annotation = { ...start, kind, at: centre, text: '' };
+    } else if (kind === 'comment') {
+      // The pin's square corner is what marks the spot, so that's what goes where it was clicked.
+      annotation = { ...start, kind, at: { x: centre.x, y: centre.y - PIN_SIZE }, text: '' };
     }
     if (!annotation) return;
-    const placed = annotationMovedTo(annotation, pageNumber, centre, page);
-    if (placed.kind === 'note') startNote(placed);
-    else add(placed, focus);
+    if (annotation.kind === 'comment') startComment(movedAnnotation(annotation, 0, 0, page));
+    else add(annotationMovedTo(annotation, pageNumber, centre, page), focus);
   };
 
   /** Marks text that's been worked out already, such as a whole line from the keyboard. */
@@ -172,7 +183,7 @@ export function useAnnotating(
 
   const pickSwatch = (next: Swatch) => {
     setSwatch(next);
-    if (selected && selected.kind !== 'whiteout') {
+    if (selected && canRecolour(selected)) {
       change({ ...selected, color: colorFor(selected.kind, next) });
     }
   };
@@ -217,6 +228,16 @@ export function useAnnotating(
 
   return {
     annotations: shown,
+    /** Just what's real so far, without a new comment that has no words yet. */
+    saved: annotations,
+    /** Picks it from the list, wherever it is. */
+    goTo: (annotation: Annotation) => {
+      setSelectedId(annotation.id);
+      setMovingId(null);
+      setTool(null);
+      setFocusId(annotation.id);
+    },
+    topOf: (annotation: Annotation) => boundsOfAnnotation(annotation).y,
     tool,
     pickTool: (next: AnnotationTool) => {
       setTool((current) => (current === next ? null : next));
@@ -243,12 +264,12 @@ export function useAnnotating(
       setMovingId(null);
       setFocusId(id);
     },
-    openNoteId,
-    toggleNote: (id: string) => {
-      setOpenNoteId((current) => (current === id ? null : id));
+    openCommentId,
+    toggleComment: (id: string) => {
+      setOpenCommentId((current) => (current === id ? null : id));
     },
-    closeNote: () => {
-      setOpenNoteId(null);
+    closeComment: () => {
+      setOpenCommentId(null);
     },
     focusId,
     focus: setFocusId,

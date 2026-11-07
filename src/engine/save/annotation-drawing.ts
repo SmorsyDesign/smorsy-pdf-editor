@@ -18,7 +18,7 @@ import {
   type PDFOperator,
 } from '@cantoo/pdf-lib';
 import { displayToUser, type PageBox, type Point } from '../coordinates';
-import { NOTE_SIZE, type Annotation, type MarkupKind, type ShapeKind } from '../edits/annotations';
+import { PIN_SIZE, type Annotation, type MarkupKind, type ShapeKind } from '../edits/annotations';
 import type { Color, Rect } from '../edits/model';
 import { boundsAround } from './page-annotations';
 
@@ -218,31 +218,71 @@ function drawnArrow(
   };
 }
 
-function drawnNote(
-  annotation: Extract<Annotation, { kind: 'note' }>,
+// How far a corner's control points sit along each side, for a quarter of a circle of radius one.
+const ROUND = 0.5523;
+
+/**
+ * A speech bubble whose one square corner, at the bottom left as displayed, is the spot it's about.
+ * It's worked out as displayed and converted point by point, so it's right on any page rotation.
+ */
+function drawnComment(
+  annotation: Extract<Annotation, { kind: 'comment' }>,
   box: PageBox,
   unit: number,
 ): Drawn {
   const { at, color, text } = annotation;
-  const corners = cornersOf({ ...at, width: NOTE_SIZE, height: NOTE_SIZE }, box);
-  const { left, right, bottom, top } = boundsAround(Object.values(corners));
-  const inset = (right - left) * 0.25;
-  const lines = [0.65, 0.5, 0.35].flatMap((share) => {
-    const y = bottom + (top - bottom) * share;
-    return [moveTo(left + inset, y), lineTo(right - inset, y)];
-  });
+  const corners = cornersOf({ ...at, width: PIN_SIZE, height: PIN_SIZE }, box);
+  const point = (x: number, y: number) => displayToUser({ x: at.x + x, y: at.y + y }, box);
+  const mid = PIN_SIZE / 2;
+  const reach = mid * ROUND;
+  const curve = (points: readonly (readonly [number, number])[]) => {
+    const [one, two, three] = points.map(([x, y]) => point(x, y));
+    return one && two && three
+      ? [appendBezierCurve(one.x, one.y, two.x, two.y, three.x, three.y)]
+      : [];
+  };
+  const start = point(0, PIN_SIZE);
+  const up = point(0, mid);
+  const bubble = [
+    moveTo(start.x, start.y),
+    lineTo(up.x, up.y),
+    ...curve([
+      [0, mid - reach],
+      [mid - reach, 0],
+      [mid, 0],
+    ]),
+    ...curve([
+      [mid + reach, 0],
+      [PIN_SIZE, mid - reach],
+      [PIN_SIZE, mid],
+    ]),
+    ...curve([
+      [PIN_SIZE, mid + reach],
+      [mid + reach, PIN_SIZE],
+      [mid, PIN_SIZE],
+    ]),
+    closePath(),
+  ];
+  // The same two lines as the pin on screen: words, one line longer than the other.
+  const line = (y: number, length: number) => {
+    const from = point(6, y);
+    const to = point(6 + length, y);
+    return [moveTo(from.x, from.y), lineTo(to.x, to.y)];
+  };
   return {
     subtype: 'Text',
     points: Object.values(corners),
     extra: { Contents: PDFHexString.fromText(text), Name: 'Comment', Open: false },
     operators: [
       setFillingRgbColor(color.r, color.g, color.b),
-      ...outline(corners),
+      ...bubble,
       fill(),
-      ...inkSetup({ r: 0.3, g: 0.23, b: 0 }, 1 / unit),
-      ...outline(corners),
+      ...inkSetup({ r: 0.2, g: 0.16, b: 0.04 }, 1 / unit),
+      ...bubble,
       stroke(),
-      ...lines,
+      ...inkSetup({ r: 0.2, g: 0.16, b: 0.04 }, 2 / unit),
+      ...line(9, 12),
+      ...line(15, 7),
       stroke(),
     ],
   };
@@ -258,10 +298,12 @@ export function drawnAnnotation(annotation: Annotation, box: PageBox): Drawn | n
       return drawnShape(annotation, box, unit);
     case 'arrow':
       return drawnArrow(annotation, box, unit);
-    case 'note':
-      return drawnNote(annotation, box, unit);
+    case 'comment':
+      return drawnComment(annotation, box, unit);
     // Whiteout is part of the page rather than an annotation, so it's drawn elsewhere.
     case 'whiteout':
+    // Another app's own drawing stays as it was.
+    case 'foreign':
       return null;
     default:
       return drawnMarkup(annotation, box, unit);

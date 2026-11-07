@@ -162,21 +162,21 @@ export function Highlights({
   );
 }
 
-export const noteColor = (color: Color) => cssInk(color);
+export const pinColor = (color: Color) => cssInk(color);
 
-const NOTE_CARD_WIDTH = 200;
-const NOTE_CARD_HEIGHT = 112;
-const NOTE_CARD_GAP = 8;
+const COMMENT_CARD_WIDTH = 232;
+const COMMENT_CARD_HEIGHT = 112;
+const COMMENT_CARD_GAP = 8;
 
 /** Under the pin, unless that would run off the page, so the words are never cut off. */
-export function noteCardPlace(pin: Rect, scale: number, page: PageSize) {
+export function commentCardPlace(pin: Rect, scale: number, page: PageSize) {
   const left = pin.x * scale;
-  const below = (pin.y + pin.height) * scale + NOTE_CARD_GAP;
-  const fitsBelow = below + NOTE_CARD_HEIGHT <= page.height * scale;
+  const below = (pin.y + pin.height) * scale + COMMENT_CARD_GAP;
+  const fitsBelow = below + COMMENT_CARD_HEIGHT <= page.height * scale;
   return {
-    left: Math.round(Math.max(0, Math.min(left, page.width * scale - NOTE_CARD_WIDTH))),
+    left: Math.round(Math.max(0, Math.min(left, page.width * scale - COMMENT_CARD_WIDTH))),
     top: Math.round(
-      fitsBelow ? below : Math.max(0, pin.y * scale - NOTE_CARD_GAP - NOTE_CARD_HEIGHT),
+      fitsBelow ? below : Math.max(0, pin.y * scale - COMMENT_CARD_GAP - COMMENT_CARD_HEIGHT),
     ),
   };
 }

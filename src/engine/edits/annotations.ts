@@ -5,10 +5,22 @@ import type { Color, Rect } from './model';
 export type MarkupKind = 'highlight' | 'underline' | 'strikeout';
 export type ShapeKind = 'rect' | 'ellipse' | 'whiteout';
 
+/** Where an annotation that was already in the file lives, so saving can find it again. */
+export interface SavedSource {
+  /** The PDF's own name for it, as the page renderer knows it too: "12R". */
+  readonly ref: string;
+  readonly pageNumber: number;
+  /** Another app made it, so only its words and tags are safe to change. */
+  readonly foreign: boolean;
+}
+
 interface Common {
   readonly id: string;
   readonly pageNumber: number;
   readonly color: Color;
+  readonly tags?: readonly string[];
+  /** Absent for anything made since the file was opened. */
+  readonly saved?: SavedSource;
 }
 
 /** Everything is in PDF points as displayed: origin at the page's top left, y going down. */
@@ -27,10 +39,17 @@ export type Annotation =
       readonly to: Point;
       readonly width: number;
     })
-  | (Common & { readonly kind: 'note'; readonly at: Point; readonly text: string });
+  | (Common & { readonly kind: 'comment'; readonly at: Point; readonly text: string })
+  // Anything else another app left in the file, which is shown as it is rather than redrawn.
+  | (Common & {
+      readonly kind: 'foreign';
+      readonly subtype: string;
+      readonly rect: Rect;
+      readonly text: string;
+    });
 
 export const LINE_WIDTH = 2;
-export const NOTE_SIZE = 24;
+export const PIN_SIZE = 24;
 export const WHITE: Color = { r: 1, g: 1, b: 1 };
 
 const DEFAULT_WIDTH = 120;
@@ -106,11 +125,12 @@ export function boundsOfAnnotation(annotation: Annotation): Rect {
       return boundsAround(annotation.points);
     case 'arrow':
       return boundsAround([annotation.from, annotation.to]);
-    case 'note':
-      return { ...annotation.at, width: NOTE_SIZE, height: NOTE_SIZE };
+    case 'comment':
+      return { ...annotation.at, width: PIN_SIZE, height: PIN_SIZE };
     case 'rect':
     case 'ellipse':
     case 'whiteout':
+    case 'foreign':
       return annotation.rect;
     default:
       return boundsAround(
@@ -124,11 +144,20 @@ export function boundsOfAnnotation(annotation: Annotation): Rect {
 
 /** Marks belong to the text under them, so only what's drawn freely can be moved. */
 export function canMove(annotation: Annotation): boolean {
+  if (annotation.saved?.foreign) return false;
   return !['highlight', 'underline', 'strikeout'].includes(annotation.kind);
 }
 
+/** Another app's drawing can't be redrawn in a new colour, and whiteout has to stay white. */
+export function canRecolour(annotation: Annotation): boolean {
+  return !annotation.saved?.foreign && annotation.kind !== 'whiteout';
+}
+
+/** Whiteout goes in the page itself when saved, so a tag on one would have nowhere to live. */
+export const canTag = (annotation: Annotation) => annotation.kind !== 'whiteout';
+
 export function canResize(annotation: Annotation): boolean {
-  return canMove(annotation) && annotation.kind !== 'note';
+  return canMove(annotation) && annotation.kind !== 'comment';
 }
 
 function moved(annotation: Annotation, dx: number, dy: number): Annotation {
@@ -138,11 +167,12 @@ function moved(annotation: Annotation, dx: number, dy: number): Annotation {
       return { ...annotation, points: annotation.points.map(shift) };
     case 'arrow':
       return { ...annotation, from: shift(annotation.from), to: shift(annotation.to) };
-    case 'note':
+    case 'comment':
       return { ...annotation, at: shift(annotation.at) };
     case 'rect':
     case 'ellipse':
     case 'whiteout':
+    case 'foreign':
       return { ...annotation, rect: { ...annotation.rect, ...shift(annotation.rect) } };
     default:
       return annotation;
@@ -217,7 +247,7 @@ export function scaledAnnotation(
   return movedAnnotation(next, 0, 0, page);
 }
 
-const LABELS: Readonly<Record<Annotation['kind'], string>> = {
+const LABELS: Readonly<Record<Exclude<Annotation['kind'], 'foreign'>, string>> = {
   highlight: 'Highlight',
   underline: 'Underline',
   strikeout: 'Strikethrough',
@@ -225,11 +255,56 @@ const LABELS: Readonly<Record<Annotation['kind'], string>> = {
   rect: 'Rectangle',
   ellipse: 'Ellipse',
   arrow: 'Arrow',
-  note: 'Note',
+  comment: 'Comment',
   whiteout: 'Whiteout box',
 };
 
-export const annotationLabel = (annotation: Annotation) => LABELS[annotation.kind];
+const FOREIGN_LABELS: Readonly<Record<string, string>> = {
+  Highlight: 'Highlight',
+  Underline: 'Underline',
+  StrikeOut: 'Strikethrough',
+  Squiggly: 'Squiggly underline',
+  Ink: 'Pen drawing',
+  Square: 'Rectangle',
+  Circle: 'Ellipse',
+  Line: 'Line',
+  PolyLine: 'Line',
+  Polygon: 'Polygon',
+  FreeText: 'Text box',
+  Stamp: 'Stamp',
+  Caret: 'Insertion mark',
+  FileAttachment: 'Attached file',
+};
+
+export const annotationLabel = (annotation: Annotation) =>
+  annotation.kind === 'foreign'
+    ? (FOREIGN_LABELS[annotation.subtype] ?? 'Annotation')
+    : LABELS[annotation.kind];
+
+export type AnnotationCategory = 'comment' | 'markup' | 'drawing';
+
+const FOREIGN_MARKUP: ReadonlySet<string> = new Set([
+  'Highlight',
+  'Underline',
+  'StrikeOut',
+  'Squiggly',
+]);
+
+/** Which tab of the panel something belongs on. */
+export function annotationCategory(annotation: Annotation): AnnotationCategory {
+  switch (annotation.kind) {
+    case 'comment':
+      return 'comment';
+    case 'highlight':
+    case 'underline':
+    case 'strikeout':
+      return 'markup';
+    case 'foreign':
+      return FOREIGN_MARKUP.has(annotation.subtype) ? 'markup' : 'drawing';
+    default:
+      return 'drawing';
+  }
+}
 
 export function annotationDetail(annotation: Annotation): string {
   if ('text' in annotation) return annotation.text;

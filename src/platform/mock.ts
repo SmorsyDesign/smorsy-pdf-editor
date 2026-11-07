@@ -52,7 +52,46 @@ const SHORTCUTS: Readonly<Record<string, MenuCommand>> = {
 };
 
 /** Stands in for the operating system when the UI runs in a plain browser for tests. */
+/** Someone looking at this in an ordinary browser, rather than a test, gets a real file picker. */
+function pickFileInBrowser(): Promise<OpenedFile | null> {
+  return new Promise((resolve, reject) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/pdf';
+    input.addEventListener('cancel', () => {
+      resolve(null);
+    });
+    input.addEventListener('change', () => {
+      const file = input.files?.[0];
+      if (!file) {
+        resolve(null);
+        return;
+      }
+      file.arrayBuffer().then((buffer) => {
+        resolve({
+          path: `/test-version/${file.name}`,
+          name: file.name,
+          bytes: new Uint8Array(buffer),
+        });
+      }, reject);
+    });
+    input.click();
+  });
+}
+
+/** A browser can't write to the computer, and "Copy saved" would otherwise look like it had. */
+function sayThisIsTheTestVersion(): void {
+  const notice = document.createElement('p');
+  notice.textContent =
+    'Test version: saving doesn’t write a file. For the real app, run npm run tauri dev.';
+  notice.setAttribute('role', 'note');
+  notice.style.cssText =
+    'position:fixed;left:50%;bottom:32px;z-index:100;margin:0;padding:4px 12px;transform:translateX(-50%);border-radius:4px;background:#8a4f00;color:#fff;font:400 12px/16px sans-serif;';
+  document.body.append(notice);
+}
+
 export function createMockPlatform(): Platform {
+  if (!navigator.webdriver) sayThisIsTheTestVersion();
   const controls: MockControls = {
     nextOpen: null,
     nextImage: null,
@@ -76,6 +115,7 @@ export function createMockPlatform(): Platform {
     chooseFileToOpen() {
       const next = controls.nextOpen;
       controls.nextOpen = null;
+      if (next === null && !navigator.webdriver) return pickFileInBrowser();
       if (next === 'read-failure') return Promise.reject(new ReadFailure('Unreadable.pdf'));
       return Promise.resolve(next);
     },

@@ -164,7 +164,7 @@ describe('a list of annotations that pages share', () => {
     id: 'n',
     pageNumber: 1,
     color: white,
-    kind: 'note',
+    kind: 'comment',
     at: { x: 100, y: 100 },
     text: 'Only on the first page',
   };
@@ -196,7 +196,14 @@ describe('a note with no words at the moment of saving', () => {
     const original = await make(() => undefined);
     const bytes = await new PdfEditor(original, fonts).save([], [], {
       annotations: [
-        { id: 'n', pageNumber: 1, color: white, kind: 'note', at: { x: 100, y: 100 }, text: '  ' },
+        {
+          id: 'n',
+          pageNumber: 1,
+          color: white,
+          kind: 'comment',
+          at: { x: 100, y: 100 },
+          text: '  ',
+        },
       ],
     });
     expect(await annotationCount(bytes)).toBe(0);

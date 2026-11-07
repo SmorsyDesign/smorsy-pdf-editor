@@ -8,29 +8,16 @@ import {
   rememberPage,
   reopenSaved,
   saveTo,
+  openBytes,
   waitForRedraw,
   whatChanged,
 } from './editing-helpers';
-import { expectOpenDocument, expectPageDrawn, gotoApp, openFixture } from './helpers';
+import { expectOpenDocument, expectPageDrawn, openFixture } from './helpers';
 import { queueImage } from './signing-helpers';
 import { openDocument } from '../../src/engine/document';
 
 const PLAIN = 'test-pdfs/01-plain-text.pdf';
 
-async function openBytes(page: Page, bytes: Uint8Array) {
-  await gotoApp(page);
-  await page.evaluate((data) => {
-    if (!window.smorsyMock) throw new Error('The mock isn’t there.');
-    window.smorsyMock.nextOpen = {
-      path: '/Users/test/Made.pdf',
-      name: 'Made.pdf',
-      bytes: Uint8Array.from(data),
-    };
-  }, Array.from(bytes));
-  await page.getByRole('button', { name: 'Choose a file' }).click();
-  await expectOpenDocument(page, 1);
-  await expectPageDrawn(page);
-}
 const ROTATED = 'test-pdfs/06-rotated-pages.pdf';
 
 const bar = (page: Page) => page.getByRole('toolbar', { name: 'Annotation tools' });
@@ -159,19 +146,19 @@ for (const [pageNumber, angle] of ROTATIONS) {
       });
     }
 
-    test('a note’s pin saves where it was clicked', async ({ page }) => {
+    test('a comment’s pin saves with its corner where it was clicked', async ({ page }) => {
       await openForAnnotating(page, ROTATED, 4);
       await pageElement(page, pageNumber).scrollIntoViewIfNeeded();
       await waitForRedraw(page, pageNumber);
       await rememberPage(page, pageNumber);
-      await tool(page, 'Sticky note').click();
+      await tool(page, 'Comment').click();
       await clickOnPage(page, [300, 300], pageNumber);
       await page.keyboard.type('Check this');
       await clickOnPage(page, [40, 40], pageNumber);
       await reopened(page, 4);
       const changed = await whatChanged(page, pageNumber);
       expect(changed.pixels).toBeGreaterThan(10);
-      expectInside(changed, { x: 280, y: 280, width: 40, height: 40 });
+      expectInside(changed, { x: 300, y: 264, width: 36, height: 36 });
     });
 
     test('whiteout hides what’s beneath it, and nothing else', async ({ page }) => {
@@ -438,19 +425,19 @@ test.describe('whiteout over what viewers paint on top', () => {
   });
 });
 
-test.describe('rewording a note', () => {
+test.describe('rewording a comment', () => {
   const makeNote = async (page: Page) => {
     await openForAnnotating(page);
-    await tool(page, 'Sticky note').click();
+    await tool(page, 'Comment').click();
     await clickOnPage(page, [300, 300]);
     await page.keyboard.type('Private words');
     await clickOnPage(page, [100, 600]);
-    await page.locator('[data-kind="note"]').click();
+    await page.locator('[data-kind="comment"]').click();
   };
 
   test('clearing it and saving from inside the box leaves the words out', async ({ page }) => {
     await makeNote(page);
-    await page.getByRole('textbox', { name: 'Note', exact: true }).fill('');
+    await page.getByRole('textbox', { name: 'Comment', exact: true }).fill('');
     await saveTo(page);
     const doc = await openDocument(Uint8Array.from((await lastWrite(page))?.bytes ?? []));
     const notes = await doc.existingNotes(1);
@@ -460,7 +447,7 @@ test.describe('rewording a note', () => {
 
   test('new words typed without leaving the box are the ones saved', async ({ page }) => {
     await makeNote(page);
-    await page.getByRole('textbox', { name: 'Note', exact: true }).fill('Better words');
+    await page.getByRole('textbox', { name: 'Comment', exact: true }).fill('Better words');
     await saveTo(page);
     const doc = await openDocument(Uint8Array.from((await lastWrite(page))?.bytes ?? []));
     const notes = await doc.existingNotes(1);
@@ -470,11 +457,11 @@ test.describe('rewording a note', () => {
 
   test('clearing it removes it, and one undo brings the words back', async ({ page }) => {
     await makeNote(page);
-    await page.getByRole('textbox', { name: 'Note', exact: true }).fill('');
+    await page.getByRole('textbox', { name: 'Comment', exact: true }).fill('');
     await clickOnPage(page, [100, 600]);
-    await expect(page.locator('[data-kind="note"]')).toHaveCount(0);
+    await expect(page.locator('[data-kind="comment"]')).toHaveCount(0);
     await page.getByRole('button', { name: 'Undo' }).click();
-    await expect(page.locator('.row-sub')).toContainText('Private words');
+    await expect(page.locator('.row-words')).toContainText('Private words');
   });
 });
 
@@ -498,28 +485,28 @@ test.describe('keyboard focus', () => {
 
   test('Esc in a note goes back to its pin', async ({ page }) => {
     await openForAnnotating(page);
-    await tool(page, 'Sticky note').click();
+    await tool(page, 'Comment').click();
     await clickOnPage(page, [300, 300]);
     await page.keyboard.type('Words');
     await page.keyboard.press('Escape');
-    await expect(page.locator('[data-kind="note"]')).toBeFocused();
-    await expect(page.getByTestId('note-card')).toHaveCount(0);
+    await expect(page.locator('[data-kind="comment"]')).toBeFocused();
+    await expect(page.getByTestId('comment-card')).toHaveCount(0);
   });
 
   test('Esc in an empty note leaves nothing, and focus on the page', async ({ page }) => {
     await openForAnnotating(page);
-    await tool(page, 'Sticky note').click();
+    await tool(page, 'Comment').click();
     await clickOnPage(page, [300, 300]);
     await page.keyboard.press('Escape');
     await expect(page.locator('main.canvas')).toBeFocused();
-    await expect(page.locator('[data-kind="note"]')).toHaveCount(0);
+    await expect(page.locator('[data-kind="comment"]')).toHaveCount(0);
   });
 
   test('leaving an empty note for another control keeps focus on that control', async ({
     page,
   }) => {
     await openForAnnotating(page);
-    await tool(page, 'Sticky note').click();
+    await tool(page, 'Comment').click();
     await clickOnPage(page, [300, 300]);
     await page.getByRole('button', { name: 'Undo' }).or(tool(page, 'Pen')).last().focus();
     await expect(page.locator('main.canvas')).not.toBeFocused();
@@ -545,16 +532,16 @@ test.describe('keyboard focus', () => {
 
   test('dragging a note doesn’t also open it', async ({ page }) => {
     await openForAnnotating(page);
-    await tool(page, 'Sticky note').click();
+    await tool(page, 'Comment').click();
     await clickOnPage(page, [300, 300]);
     await page.keyboard.type('Words');
     await clickOnPage(page, [100, 600]);
-    const pin = await page.locator('[data-kind="note"]').boundingBox();
+    const pin = await page.locator('[data-kind="comment"]').boundingBox();
     if (!pin) throw new Error('Not on screen.');
     await page.mouse.move(pin.x + 10, pin.y + 10);
     await page.mouse.down();
     await page.mouse.move(pin.x + 80, pin.y + 80, { steps: 5 });
     await page.mouse.up();
-    await expect(page.getByTestId('note-card')).toHaveCount(0);
+    await expect(page.getByTestId('comment-card')).toHaveCount(0);
   });
 });

@@ -1,5 +1,5 @@
 import type { FieldValue } from '../forms/fields';
-import type { Annotation } from './annotations';
+import type { Annotation, SavedSource } from './annotations';
 
 /** Positions are PDF points as displayed: origin at the page's top left, y going down. */
 export interface Rect {
@@ -231,8 +231,12 @@ export function deriveSignatures(edits: readonly Edit[]): readonly PlacedSignatu
   return [...placed.values()];
 }
 
-export function deriveAnnotations(edits: readonly Edit[]): readonly Annotation[] {
-  const annotations = new Map<string, Annotation>();
+/** What's there now: whatever was already in the file, with the edits made since applied to it. */
+export function deriveAnnotations(
+  edits: readonly Edit[],
+  existing: readonly Annotation[] = [],
+): readonly Annotation[] {
+  const annotations = new Map(existing.map((annotation) => [annotation.id, annotation]));
   for (const edit of edits) {
     if (edit.kind === 'add-annotation' || edit.kind === 'change-annotation') {
       annotations.set(edit.annotation.id, edit.annotation);
@@ -243,12 +247,36 @@ export function deriveAnnotations(edits: readonly Edit[]): readonly Annotation[]
   return [...annotations.values()];
 }
 
-/** The latest answer for each field that's been changed. */
+/** What's changed about annotations already in the file, which is all a save needs to touch. */
+export function savedChanges(
+  edits: readonly Edit[],
+  existing: readonly Annotation[],
+): { readonly changed: readonly Annotation[]; readonly removed: readonly SavedSource[] } {
+  const current = deriveAnnotations(edits, existing);
+  const touched = new Set(
+    edits.flatMap((edit) =>
+      edit.kind === 'change-annotation'
+        ? [edit.annotation.id]
+        : edit.kind === 'remove-annotation'
+          ? [edit.id]
+          : [],
+    ),
+  );
+  const stillThere = new Set(current.map((annotation) => annotation.id));
+  return {
+    changed: current.filter((annotation) => annotation.saved && touched.has(annotation.id)),
+    removed: existing.flatMap((annotation) =>
+      annotation.saved && !stillThere.has(annotation.id) ? [annotation.saved] : [],
+    ),
+  };
+}
+
 /** Whether answers become part of the page when saving. */
 export function deriveLock(edits: readonly Edit[]): boolean {
   return edits.reduce((lock, edit) => (edit.kind === 'lock-answers' ? edit.lock : lock), false);
 }
 
+/** The latest answer for each field that's been changed. */
 export function deriveFieldAnswers(edits: readonly Edit[]): ReadonlyMap<string, FieldValue> {
   const answers = new Map<string, FieldValue>();
   for (const edit of edits) {

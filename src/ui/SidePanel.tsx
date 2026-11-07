@@ -17,6 +17,7 @@ interface SidePanelProps {
   readonly currentPage: number;
   readonly onLeaveSign: () => void;
   readonly onJumpToField: (pageNumber: number, fieldId: string, y: number) => void;
+  readonly onGoToPage: (pageNumber: number, y: number) => void;
 }
 
 /** The panel beside the pages, which depends on what's being done. */
@@ -30,6 +31,7 @@ export function SidePanel({
   currentPage,
   onLeaveSign,
   onJumpToField,
+  onGoToPage,
 }: SidePanelProps) {
   if (mode === 'sign') {
     return <SignPanel signing={signing} currentPage={currentPage} onClose={onLeaveSign} />;
@@ -39,10 +41,9 @@ export function SidePanel({
       <AnnotatePanel
         annotating={annotating}
         signing={signing}
-        annotations={editor.annotations.filter((item) => item.pageNumber === currentPage)}
-        images={editor.signatures.filter(
-          (item) => item.pageNumber === currentPage && item.purpose === 'image',
-        )}
+        images={editor.signatures.filter((item) => item.purpose === 'image')}
+        currentPage={currentPage}
+        onGoTo={onGoToPage}
       />
     );
   }

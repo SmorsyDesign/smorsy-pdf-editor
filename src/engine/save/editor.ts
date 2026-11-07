@@ -18,13 +18,19 @@ import {
   type PDFPage,
 } from '@cantoo/pdf-lib';
 import { displayToUser, userAngle } from '../coordinates';
-import type { Annotation } from '../edits/annotations';
+import type { Annotation, SavedSource } from '../edits/annotations';
 import type { Color, PlacedSignature, TextBox } from '../edits/model';
 import { UNSUPPORTED_TEXT, nameCharacter } from '../errors';
 import { findEmbeddedFont, type EmbeddedFont } from '../fonts/embedded';
 import { bundledFaceFile } from '../fonts/match';
 import { placementInPdf } from '../signatures/placement';
-import { annotationBounds, writeAnnotation } from './annotation-writing';
+import { readAnnotations } from './annotation-reading';
+import {
+  annotationBounds,
+  removeSaved,
+  updateForeign,
+  writeAnnotation,
+} from './annotation-writing';
 import { fillFields, type FieldAnswers } from './field-filling';
 import { clearFieldsUnder, clearForWhiteout, countSolidFieldsOver } from './form-fields';
 import { lockAnswers } from './lock-answers';
@@ -35,7 +41,10 @@ import { FontChooser, systemFontKey, type FontBytes, type FontOutcome } from './
 
 /** What else goes in a save, beyond text and signatures. */
 export interface SaveExtras {
+  /** New ones, and any already in the file that have changed. */
   readonly annotations?: readonly Annotation[];
+  /** Ones already in the file that have been deleted. */
+  readonly removedSaved?: readonly SavedSource[];
   readonly answers?: FieldAnswers;
   /** Makes answers part of the page. */
   readonly lock?: boolean;
@@ -75,6 +84,11 @@ export class PdfEditor {
     const doc = await PDFDocument.load(this.original.slice());
     doc.registerFontkit(fontkit);
     return doc;
+  }
+
+  /** Everything people have put on the pages already. */
+  async existingAnnotations(): Promise<readonly Annotation[]> {
+    return readAnnotations(await this.load());
   }
 
   /** Which font an edit will use, and any characters that have no font. */
@@ -235,11 +249,16 @@ export class PdfEditor {
   async saveWithReport(
     boxes: readonly TextBox[],
     signatures: readonly PlacedSignature[],
-    { annotations: allAnnotations = [], answers = [], lock = false }: SaveExtras = {},
+    {
+      annotations: allAnnotations = [],
+      removedSaved = [],
+      answers = [],
+      lock = false,
+    }: SaveExtras = {},
   ): Promise<SaveReport> {
     // A note being retyped can be empty at the moment of saving, and it's no note until it has words.
     const annotations = allAnnotations.filter(
-      (annotation) => annotation.kind !== 'note' || annotation.text.trim() !== '',
+      (annotation) => annotation.kind !== 'comment' || annotation.text.trim() !== '',
     );
     const doc = await this.load();
     // Before anything else touches a page, because filling and locking change these lists too.
@@ -252,6 +271,14 @@ export class PdfEditor {
       fillFields(doc, answers, font);
       if (lock) lockAnswers(doc, font);
     }
+    // Before anything else looks at the pages, so what's being replaced can't be mistaken for
+    // something a new whiteout has to deal with.
+    for (const source of removedSaved) removeSaved(doc.getPage(source.pageNumber - 1), source);
+    for (const annotation of annotations) {
+      const { saved } = annotation;
+      if (saved?.foreign) updateForeign(doc.getPage(saved.pageNumber - 1), annotation);
+      else if (saved) removeSaved(doc.getPage(saved.pageNumber - 1), saved);
+    }
     const pageNumbers = new Set(
       [...boxes, ...signatures, ...annotations].map((item) => item.pageNumber),
     );
@@ -263,7 +290,9 @@ export class PdfEditor {
       const pageBox = pageBoxOf(page);
       const onPage = boxes.filter((box) => box.pageNumber === pageNumber);
       const signed = signatures.filter((signature) => signature.pageNumber === pageNumber);
-      const marks = annotations.filter((annotation) => annotation.pageNumber === pageNumber);
+      const marks = annotations.filter(
+        (annotation) => annotation.pageNumber === pageNumber && !annotation.saved?.foreign,
+      );
       const whiteouts = marks.filter((mark) => mark.kind === 'whiteout');
       const beneath = clearForWhiteout(
         page,

@@ -18,6 +18,8 @@ interface PageStackProps {
   readonly keepOverlayOn: number | null;
   readonly onBackgroundClick: () => void;
   readonly scrollToPageRef: RefObject<((pageNumber: number, yOffset?: number) => void) | null>;
+  /** Saved annotations that have changed since, and so shouldn't be drawn from the file. */
+  readonly hiddenAnnotations: ReadonlyMap<number, readonly string[]>;
   readonly renderOverlay: (pageNumber: number, page: PageSize, scale: number) => ReactNode;
 }
 
@@ -36,6 +38,7 @@ export function PageStack({
   keepOverlayOn,
   onBackgroundClick,
   scrollToPageRef,
+  hiddenAnnotations,
   renderOverlay,
 }: PageStackProps) {
   const scrollerRef = useRef<HTMLElement>(null);
@@ -177,6 +180,7 @@ export function PageStack({
               width={width}
               height={height}
               active={measured && size !== undefined && activePages.has(pageNumber)}
+              hiddenAnnotations={hiddenAnnotations.get(pageNumber)?.join(' ') ?? ''}
             />
             {measured &&
               size !== undefined &&

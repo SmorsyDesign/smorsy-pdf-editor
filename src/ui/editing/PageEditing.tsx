@@ -4,7 +4,7 @@ import type { SearchMatch } from '../../engine/search';
 import type { PageSize } from '../../engine/zoom';
 import { AnnotationArt, Highlights, WhiteoutBoxes } from '../annotating/AnnotationArt';
 import { AnnotationControls } from '../annotating/AnnotationControls';
-import { ExistingNotes } from '../annotating/ExistingNotes';
+import { CommentReader } from '../annotating/CommentReader';
 import { DrawLayer } from '../annotating/DrawLayer';
 import { MarkupLines } from '../annotating/MarkupLines';
 import { isMarkupTool, type Annotating } from '../annotating/useAnnotating';
@@ -60,6 +60,8 @@ export function PageEditing({
 }: PageEditingProps) {
   const { draft } = session;
   const marks = annotating.annotations.filter((annotation) => annotation.pageNumber === pageNumber);
+  // The rest are saved in the file exactly as they are, so the page already shows them.
+  const drawn = marks.filter(editor.isDrawnByApp);
   const annotatingHere = mode === 'note';
   const marking = annotatingHere && isMarkupTool(annotating.tool);
   const pickable = annotatingHere && annotating.tool === null;
@@ -67,7 +69,7 @@ export function PageEditing({
   return (
     <PageOverlay
       showsTextLayer={mode === 'select' || marking}
-      beneath={<WhiteoutBoxes annotations={marks} scale={scale} outlined={annotatingHere} />}
+      beneath={<WhiteoutBoxes annotations={drawn} scale={scale} outlined={annotatingHere} />}
       document={document}
       pageNumber={pageNumber}
       zoomPercent={zoomPercent}
@@ -119,8 +121,8 @@ export function PageEditing({
         page={page}
         isInteractive={(placed) => (placed.purpose === 'image' ? pickable : mode === 'sign')}
       />
-      <Highlights annotations={marks} scale={scale} />
-      <AnnotationArt annotations={marks} page={page} scale={scale} />
+      <Highlights annotations={drawn} scale={scale} />
+      <AnnotationArt annotations={drawn} page={page} scale={scale} />
       {marking && (
         <MarkupLines
           annotating={annotating}
@@ -135,9 +137,17 @@ export function PageEditing({
         scale={scale}
         page={page}
         interactive={pickable}
+        isDrawn={editor.isDrawnByApp}
       />
-      {(mode === 'select' || pickable) && (
-        <ExistingNotes document={document} pageNumber={pageNumber} page={page} scale={scale} />
+      {mode === 'select' && (
+        <CommentReader
+          document={document}
+          pageNumber={pageNumber}
+          page={page}
+          scale={scale}
+          comments={marks}
+          hidden={editor.hiddenAnnotations.get(pageNumber) ?? []}
+        />
       )}
       {draft?.pageNumber === pageNumber && (
         <TextEditor

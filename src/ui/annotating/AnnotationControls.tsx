@@ -8,13 +8,12 @@ import {
 } from '../../engine/edits/annotations';
 import type { Rect } from '../../engine/edits/model';
 import type { PageSize } from '../../engine/zoom';
-import { Icon } from '../Icon';
 import { ARROWS, FINE_KEY_STEP, KEY_STEP } from '../nudgeKeys';
 import { useDragPreview } from '../signing/useDragPreview';
 import { useFocusOnRequest } from '../useFocusOnRequest';
-import { noteColor } from './AnnotationArt';
+import { pinColor } from './AnnotationArt';
 import { AnnotationToolbar } from './AnnotationToolbar';
-import { NoteCard } from './NoteCard';
+import { CommentCard } from './CommentCard';
 import type { Annotating } from './useAnnotating';
 
 /** How far a press can move and still be a click rather than a drag. */
@@ -27,6 +26,8 @@ interface ControlProps {
   readonly scale: number;
   readonly page: PageSize;
   readonly interactive: boolean;
+  /** The saved file's own drawing is already on the page, unless this has changed since. */
+  readonly drawn: boolean;
 }
 
 /** A flat arrow or a thin line has almost no area of its own, so this keeps it easy to pick up. */
@@ -41,7 +42,7 @@ function hitArea(bounds: Rect, scale: number) {
   };
 }
 
-function Control({ annotation, annotating, scale, page, interactive }: ControlProps) {
+function Control({ annotation, annotating, scale, page, interactive, drawn }: ControlProps) {
   const selected = annotating.selected?.id === annotation.id;
   const rootRef = useRef<HTMLDivElement>(null);
   const pressedAt = useRef({ x: 0, y: 0 });
@@ -83,9 +84,9 @@ function Control({ annotation, annotating, scale, page, interactive }: ControlPr
     } else if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault();
       annotating.remove(id);
-    } else if (event.key === 'Enter' && annotation.kind === 'note') {
+    } else if (event.key === 'Enter' && annotation.kind === 'comment') {
       event.preventDefault();
-      annotating.toggleNote(id);
+      annotating.toggleComment(id);
     } else if (event.key === 'Escape') {
       event.preventDefault();
       annotating.select(null);
@@ -93,7 +94,7 @@ function Control({ annotation, annotating, scale, page, interactive }: ControlPr
   };
 
   const bounds = boundsOfAnnotation(shown);
-  const isNote = annotation.kind === 'note';
+  const isComment = annotation.kind === 'comment';
   return (
     <>
       <div
@@ -104,7 +105,7 @@ function Control({ annotation, annotating, scale, page, interactive }: ControlPr
         role="group"
         aria-label={
           interactive
-            ? `${annotationLabel(annotation)}. Use the arrow keys to move it, or Delete to remove it.`
+            ? `${annotationLabel(annotation)}. ${canMove(annotation) ? 'Use the arrow keys to move it, or Delete to remove it.' : 'Press Delete to remove it.'}`
             : annotationLabel(annotation)
         }
         {...(interactive ? { tabIndex: 0 } : {})}
@@ -114,12 +115,12 @@ function Control({ annotation, annotating, scale, page, interactive }: ControlPr
         }}
         onClick={(event) => {
           event.stopPropagation();
-          // The end of a drag also counts as a click, which shouldn't open the note as well.
+          // The end of a drag also counts as a click, which shouldn't open the comment as well.
           const travelled = Math.hypot(
             event.clientX - pressedAt.current.x,
             event.clientY - pressedAt.current.y,
           );
-          if (isNote && interactive && travelled < CLICK_SLOP) annotating.toggleNote(id);
+          if (isComment && interactive && travelled < CLICK_SLOP) annotating.toggleComment(id);
         }}
         onFocus={(event) => {
           if (interactive && event.target === event.currentTarget) annotating.select(id);
@@ -127,14 +128,12 @@ function Control({ annotation, annotating, scale, page, interactive }: ControlPr
         onPointerDown={startDrag}
         onKeyDown={interactive ? onKeyDown : undefined}
       >
-        {isNote && (
-          <span className="note-pin" style={{ background: noteColor(annotation.color) }}>
-            <Icon name="pin" />
-          </span>
+        {isComment && drawn && (
+          <span className="comment-pin" style={{ background: pinColor(annotation.color) }} />
         )}
       </div>
-      {annotation.kind === 'note' && annotating.openNoteId === id && (
-        <NoteCard note={annotation} annotating={annotating} scale={scale} page={page} />
+      {annotation.kind === 'comment' && annotating.openCommentId === id && (
+        <CommentCard comment={annotation} annotating={annotating} scale={scale} page={page} />
       )}
       {selected && interactive && (
         <AnnotationToolbar annotation={shown} annotating={annotating} scale={scale} page={page} />
@@ -149,6 +148,7 @@ interface AnnotationControlsProps {
   readonly scale: number;
   readonly page: PageSize;
   readonly interactive: boolean;
+  readonly isDrawn: (annotation: Annotation) => boolean;
 }
 
 /** What can be picked up and changed, laid over what's been drawn. */
@@ -158,6 +158,7 @@ export function AnnotationControls({
   scale,
   page,
   interactive,
+  isDrawn,
 }: AnnotationControlsProps) {
   return annotations.map((annotation) => (
     <Control
@@ -167,6 +168,7 @@ export function AnnotationControls({
       scale={scale}
       page={page}
       interactive={interactive}
+      drawn={isDrawn(annotation)}
     />
   ));
 }

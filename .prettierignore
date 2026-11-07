@@ -6,3 +6,4 @@ test-pdfs/
 node_modules/
 package-lock.json
 SPEC.md
+.claude/launch.json

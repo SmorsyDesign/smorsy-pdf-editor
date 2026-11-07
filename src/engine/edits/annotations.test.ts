@@ -63,7 +63,7 @@ const arrow: Annotation = {
   to: { x: 60, y: 40 },
   width: 2,
 };
-const note: Annotation = { ...base, kind: 'note', at: { x: 50, y: 60 }, text: 'Check' };
+const note: Annotation = { ...base, kind: 'comment', at: { x: 50, y: 60 }, text: 'Check' };
 const highlight: Annotation = {
   ...base,
   kind: 'highlight',

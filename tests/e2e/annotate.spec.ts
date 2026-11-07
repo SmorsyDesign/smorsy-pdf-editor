@@ -338,16 +338,16 @@ test.describe('changing what’s drawn', () => {
   });
 });
 
-test.describe('sticky notes', () => {
+test.describe('comments', () => {
   test('a click opens one to type in, and the words are saved', async ({ page }) => {
     await openForAnnotating(page);
-    await tool(page, 'Sticky note').click();
+    await tool(page, 'Comment').click();
     await clickOnPage(page, [400, 400]);
-    const field = page.getByRole('textbox', { name: 'Note', exact: true });
+    const field = page.getByRole('textbox', { name: 'Comment', exact: true });
     await expect(field).toBeFocused();
     await page.keyboard.type('Ask about the late fee');
     await clickOnPage(page, [100, 600]);
-    await expect(page.locator('.row-sub')).toContainText('Ask about the late fee');
+    await expect(page.locator('.row-words')).toContainText('Ask about the late fee');
     await saveTo(page);
     const doc = await openDocument(Uint8Array.from((await lastWrite(page))?.bytes ?? []));
     const notes = await doc.existingNotes(1);
@@ -357,7 +357,7 @@ test.describe('sticky notes', () => {
 
   test('typing spaces doesn’t scroll the page', async ({ page }) => {
     await openForAnnotating(page);
-    await tool(page, 'Sticky note').click();
+    await tool(page, 'Comment').click();
     await clickOnPage(page, [400, 400]);
     const scroller = page.locator('main.canvas');
     const before = await scroller.evaluate((element) => element.scrollTop);
@@ -367,59 +367,59 @@ test.describe('sticky notes', () => {
 
   test('one left empty leaves nothing behind', async ({ page }) => {
     await openForAnnotating(page);
-    await tool(page, 'Sticky note').click();
+    await tool(page, 'Comment').click();
     await clickOnPage(page, [400, 400]);
     await clickOnPage(page, [100, 600]);
-    await expect(page.locator('[data-kind="note"]')).toHaveCount(0);
+    await expect(page.locator('[data-kind="comment"]')).toHaveCount(0);
     await expect(page.getByText('unsaved change')).toHaveCount(0);
   });
 
   test('typing it then saving straight away keeps the words', async ({ page }) => {
     await openForAnnotating(page);
-    await tool(page, 'Sticky note').click();
+    await tool(page, 'Comment').click();
     await clickOnPage(page, [400, 400]);
     await page.keyboard.type('Keep me');
     await saveTo(page);
     await reopenSaved(page, 3);
-    await pageElement(page, 1).getByRole('button', { name: 'Read note' }).click();
+    await pageElement(page, 1).getByRole('button', { name: 'Read comment' }).click();
     await expect(page.getByRole('note')).toContainText('Keep me');
   });
 
   test('all the typing in one visit is one undo', async ({ page }) => {
     await openForAnnotating(page);
-    await tool(page, 'Sticky note').click();
+    await tool(page, 'Comment').click();
     await clickOnPage(page, [400, 400]);
     await page.keyboard.type('Several words here');
     await clickOnPage(page, [100, 600]);
     await expect(page.getByText('1 unsaved change')).toBeVisible();
     await page.getByRole('button', { name: 'Undo' }).click();
-    await expect(page.locator('[data-kind="note"]')).toHaveCount(0);
+    await expect(page.locator('[data-kind="comment"]')).toHaveCount(0);
   });
 
   test('it can be opened again and reworded', async ({ page }) => {
     await openForAnnotating(page);
-    await tool(page, 'Sticky note').click();
+    await tool(page, 'Comment').click();
     await clickOnPage(page, [400, 400]);
     await page.keyboard.type('First');
     await clickOnPage(page, [100, 600]);
-    await page.locator('[data-kind="note"]').click();
-    const field = page.getByRole('textbox', { name: 'Note', exact: true });
+    await page.locator('[data-kind="comment"]').click();
+    const field = page.getByRole('textbox', { name: 'Comment', exact: true });
     await field.fill('Second');
     await clickOnPage(page, [100, 600]);
-    await expect(page.locator('.row-sub')).toContainText('Second');
+    await expect(page.locator('.row-words')).toContainText('Second');
   });
 });
 
-test.describe('notes already in a file', () => {
+test.describe('comments already in a file', () => {
   test('can be read after saving and opening again', async ({ page }) => {
     await openForAnnotating(page);
-    await tool(page, 'Sticky note').click();
+    await tool(page, 'Comment').click();
     await clickOnPage(page, [400, 400]);
     await page.keyboard.type('Ask about the late fee');
     await clickOnPage(page, [100, 600]);
     await saveTo(page);
     await reopenSaved(page, 3);
-    const pin = pageElement(page, 1).getByRole('button', { name: 'Read note' });
+    const pin = pageElement(page, 1).getByRole('button', { name: 'Read comment' });
     await pin.click();
     await expect(page.getByRole('note')).toContainText('Ask about the late fee');
     await page.keyboard.press('Escape');
@@ -432,9 +432,9 @@ test.describe('notes already in a file', () => {
       element.scrollIntoView({ block: 'end' });
     });
     const sheet = await pageElement(page, 1).boundingBox();
-    await tool(page, 'Sticky note').click();
+    await tool(page, 'Comment').click();
     await clickOnPage(page, [(sheet?.width ?? 0) - 10, (sheet?.height ?? 0) - 10]);
-    const card = await page.getByTestId('note-card').boundingBox();
+    const card = await page.getByTestId('comment-card').boundingBox();
     expect((card?.x ?? 0) + (card?.width ?? 0)).toBeLessThanOrEqual(
       (sheet?.x ?? 0) + (sheet?.width ?? 0) + 1,
     );

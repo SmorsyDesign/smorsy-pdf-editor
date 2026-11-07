@@ -89,7 +89,7 @@ describe('saving annotations', () => {
       { ...common, kind: 'arrow', from: { x: 100, y: 200 }, to: { x: 250, y: 214 }, width: 2 },
       'Line',
     ],
-    [{ ...common, kind: 'note', at: { x: 100, y: 200 }, text: 'Check this' }, 'Text'],
+    [{ ...common, kind: 'comment', at: { x: 100, y: 200 }, text: 'Check this' }, 'Text'],
   ];
 
   for (const [annotation, subtype] of kinds) {
@@ -111,7 +111,7 @@ describe('saving annotations', () => {
 
   it('keeps a note’s words, in any language', async () => {
     const bytes = await saved('01-plain-text.pdf', [
-      { ...common, kind: 'note', at: { x: 100, y: 200 }, text: 'Проверить 日本' },
+      { ...common, kind: 'comment', at: { x: 100, y: 200 }, text: 'Проверить 日本' },
     ]);
     const { annotations } = await reopened(bytes);
     expect(annotations[0]?.contentsObj?.str).toBe('Проверить 日本');
@@ -121,7 +121,7 @@ describe('saving annotations', () => {
     const bytes = original('01-plain-text.pdf');
     const before = bytes.slice();
     await new PdfEditor(bytes, fontBytes).save([], [], {
-      annotations: [{ ...common, kind: 'note', at: { x: 1, y: 1 }, text: 'x' }],
+      annotations: [{ ...common, kind: 'comment', at: { x: 1, y: 1 }, text: 'x' }],
     });
     expect(bytes).toEqual(before);
   });
@@ -129,7 +129,7 @@ describe('saving annotations', () => {
   it('adds to what’s already there, without disturbing it', async () => {
     const before = await reopened(original('11-annotations-links.pdf'));
     const bytes = await saved('11-annotations-links.pdf', [
-      { ...common, kind: 'note', at: { x: 1, y: 1 }, text: 'x' },
+      { ...common, kind: 'comment', at: { x: 1, y: 1 }, text: 'x' },
     ]);
     const after = await reopened(bytes);
     expect(after.annotations).toHaveLength(before.annotations.length + 1);

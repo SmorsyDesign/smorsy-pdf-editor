@@ -20,7 +20,7 @@ const TOOLS: readonly (readonly (readonly [AnnotationTool | typeof IMAGE, IconNa
       ['arrow', 'arrow', 'Arrow'],
     ],
     [
-      ['note', 'pin', 'Sticky note'],
+      ['comment', 'comment', 'Comment'],
       [IMAGE, 'image', 'Image'],
       ['whiteout', 'whiteout', 'Whiteout box'],
     ],

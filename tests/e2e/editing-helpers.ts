@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { openDocument } from '../../src/engine/document';
-import { expectOpenDocument, expectPageDrawn, openFixture } from './helpers';
+import { expectOpenDocument, expectPageDrawn, gotoApp, openFixture } from './helpers';
 
 export const PLAIN = 'test-pdfs/01-plain-text.pdf';
 export const HEADING = 'Plain text, page 1';
@@ -81,18 +81,39 @@ export async function savedBlocks(page: Page, pageNumber = 1) {
 
 /** Opens the saved file in the app, so its pages are drawn by the real renderer. */
 export async function reopenSaved(page: Page, pageCount: number) {
-  await page.evaluate(() => {
+  // A name of its own each time, so a second reopening can't be mistaken for the first.
+  const name = await page.evaluate(() => {
     const mock = window.smorsyMock;
-    if (!mock?.lastWrite) throw new Error('Nothing was saved.');
+    if (!mock?.lastWrite) throw new Error('The test hasn’t saved anything to reopen.');
+    const previous =
+      mock.nextOpen === null ? document.querySelector('.file-name')?.textContent : '';
+    const fileName = previous === 'Reopened.pdf' ? 'Reopened again.pdf' : 'Reopened.pdf';
     mock.nextOpen = {
-      path: '/Users/test/Reopened.pdf',
-      name: 'Reopened.pdf',
+      path: `/Users/test/${fileName}`,
+      name: fileName,
       bytes: mock.lastWrite.bytes,
     };
+    return fileName;
   });
   await page.keyboard.press('ControlOrMeta+o');
-  await expect(page.locator('.file-name')).toHaveText('Reopened.pdf');
+  await expect(page.locator('.file-name')).toHaveText(name);
   await expectOpenDocument(page, pageCount);
+}
+
+/** Opens a PDF made during the test, for cases no fixture covers. */
+export async function openBytes(page: Page, bytes: Uint8Array, pageCount = 1) {
+  await gotoApp(page);
+  await page.evaluate((data) => {
+    if (!window.smorsyMock) throw new Error('The mock isn’t there.');
+    window.smorsyMock.nextOpen = {
+      path: '/Users/test/Made.pdf',
+      name: 'Made.pdf',
+      bytes: Uint8Array.from(data),
+    };
+  }, Array.from(bytes));
+  await page.getByRole('button', { name: 'Choose a file' }).click();
+  await expectOpenDocument(page, pageCount);
+  await expectPageDrawn(page);
 }
 
 export const pageElement = (page: Page, pageNumber: number) =>

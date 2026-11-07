@@ -47,7 +47,7 @@ export function DrawLayer({ annotating, pageNumber, page, scale, onEmptyClick }:
   };
 
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0 || !tool || isMarkupTool(tool) || tool === 'note') return;
+    if (event.button !== 0 || !tool || isMarkupTool(tool) || tool === 'comment') return;
     event.currentTarget.setPointerCapture(event.pointerId);
     const point = pointIn(event, event.currentTarget);
     started.current = point;
@@ -98,8 +98,8 @@ export function DrawLayer({ annotating, pageNumber, page, scale, onEmptyClick }:
     if (moving) {
       annotating.change(annotationMovedTo(moving, pageNumber, point, page));
       annotating.moveFinished(moving.id);
-    } else if (tool === 'note') {
-      annotating.placeAt('note', pageNumber, point);
+    } else if (tool === 'comment') {
+      annotating.placeAt('comment', pageNumber, point);
     } else if (!tool) {
       annotating.select(null);
       onEmptyClick();

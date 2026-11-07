@@ -1,3 +1,4 @@
+import { isEncrypted } from '../../engine/extract';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   EMPTY_LOG,
@@ -9,6 +10,7 @@ import {
   deriveAnnotations,
   deriveFieldAnswers,
   deriveLock,
+  savedChanges,
   deriveSignatures,
   deriveTextBoxes,
   record,
@@ -51,6 +53,10 @@ export interface DocumentEditor {
   readonly boxes: readonly TextBox[];
   readonly signatures: readonly PlacedSignature[];
   readonly annotations: readonly Annotation[];
+  /** Saved annotations that have changed since, which shouldn't be drawn from the file. */
+  readonly hiddenAnnotations: ReadonlyMap<number, readonly string[]>;
+  /** Whether the app draws this, rather than the page showing the file's own drawing of it. */
+  readonly isDrawnByApp: (annotation: Annotation) => boolean;
   /** Form answers that have been changed, by field name. */
   readonly answers: ReadonlyMap<string, FieldValue>;
   /** Whether saving makes answers part of the page. */
@@ -89,6 +95,9 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
   const [notice, setNotice] = useState<FontNoticeState | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [outcomes, setOutcomes] = useState<ReadonlyMap<string, FontOutcome>>(() => new Map());
+  const [existing, setExisting] = useState<readonly Annotation[]>([]);
+  const existingRef = useRef(existing);
+  existingRef.current = existing;
   // Kept in step with the state, because saving straight after an edit must include that edit.
   const logRef = useRef(log);
   const savedRef = useRef(savedEntry);
@@ -133,9 +142,49 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
     };
   }, [file, platform]);
 
+  useEffect(() => {
+    setExisting([]);
+    const client = clientRef.current;
+    // A protected file can't be changed anyway, and comments in it can still be read another way.
+    if (!file || !client || isEncrypted(file.bytes)) return;
+    let current = true;
+    client
+      .then((opened) => opened.existingAnnotations())
+      .then((found) => {
+        if (current) setExisting(found);
+      })
+      .catch((error: unknown) => {
+        console.error(error);
+        if (current) {
+          setProblem(
+            'The annotations already in this file couldn’t be read, so they can’t be changed here. They’re still in the file.',
+          );
+        }
+      });
+    return () => {
+      current = false;
+    };
+  }, [file]);
+
   const boxes = useMemo(() => deriveTextBoxes(activeEdits(log)), [log]);
   const signatures = useMemo(() => deriveSignatures(activeEdits(log)), [log]);
-  const annotations = useMemo(() => deriveAnnotations(activeEdits(log)), [log]);
+  const annotations = useMemo(() => deriveAnnotations(activeEdits(log), existing), [log, existing]);
+  const savedChange = useMemo(() => savedChanges(activeEdits(log), existing), [log, existing]);
+  const redrawn = useMemo(
+    () => new Set(savedChange.changed.filter(({ saved }) => !saved?.foreign).map(({ id }) => id)),
+    [savedChange],
+  );
+  const hiddenAnnotations = useMemo(() => {
+    const hidden = new Map<number, string[]>();
+    const sources = [
+      ...savedChange.removed,
+      ...savedChange.changed.flatMap(({ saved }) => (saved && !saved.foreign ? [saved] : [])),
+    ];
+    for (const { pageNumber, ref } of sources) {
+      hidden.set(pageNumber, [...(hidden.get(pageNumber) ?? []), ref]);
+    }
+    return hidden;
+  }, [savedChange]);
   const answers = useMemo(() => deriveFieldAnswers(activeEdits(log)), [log]);
   const locksAnswers = useMemo(() => deriveLock(activeEdits(log)), [log]);
 
@@ -185,11 +234,16 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
     const active = deriveTextBoxes(activeEdits(current));
     const edits = activeEdits(current);
     const placed = deriveSignatures(edits);
-    const marks = deriveAnnotations(edits);
+    const { changed, removed } = savedChanges(edits, existingRef.current);
+    const marks = [...deriveAnnotations(edits).filter(({ saved }) => !saved), ...changed];
     const filled = [...deriveFieldAnswers(edits)];
     const lock = deriveLock(edits);
     const nothingToDo =
-      active.length === 0 && placed.length === 0 && marks.length === 0 && filled.length === 0;
+      active.length === 0 &&
+      placed.length === 0 &&
+      marks.length === 0 &&
+      removed.length === 0 &&
+      filled.length === 0;
     if (nothingToDo && !lock) {
       if (!file) throw new Error('The document closed before it could be saved.');
       return {
@@ -209,7 +263,12 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
       clientRef.current = createClientRef.current();
       client = await clientRef.current;
     }
-    const report = await client.save(active, placed, { annotations: marks, answers: filled, lock });
+    const report = await client.save(active, placed, {
+      annotations: marks,
+      removedSaved: removed,
+      answers: filled,
+      lock,
+    });
     return { ...report, edited: true, entry };
   }, [file]);
 
@@ -233,6 +292,8 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
     boxes,
     signatures,
     annotations,
+    hiddenAnnotations,
+    isDrawnByApp: (annotation: Annotation) => !annotation.saved || redrawn.has(annotation.id),
     answers,
     locksAnswers,
     setLocksAnswers: (lock: boolean) => {

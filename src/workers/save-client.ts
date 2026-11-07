@@ -1,3 +1,4 @@
+import type { Annotation } from '../engine/edits/annotations';
 import type { PlacedSignature, TextBox } from '../engine/edits/model';
 import type { FontOutcome, SystemFontStyle } from '../engine/save/choose-font';
 import type { SaveExtras, SaveReport } from '../engine/save/editor';
@@ -44,6 +45,12 @@ export class SaveClient {
   async resolveFont(box: TextBox): Promise<FontOutcome> {
     const response = await this.request((id) => ({ type: 'resolve', id, box }));
     if ('outcome' in response) return response.outcome;
+    throw new Error('The save worker gave an unexpected reply.');
+  }
+
+  async existingAnnotations(): Promise<readonly Annotation[]> {
+    const response = await this.request((id) => ({ type: 'read-annotations', id }));
+    if ('annotations' in response) return response.annotations;
     throw new Error('The save worker gave an unexpected reply.');
   }
 

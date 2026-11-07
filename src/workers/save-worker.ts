@@ -1,3 +1,4 @@
+import type { Annotation } from '../engine/edits/annotations';
 import type { PlacedSignature, TextBox } from '../engine/edits/model';
 import type { FontOutcome, SystemFontStyle } from '../engine/save/choose-font';
 import { PdfEditor, type SaveExtras, type SaveReport } from '../engine/save/editor';
@@ -9,6 +10,7 @@ export type SaveRequest =
       readonly systemFonts: Partial<Record<SystemFontStyle, Uint8Array>>;
     }
   | { readonly type: 'resolve'; readonly id: number; readonly box: TextBox }
+  | { readonly type: 'read-annotations'; readonly id: number }
   | {
       readonly type: 'save';
       readonly id: number;
@@ -20,6 +22,7 @@ export type SaveRequest =
 export type SaveResponse =
   | { readonly id: number; readonly ok: true; readonly outcome: FontOutcome }
   | { readonly id: number; readonly ok: true; readonly report: SaveReport }
+  | { readonly id: number; readonly ok: true; readonly annotations: readonly Annotation[] }
   | { readonly id: number; readonly ok: false; readonly error: string };
 
 let editor: PdfEditor | null = null;
@@ -34,6 +37,9 @@ async function handle(request: Exclude<SaveRequest, { type: 'init' }>): Promise<
   if (!editor) throw new Error('The editor was used before it was set up.');
   if (request.type === 'resolve') {
     return { id: request.id, ok: true, outcome: await editor.resolveFont(request.box) };
+  }
+  if (request.type === 'read-annotations') {
+    return { id: request.id, ok: true, annotations: await editor.existingAnnotations() };
   }
   return {
     id: request.id,

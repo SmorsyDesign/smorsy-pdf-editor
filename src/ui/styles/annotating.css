@@ -45,7 +45,7 @@
 .rows {
   display: grid;
   gap: var(--space-1);
-  margin: 0;
+  margin: var(--space-2) 0 0;
   padding: 0;
   list-style: none;
 }
@@ -136,34 +136,43 @@
 .annotation-hit[data-kind='strikeout'] {
   cursor: pointer;
 }
-.note-pin {
+.comment-pin {
   display: grid;
   place-items: center;
   width: 100%;
   height: 100%;
-  border: 1px solid #9a7b00;
-  border-radius: var(--radius-sm);
-  color: #4a3b00;
+  border: 1px solid #00000040;
+  /* The square corner is the exact spot a comment is about. */
+  border-radius: 12px 12px 12px 2px;
   pointer-events: none;
 }
-.note-card {
+.comment-pin::before {
+  content: '';
+  width: 12px;
+  height: 8px;
+  background:
+    linear-gradient(#33290a, #33290a) 0 0 / 12px 2px no-repeat,
+    linear-gradient(#33290a, #33290a) 0 100% / 7px 2px no-repeat;
+}
+.comment-card {
   position: absolute;
   z-index: 4;
-  width: 200px;
+  width: 232px;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
+  background: #ffffff;
   box-shadow:
-    0 0 0 1px #c4a93c,
+    0 0 0 1px #aab5bd,
     0 4px 12px #17222b29;
 }
-.note-card textarea {
+.comment-card textarea {
   display: block;
   width: 100%;
   padding: 0;
   border: 0;
   outline: 0;
   background: transparent;
-  color: #33290a;
+  color: #17222b;
   font: 400 var(--text-sm) / var(--line-sm) var(--font-ui);
   resize: none;
   user-select: text;
@@ -264,7 +273,7 @@ textarea.f-input {
 }
 
 /* The file's own pin shows through, so this is only a target and a focus ring. */
-.note-read {
+.comment-read {
   position: absolute;
   z-index: 3;
   display: grid;
@@ -273,37 +282,35 @@ textarea.f-input {
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: transparent;
   cursor: pointer;
 }
 
-.note-read:hover {
+.comment-read:hover {
   outline: 2px solid var(--mark);
 }
 
-.note-read:focus-visible {
+.comment-read:focus-visible {
   outline: 2px solid var(--mark);
   outline-offset: 1px;
 }
 
-.note-card.is-reading {
-  background: var(--note-yellow);
-  color: #33290a;
+.comment-card.is-reading {
+  color: #17222b;
   font: 400 var(--text-sm) / var(--line-sm) var(--font-ui);
 }
 
-.note-card.is-reading strong {
+.comment-card.is-reading strong {
   display: block;
   font-weight: 600;
 }
 
-.note-card.is-reading p {
+.comment-card.is-reading p {
   margin: 0;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
 
-.note-problem {
+.comment-problem {
   position: absolute;
   bottom: var(--space-2);
   left: var(--space-2);
@@ -321,8 +328,197 @@ textarea.f-input {
   outline-color: var(--mark);
 }
 
-.note-card:focus-within {
+.comment-card:focus-within {
   box-shadow:
     0 0 0 2px var(--mark),
     0 4px 12px #17222b29;
+}
+
+.comment-card textarea::placeholder {
+  color: #4d5b66;
+}
+
+/* The annotation panel: where they're from, what kind, and which tag. */
+.scope {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: var(--radius-md);
+  background: var(--chrome-sunken);
+}
+.scope button {
+  height: 24px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font: 500 var(--text-sm) / var(--line-sm) var(--font-ui);
+  cursor: pointer;
+}
+.scope button:hover {
+  color: var(--text);
+}
+.scope button[aria-pressed='true'] {
+  background: var(--chrome-raised);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: 0 0 0 1px var(--line);
+}
+.panel-tabs {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  border-bottom: 1px solid var(--line);
+}
+.panel-tabs button {
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font: 500 var(--text-sm) / var(--line-sm) var(--font-ui);
+  cursor: pointer;
+}
+.panel-tabs button:hover {
+  color: var(--text);
+}
+.panel-tabs button[aria-pressed='true'] {
+  border-bottom-color: var(--accent);
+  color: var(--text);
+  font-weight: 600;
+}
+.tag-filters,
+.tag-offers {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+.tag-filters {
+  margin-top: var(--space-2);
+}
+.tag-offers-label {
+  flex-basis: 100%;
+}
+.tag-btn {
+  min-height: 24px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: 500 var(--text-sm) / var(--line-sm) var(--font-ui);
+  cursor: pointer;
+}
+.tag-btn:hover {
+  background: var(--chrome-sunken);
+}
+.tag-btn[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-soft-text);
+  font-weight: 600;
+}
+.tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--chrome-sunken);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--line-sm);
+}
+.tag.is-removable {
+  gap: var(--space-1);
+  min-height: 24px;
+  padding-right: 0;
+  color: var(--text);
+}
+.tag.is-removable button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.tag.is-removable .icon {
+  width: 12px;
+  height: 12px;
+}
+.row-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+}
+.row-note {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--line-sm);
+}
+.row-words {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.row.is-selected {
+  background: var(--accent-soft);
+}
+.row.is-selected .row-sub {
+  color: var(--accent-soft-text);
+}
+.rows-heading {
+  margin-top: var(--space-2);
+  padding-left: var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: var(--line-sm);
+}
+.rows-heading:first-child {
+  margin-top: 0;
+}
+.tag-editor {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0 var(--space-1) var(--space-2) var(--space-6);
+}
+.tag-editing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--chrome-raised);
+}
+.tag-editing:focus-within {
+  outline: 2px solid var(--focus);
+}
+.tag-input {
+  flex: 1;
+  min-width: 72px;
+  height: 24px;
+  padding: 0 var(--space-1);
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: 400 var(--text-sm) / var(--line-sm) var(--font-ui);
+}
+.tag-input::placeholder {
+  color: var(--text-muted);
 }

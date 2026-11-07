@@ -184,6 +184,7 @@ export function DocumentView({
             onZoomTo={applyZoom}
             onBackgroundClick={finishOpenEdit}
             scrollToPageRef={scrollToPageRef}
+            hiddenAnnotations={editor.hiddenAnnotations}
             renderOverlay={(pageNumber, page, scale) => (
               <PageEditing
                 document={pdf}
@@ -239,6 +240,9 @@ export function DocumentView({
           currentPage={currentPage}
           onLeaveSign={() => {
             setMode('select');
+          }}
+          onGoToPage={(pageNumber, y) => {
+            scrollToPageRef.current?.(pageNumber, y);
           }}
           onJumpToField={(pageNumber, fieldId, y) => {
             scrollToPageRef.current?.(pageNumber, y);

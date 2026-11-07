@@ -1,4 +1,5 @@
 import {
+  AnnotationMode,
   OPS,
   TextLayer,
   Util,
@@ -34,6 +35,8 @@ interface RenderRequest {
   readonly canvas: HTMLCanvasElement;
   readonly zoomPercent: number;
   readonly devicePixelRatio: number;
+  /** Saved annotations to leave out, by name. Left unset, it stays as it was last asked for. */
+  readonly hiddenAnnotations?: readonly string[];
 }
 
 export interface RenderTask {
@@ -55,7 +58,7 @@ export interface PdfDocument {
   release(pageNumber: number): void;
   /** Every form field in the document, or nothing if it has no form. */
   formFields(): Promise<readonly FormField[]>;
-  /** Sticky notes saved in the file earlier, whose words the page itself doesn't show. */
+  /** Comments saved in the file earlier, whose words the page itself doesn't show. */
   existingNotes(pageNumber: number): Promise<readonly ExistingNote[]>;
   close(): Promise<void>;
 }
@@ -143,6 +146,7 @@ function translateOpenError(error: unknown): EngineError {
 class PdfJsDocument implements PdfDocument {
   private readonly proxy: PDFDocumentProxy;
   private readonly loadingTask: PDFDocumentLoadingTask;
+  private readonly hidden = new Map<number, readonly string[]>();
 
   constructor(proxy: PDFDocumentProxy, loadingTask: PDFDocumentLoadingTask) {
     this.proxy = proxy;
@@ -237,7 +241,30 @@ class PdfJsDocument implements PdfDocument {
     return blocks;
   }
 
-  render({ pageNumber, canvas, zoomPercent, devicePixelRatio }: RenderRequest): RenderTask {
+  /**
+   * pdf.js leaves out a saved annotation that's marked deleted in its editor's storage. Nothing else
+   * can stop it being drawn. The prefix is pdf.js's own, and a test reads the pixels in case it moves.
+   */
+  private hideAnnotations(pageNumber: number, refs: readonly string[]): void {
+    const storage = this.proxy.annotationStorage;
+    const key = (ref: string) => `pdfjs_internal_editor_hide_${ref}`;
+    for (const ref of this.hidden.get(pageNumber) ?? []) {
+      if (!refs.includes(ref)) storage.remove(key(ref));
+    }
+    for (const ref of refs) {
+      storage.setValue(key(ref), { deleted: true, id: ref, pageIndex: pageNumber - 1 });
+    }
+    this.hidden.set(pageNumber, refs);
+  }
+
+  render({
+    pageNumber,
+    canvas,
+    zoomPercent,
+    devicePixelRatio,
+    hiddenAnnotations,
+  }: RenderRequest): RenderTask {
+    if (hiddenAnnotations) this.hideAnnotations(pageNumber, hiddenAnnotations);
     const stop = new AbortController();
 
     const finished = (async () => {
@@ -254,6 +281,8 @@ class PdfJsDocument implements PdfDocument {
         canvas,
         viewport,
         transform: [pixels.outputScale, 0, 0, pixels.outputScale, 0, 0],
+        // The only drawing mode that honours what's been asked to be left out.
+        annotationMode: AnnotationMode.ENABLE_STORAGE,
       });
       stop.signal.addEventListener('abort', () => {
         task.cancel();

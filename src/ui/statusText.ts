@@ -9,7 +9,7 @@ function annotateHint({ tool, moving }: Annotating, pageIsScan: boolean): string
       : 'Drag across text to mark it, or Tab to a line';
   }
   if (tool === 'pen') return 'Drag on the page to draw. Drawing needs a pointer';
-  if (tool === 'note') return 'Click where the note goes';
+  if (tool === 'comment') return 'Click where the comment goes';
   if (tool) return 'Drag on the page, or click for a standard size';
   if (moving) return 'Click where it goes on the page';
   return 'Pick a tool, or click something on the page to change it';

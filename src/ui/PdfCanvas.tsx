@@ -10,6 +10,8 @@ interface PdfCanvasProps {
   readonly active: boolean;
   /** Thumbnails repeat what the page itself says, so screen readers skip them. */
   readonly decorative?: boolean;
+  /** Names of saved annotations to leave out, separated by spaces. Thumbnails don't ask. */
+  readonly hiddenAnnotations?: string;
 }
 
 // Waits for a zoom gesture to settle; the old bitmap scales with CSS until then.
@@ -23,6 +25,7 @@ export function PdfCanvas({
   height,
   active,
   decorative = false,
+  hiddenAnnotations,
 }: PdfCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [failed, setFailed] = useState(false);
@@ -51,6 +54,9 @@ export function PdfCanvas({
         canvas,
         zoomPercent,
         devicePixelRatio: window.devicePixelRatio,
+        ...(hiddenAnnotations === undefined
+          ? {}
+          : { hiddenAnnotations: hiddenAnnotations.split(' ').filter(Boolean) }),
       });
       task.finished
         .then(() => {
@@ -69,7 +75,7 @@ export function PdfCanvas({
       window.clearTimeout(timer);
       task?.cancel();
     };
-  }, [active, document, pageNumber, zoomPercent]);
+  }, [active, document, pageNumber, zoomPercent, hiddenAnnotations]);
 
   return (
     <>

@@ -160,6 +160,25 @@ describe.each(files)('%s', (name) => {
     },
   );
 
+  it.skipIf(password !== undefined)('survives its annotations being read and changed', async () => {
+    const editor = new PdfEditor(original, fonts);
+    const found = await editor.existingAnnotations();
+    const before = await inspect(original);
+    const tagged = found.map((annotation) => ({ ...annotation, tags: ['Chapter 1'] }));
+    const saved = await editor.save([], [], { annotations: tagged });
+    const path = join(temp, `retagged-${name}`);
+    writeFileSync(path, saved);
+    expect([0, 3]).toContain(qpdfStatus(path));
+    const after = await inspect(saved);
+    expect(after.pages).toBe(before.pages);
+    expect(after.links).toBe(before.links);
+    expect(after.outlineItems).toBe(before.outlineItems);
+    expect(after.annotations).toBe(before.annotations);
+    const again = await new PdfEditor(saved, fonts).existingAnnotations();
+    expect(again.length).toBe(found.length);
+    expect(again.every((annotation) => annotation.tags?.includes('Chapter 1'))).toBe(true);
+  });
+
   it.skipIf(password !== undefined)('survives filling in and locking its form', async () => {
     const form = (await PDFDocument.load(original, { ignoreEncryption: true })).getForm();
     const answers = form
@@ -192,7 +211,7 @@ describe.each(files)('%s', (name) => {
         { ...common, id: 'e', kind: 'rect', rect, width: 2 },
         { ...common, id: 'f', kind: 'ellipse', rect, width: 2 },
         { ...common, id: 'g', kind: 'arrow', from: rect, to: { x: 200, y: 200 }, width: 2 },
-        { ...common, id: 'h', kind: 'note', at: rect, text: 'Note' },
+        { ...common, id: 'h', kind: 'comment', at: rect, text: 'Note' },
         { ...common, id: 'i', kind: 'whiteout', rect, width: 0 },
       ],
     });

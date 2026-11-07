@@ -29,3 +29,6 @@ Thumbs.db
 # Generated at dev and build time
 public/pdfjs/
 public/fonts/
+
+# Written by the Claude desktop app for its browser preview.
+.claude/launch.json
