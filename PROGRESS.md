@@ -1,6 +1,6 @@
 # Progress
 
-**Current phase:** 4 finished, waiting for the owner's "continue" before Phase 5.
+**Current phase:** 4b, designs waiting for the owner's approval.
 
 ## Phase 0: Plan and design
 
@@ -83,12 +83,12 @@
 
 ## Phase 4b: Organising annotations
 
-Added by the owner after Phase 4. Timing relative to Phase 5 still to be confirmed.
+Added by the owner after Phase 4, to come before Phase 5.
 
 - [ ] Design approval for the new screens
 - [ ] Edit saved annotations after reopening
 - [ ] Comments replace sticky notes, with no author names or replies
-- [ ] Side panel tabs by purpose, and this page or the whole document
+- [ ] Side panel tabs by purpose, and this page or all pages
 - [ ] Tags such as "Chapter 1", saved in the file
 - [ ] Part 7 gates and check-in
 

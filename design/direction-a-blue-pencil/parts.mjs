@@ -29,6 +29,7 @@ const ICONS = {
   rect: '<path d="M2.5 4h11v8h-11z"/>',
   ellipse: '<ellipse cx="8" cy="8" rx="5.5" ry="4.5"/>',
   arrow: '<path d="M3 13L13 3M7 3h6v6"/>',
+  comment: '<path d="M3 13.5V8a5 5 0 0 1 5-5h.5a5 5 0 0 1 0 10z"/><path d="M6 7h5M6 9.5h3.5"/>',
   pin: '<path d="M2.5 2.5h11v8l-3 3h-8zM10.5 13.5v-3h3"/>',
   image: '<path d="M2.5 3h11v10h-11zM2.5 11l3-3 2.5 2.5 2-2 3.5 3.5"/><circle cx="10.5" cy="6" r="1"/>',
   whiteout: '<path d="M2.5 4h11v8h-11z"/><path d="M5 8h6" stroke-dasharray="2 2"/>',

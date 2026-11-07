@@ -4,6 +4,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bar, formatBar, icon, key, lease, openRent, page, signPanel, status, thumbs, tickKey } from './parts.mjs';
 
+import { annotateBar, commentCard, commentPin, pageHeading, panelTop, row, tagEditor } from './parts-annotations.mjs';
+
 const here = dirname(fileURLToPath(import.meta.url));
 const LEASE = 'Lease renewal 2027.pdf';
 const CLAIM = 'Home insurance claim.pdf';
@@ -111,6 +113,107 @@ const screens = {
   ${status({ hint: 'Pick a tool, then drag on the page', extra: '' })}`,
     };
   },
+
+  // ---------- Phase 4b: comments, tabs and tags ----------
+  comment: ({ p }) => ({
+    title: 'Comment', file: LEASE,
+    content: `${bar({ p, mode: 'note', file: LEASE, state: '3 unsaved changes' })}
+  <div class="body">
+    ${thumbs(3)}
+    ${stage(lease({
+      swap: [
+        ['A late fee of $45', 'A <mark>late fee of $45</mark>'],
+        ['60 days in writing', '<span class="a-under">60 days in writing</span>'],
+        ['Pets remain subject to', '<span class="a-strike">Pets remain subject to</span>'],
+      ],
+      overlay: `${commentPin(536, 296, true)}${commentCard(504, 328, 'Ask Daniel whether the late fee can go down to $30.', true)}${commentPin(60, 556)}`,
+    }), annotateBar())}
+    <aside class="panel" aria-label="Annotations">
+      ${panelTop({ tab: 'Comments', count: '2 of 5' })}
+      <ul class="rows">
+        ${row({ kind: 'comment', words: 'Ask Daniel whether the late fee can go down to $30.', selected: true })}
+        ${row({ kind: 'comment', words: 'Good catch on the pet clause.' })}
+      </ul>
+      <div class="panel-foot"><p>Comments show in other PDF apps too. Your original file stays unchanged.</p></div>
+    </aside>
+  </div>
+  ${status({ hint: 'Click where the comment goes', extra: '' })}`,
+  }),
+
+  'annotations-document': ({ p }) => ({
+    title: 'Whole document, by tag', file: LEASE,
+    content: `${bar({ p, mode: 'note', file: LEASE, state: '9 unsaved changes' })}
+  <div class="body">
+    ${thumbs(5)}
+    ${stage(lease({ swap: [
+        ['A late fee of $45', 'A <mark>late fee of $45</mark>'],
+        ['60 days in writing', '<span class="a-under">60 days in writing</span>'],
+        ['Pets remain subject to', '<span class="a-strike">Pets remain subject to</span>'],
+      ], overlay: commentPin(536, 296) }), annotateBar())}
+    <aside class="panel" aria-label="Annotations">
+      ${panelTop({ scope: 'document', count: '4 of 9', filters: ['Chapter 1', 'Chapter 2', 'Ask Daniel'], on: ['Chapter 1'] })}
+      <ul class="rows">
+        ${pageHeading('Page 1')}
+        ${row({ kind: 'marker', title: 'Highlight', sub: 'late fee of $45', tags: ['Chapter 1', 'Ask Daniel'] })}
+        ${row({ kind: 'comment', words: 'Ask Daniel whether the late fee can go down to $30.', tags: ['Chapter 1'] })}
+        ${pageHeading('Page 3')}
+        ${row({ kind: 'underline', title: 'Underline', sub: '60 days in writing', tags: ['Chapter 1'] })}
+        ${row({ kind: 'pen', title: 'Pen drawing', sub: 'Around $1,760', tags: ['Chapter 1'] })}
+      </ul>
+    </aside>
+  </div>
+  ${status({ hint: 'Click one to go to it', extra: '' })}`,
+  }),
+
+  'annotations-tagging': ({ p }) => ({
+    title: 'Adding a tag', file: LEASE,
+    content: `${bar({ p, mode: 'note', file: LEASE, state: '6 unsaved changes' })}
+  <div class="body">
+    ${thumbs(6)}
+    ${stage(lease({
+      swap: [
+        ['A late fee of $45', 'A <span class="a-selected"><mark>late fee of $45</mark></span>'],
+        ['60 days in writing', '<span class="a-under">60 days in writing</span>'],
+        ['Pets remain subject to', '<span class="a-strike">Pets remain subject to</span>'],
+      ],
+    }), annotateBar())}
+    <aside class="panel" aria-label="Annotations">
+      ${panelTop({ count: '3 annotations', filters: ['Chapter 1', 'Ask Daniel'] })}
+      <ul class="rows">
+        ${row({ kind: 'marker', title: 'Highlight', sub: 'late fee of $45', selected: true })}
+        ${tagEditor(['Chapter 1'], ['Chapter 2', 'Ask Daniel'])}
+        ${row({ kind: 'underline', title: 'Underline', sub: '60 days in writing', tags: ['Chapter 1'] })}
+        ${row({ kind: 'strike', title: 'Strikethrough', sub: 'Pets remain subject to' })}
+      </ul>
+      <div class="panel-foot"><p>Tags are saved in the file, but only this app shows them. Your original file stays unchanged.</p></div>
+    </aside>
+  </div>
+  ${status({ hint: 'Type a tag and press Return, or pick one from the list', extra: '' })}`,
+  }),
+
+  'annotations-saved': ({ p }) => ({
+    title: 'Reopened, with saved annotations', file: 'Lease renewal 2027-edited.pdf',
+    content: `${bar({ p, mode: 'note', file: 'Lease renewal 2027-edited.pdf', state: 'No unsaved changes' })}
+  <div class="body">
+    ${thumbs(0)}
+    ${stage(lease({ swap: [
+        ['A late fee of $45', 'A <mark>late fee of $45</mark>'],
+        ['60 days in writing', '<span class="a-under">60 days in writing</span>'],
+        ['Pets remain subject to', '<span class="a-strike">Pets remain subject to</span>'],
+      ], overlay: `${commentPin(536, 296)}${commentPin(60, 556, false, '#a8e6b0')}` }), annotateBar())}
+    <aside class="panel" aria-label="Annotations">
+      ${panelTop({ count: '4 annotations', filters: ['Chapter 1'] })}
+      <ul class="rows">
+        ${row({ kind: 'marker', title: 'Highlight', sub: 'late fee of $45', tags: ['Chapter 1'] })}
+        ${row({ kind: 'comment', title: 'Comment', sub: 'Ask Daniel whether the late fee can go down to $30.' })}
+        ${row({ kind: 'underline', title: 'Underline', sub: '60 days in writing', tags: ['Chapter 1'] })}
+        ${row({ kind: 'comment', words: 'Please initial here.', note: 'Made in another app. You can change its words and tags, or delete it.' })}
+      </ul>
+      <div class="panel-foot"><p>Images and whiteout boxes become part of the page when saved, so they can’t be changed after that. Your original file stays unchanged.</p></div>
+    </aside>
+  </div>
+  ${status({ hint: 'Pick a tool, or click something on the page to change it', extra: '' })}`,
+  }),
 
   sign: ({ p }) => ({
     title: 'Sign', file: LEASE,
@@ -397,6 +500,7 @@ const groups = [
   ['Start', ['start']],
   ['Editor modes', ['select', 'edit-text', 'annotate', 'sign', 'pages']],
   ['Signature dialog', ['signature-draw', 'signature-type', 'signature-upload']],
+  ['Comments, tabs and tags', ['comment', 'annotations-document', 'annotations-tagging', 'annotations-saved']],
   ['Forms', ['form']],
   ['Notices and errors', ['font-notice', 'update', 'error-open', 'error-save']],
   ['Signed and scanned PDFs', ['signed-view', 'signed-warning', 'scanned-page']],
