@@ -1,4 +1,3 @@
-import { isEncrypted } from '../../engine/extract';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   EMPTY_LOG,
@@ -29,6 +28,7 @@ import type { FontOutcome, SystemFontStyle } from '../../engine/save/choose-font
 import { unchangedCopy } from '../../engine/copy';
 import type { OpenedFile, Platform } from '../../platform';
 import { SaveClient } from '../../workers/save-client';
+import { useExistingAnnotations } from './useExistingAnnotations';
 
 const SYSTEM_STYLES: readonly SystemFontStyle[] = ['regular', 'bold', 'italic', 'bold-italic'];
 
@@ -97,10 +97,6 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
   const [notice, setNotice] = useState<FontNoticeState | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [outcomes, setOutcomes] = useState<ReadonlyMap<string, FontOutcome>>(() => new Map());
-  const [existing, setExisting] = useState<readonly Annotation[]>([]);
-  const [unreadAnnotations, setUnreadAnnotations] = useState(0);
-  const existingRef = useRef(existing);
-  existingRef.current = existing;
   // Kept in step with the state, because saving straight after an edit must include that edit.
   const logRef = useRef(log);
   const savedRef = useRef(savedEntry);
@@ -145,32 +141,11 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
     };
   }, [file, platform]);
 
-  useEffect(() => {
-    setExisting([]);
-    setUnreadAnnotations(0);
-    const client = clientRef.current;
-    // A protected file can't be changed anyway, and comments in it can still be read another way.
-    if (!file || !client || isEncrypted(file.bytes)) return;
-    let current = true;
-    client
-      .then((opened) => opened.existingAnnotations())
-      .then((found) => {
-        if (!current) return;
-        setExisting(found.annotations);
-        setUnreadAnnotations(found.skipped);
-      })
-      .catch((error: unknown) => {
-        console.error(error);
-        if (current) {
-          setProblem(
-            'The annotations already in this file couldn’t be read, so they can’t be changed here. They’re still in the file.',
-          );
-        }
-      });
-    return () => {
-      current = false;
-    };
-  }, [file]);
+  const { existing, existingRef, unreadAnnotations } = useExistingAnnotations(
+    file,
+    clientRef,
+    setProblem,
+  );
 
   const boxes = useMemo(() => deriveTextBoxes(activeEdits(log)), [log]);
   const signatures = useMemo(() => deriveSignatures(activeEdits(log)), [log]);
@@ -237,8 +212,8 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
   const buildBytes = useCallback(async (): Promise<BuiltFile> => {
     const current = logRef.current;
     const entry = currentEntry(current);
-    const active = deriveTextBoxes(activeEdits(current));
     const edits = activeEdits(current);
+    const active = deriveTextBoxes(edits);
     const placed = deriveSignatures(edits);
     const { changed, removed } = savedChanges(edits, existingRef.current);
     const marks = [...deriveAnnotations(edits).filter(({ saved }) => !saved), ...changed];

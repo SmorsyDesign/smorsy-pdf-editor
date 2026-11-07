@@ -1,7 +1,7 @@
 import { rectFromCorners } from './coordinates';
 import type { Rect } from './edits/model';
 
-/** A sticky note already saved in the file, which can be read but not changed. */
+/** A comment already saved in the file, read this way because it works on protected files too. */
 export interface ExistingNote {
   readonly id: string;
   readonly rect: Rect;
@@ -11,7 +11,7 @@ export interface ExistingNote {
   readonly noLook: boolean;
 }
 
-/** The parts of pdf.js's description of an annotation that a note needs. */
+/** The parts of pdf.js's description of an annotation that a comment needs. */
 export interface NoteData {
   readonly id?: string;
   readonly subtype?: string;
@@ -24,7 +24,7 @@ export interface NoteData {
 
 const HIDDEN_OR_NO_VIEW = 2 | 32;
 
-/** Reads a note. Anything else on the page, or a note with no words, gives null. */
+/** Reads a comment. Anything else on the page, or a comment with no words, gives null. */
 export function noteFromAnnotation(
   data: NoteData,
   toDisplay: (rect: readonly number[]) => readonly number[],

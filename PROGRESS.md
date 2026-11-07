@@ -1,6 +1,6 @@
 # Progress
 
-**Current phase:** 4b, designs waiting for the owner's approval.
+**Current phase:** 4b finished, waiting for the owner's "continue" before Phase 5.
 
 ## Phase 0: Plan and design
 
@@ -85,12 +85,12 @@
 
 Added by the owner after Phase 4, to come before Phase 5.
 
-- [ ] Design approval for the new screens
-- [ ] Edit saved annotations after reopening
-- [ ] Comments replace sticky notes, with no author names or replies
-- [ ] Side panel tabs by purpose, and this page or all pages
-- [ ] Tags such as "Chapter 1", saved in the file
-- [ ] Part 7 gates and check-in
+- [x] Design approval for the new screens
+- [x] Edit saved annotations after reopening
+- [x] Comments replace sticky notes, with no author names or replies
+- [x] Side panel tabs by purpose, and this page or all pages
+- [x] Tags such as "Chapter 1", saved in the file
+- [x] Part 7 gates and check-in
 
 ## Phase 5: Page tools
 
@@ -133,6 +133,21 @@ Added by the owner after Phase 4, to come before Phase 5.
 - [ ] Part 7 gates and final check-in
 
 ## Skipped minor findings
+
+- **Phase 4b, not checked in Adobe Reader or macOS Preview.** The check-in asks the owner to try one. Comments use the standard PDF note type, so they should show there, but that's untested.
+- **Phase 4b, a pop-up also listed on another page keeps its words after its comment is deleted.** No app writes files this way, and leaving it is what stops that other page losing something.
+- **Phase 4b, an image shared only with a page's tiling pattern could be erased along with a deleted annotation's drawing.** It needs one object used both ways, which isn't seen in practice.
+- **Phase 4b, a comment's leading invisible byte-order character is dropped.** It's invisible, and nothing else changes.
+- **Phase 4b, another app's comment emptied and saved from inside the box stays as a pin with no words.** Leaving the box deletes it, as with any comment. The words themselves are gone either way.
+- **Phase 4b, another app's marks with no drawing of their own may not show on the page, though they're listed.** pdf.js draws its own for most kinds. Comments get a pin here.
+- **Phase 4b, typing a tag and then scrolling that row away, without clicking out of it, loses what was typed.** Enter, or clicking anywhere, keeps it.
+- **Phase 4b, pasting a tag longer than 60 characters cuts it with no notice.** The tag shows as it was kept.
+- **Phase 4b, clicking a row moves focus to the annotation, so reaching its tag field by keyboard means tabbing back to the panel.** Focus on the annotation is what lets arrow keys move it, and only one can come first.
+- **Phase 4b, clicking something already selected doesn't bring its row back if a filter has since hidden it.** Clearing the filter does.
+- **Phase 4b, a tool picked in the moment before a file's annotations finish loading gets put down.** Loading takes a fraction of a second.
+- **Phase 4b, the list isn't virtualised.** With 6,000 annotations, switching tabs takes about two seconds, though rows out of view skip layout. Real documents come nowhere near that.
+- **Phase 4b, page tools in Phase 5 have to handle saved annotations.** Rotating a page changes what the kept positions mean. A mismatch only makes them read as another app's, so nothing's lost.
+- **Phase 4b, design differences kept on purpose.** "Made in another app" shows only on the selected row, because it would crowd a list of many. The default footer states image and whiteout limits. The title says "3 pages" rather than "No unsaved changes", as it does everywhere else.
 
 - **Phase 4, not checked in Adobe Reader or macOS Preview.** Saved annotations, answers and whiteouts are verified with the pdf.js renderer, qpdf and pdf-lib only. There's no copy of Reader here.
 - **Phase 4, saved annotations can't be changed here.** New annotations are editable until the file is closed; ones already in a file can only be read (notes) or seen. The panel says so.

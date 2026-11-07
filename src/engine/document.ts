@@ -2,7 +2,6 @@ import {
   AnnotationMode,
   OPS,
   TextLayer,
-  Util,
   getDocument,
   type PDFDocumentLoadingTask,
   type PDFDocumentProxy,
@@ -12,14 +11,8 @@ import { EngineError } from './errors';
 import type { FormField } from './forms/fields';
 import type { ExistingNote } from './notes';
 import { readExistingNotes, readFormFields } from './pdf-annotations';
-import {
-  groupTextItems,
-  type FontFacts,
-  type PageText,
-  type RawTextItem,
-  type TextBlock,
-} from './extract';
-import { styleFromName } from './fonts/match';
+import { groupTextItems, type PageText, type TextBlock } from './extract';
+import { fontsInText, rawItems } from './pdf-page-text';
 import { canvasPixels, displayedPageSize, type PageSize } from './zoom';
 
 /** Where pdf.js finds its bundled files. Set in the app; Node tests don't need them. */
@@ -80,56 +73,6 @@ const IMAGE_OPERATORS: ReadonlySet<number> = new Set([
   OPS.paintImageMaskXObject,
 ]);
 
-interface PdfJsFont {
-  readonly name?: string;
-  readonly bold?: boolean;
-  readonly black?: boolean;
-  readonly italic?: boolean;
-  readonly isSerifFont?: boolean;
-  readonly isMonospace?: boolean;
-  readonly isType3Font?: boolean;
-}
-
-function readFontFacts(
-  page: PDFPageProxy,
-  fontKey: string,
-  styles: Record<string, { ascent: number; descent: number; fontFamily: string }>,
-): FontFacts {
-  const font: PdfJsFont = page.commonObjs.has(fontKey)
-    ? (page.commonObjs.get(fontKey) as PdfJsFont)
-    : {};
-  const style = styles[fontKey];
-  const name = font.name ?? '';
-  const named = styleFromName(name);
-  return {
-    name,
-    bold: named.bold || font.bold === true || font.black === true,
-    italic: named.italic || font.italic === true,
-    serif: font.isSerifFont ?? style?.fontFamily === 'serif',
-    monospace: font.isMonospace ?? style?.fontFamily === 'monospace',
-    type3: font.isType3Font === true,
-    ascent: style?.ascent || 0.8,
-    descent: Math.abs(style?.descent ?? 0.2),
-  };
-}
-
-function rawItems(items: readonly object[], transform: number[]): RawTextItem[] {
-  const raw: RawTextItem[] = [];
-  for (const item of items) {
-    if (!('str' in item)) continue;
-    const text = item as { str: string; transform: number[]; width: number; fontName: string };
-    const matrix = Util.transform(transform, text.transform) as number[];
-    const [a = 1, b = 0, c = 0, d = 1, e = 0, f = 0] = matrix;
-    raw.push({
-      text: text.str,
-      matrix: [a, b, c, d, e, f],
-      width: text.width,
-      fontKey: text.fontName,
-    });
-  }
-  return raw;
-}
-
 function translateOpenError(error: unknown): EngineError {
   const name = error instanceof Error ? error.name : '';
   const detail = error instanceof Error ? error.message : String(error);
@@ -181,22 +124,7 @@ class PdfJsDocument implements PdfDocument {
     const [content, operators] = await Promise.all([page.getTextContent(), page.getOperatorList()]);
 
     const items = rawItems(content.items, viewport.transform);
-    const fonts = new Map<string, FontFacts>();
-    const drawn = new Map<string, Set<string>>();
-    for (const item of content.items) {
-      if (!('str' in item)) continue;
-      if (!fonts.has(item.fontName)) {
-        fonts.set(item.fontName, readFontFacts(page, item.fontName, content.styles));
-        drawn.set(item.fontName, new Set());
-      }
-      const characters = drawn.get(item.fontName);
-      for (const character of item.str) characters?.add(character);
-    }
-    for (const [key, facts] of fonts) {
-      fonts.set(key, { ...facts, knownCharacters: [...(drawn.get(key) ?? [])].join('') });
-    }
-
-    const blocks = groupTextItems(items, pageNumber, fonts);
+    const blocks = groupTextItems(items, pageNumber, fontsInText(page, content));
     const scanned =
       blocks.length === 0 && operators.fnArray.some((operator) => IMAGE_OPERATORS.has(operator));
     return { blocks, scanned };

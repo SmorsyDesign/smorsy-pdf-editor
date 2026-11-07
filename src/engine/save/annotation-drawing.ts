@@ -218,9 +218,6 @@ function drawnArrow(
   };
 }
 
-// How far a corner's control points sit along each side, for a quarter of a circle of radius one.
-const ROUND = 0.5523;
-
 /**
  * A speech bubble whose one square corner, at the bottom left as displayed, is the spot it's about.
  * It's worked out as displayed and converted point by point, so it's right on any page rotation.
@@ -234,7 +231,7 @@ function drawnComment(
   const corners = cornersOf({ ...at, width: PIN_SIZE, height: PIN_SIZE }, box);
   const point = (x: number, y: number) => displayToUser({ x: at.x + x, y: at.y + y }, box);
   const mid = PIN_SIZE / 2;
-  const reach = mid * ROUND;
+  const reach = mid * CURVE;
   const curve = (points: readonly (readonly [number, number])[]) => {
     const [one, two, three] = points.map(([x, y]) => point(x, y));
     return one && two && three

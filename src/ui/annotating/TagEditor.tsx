@@ -1,5 +1,5 @@
 import { useRef, useState, type KeyboardEvent } from 'react';
-import { MAX_TAGS, cleanTags } from '../../engine/edits/saved-data';
+import { MAX_TAGS, MAX_TAG_LENGTH, cleanTags } from '../../engine/edits/saved-data';
 import { Icon } from '../Icon';
 
 interface TagEditorProps {
@@ -59,7 +59,7 @@ export function TagEditor({ tags, offers, onChange }: TagEditorProps) {
           type="text"
           aria-label="Add a tag"
           placeholder={isFull ? `${String(MAX_TAGS)} tags is the most` : 'Add a tag'}
-          maxLength={60}
+          maxLength={MAX_TAG_LENGTH}
           value={typed}
           onChange={(event) => {
             setTyped(event.target.value);

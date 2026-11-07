@@ -1,0 +1,240 @@
+/* The annotation panel: where they're from, what kind, and which tag. */
+
+/* The list of what's on the page. Selected comes after hover here, so it wins. */
+.rows {
+  display: grid;
+  gap: var(--space-1);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.row {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 48px;
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+}
+.row:hover {
+  background: var(--chrome-sunken);
+}
+.row-text {
+  display: grid;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  min-height: 24px;
+}
+.row-title {
+  font-weight: 500;
+}
+.row-sub {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--line-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scope {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: var(--radius-md);
+  background: var(--chrome-sunken);
+}
+.scope button {
+  height: 24px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font: 500 var(--text-sm) / var(--line-sm) var(--font-ui);
+  cursor: pointer;
+}
+.scope button:hover {
+  color: var(--text);
+}
+.scope button[aria-pressed='true'] {
+  background: var(--chrome-raised);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: 0 0 0 1px var(--line);
+}
+.panel-tabs {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  border-bottom: 1px solid var(--line);
+}
+.panel-tabs button {
+  min-width: 24px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font: 500 var(--text-sm) / var(--line-sm) var(--font-ui);
+  cursor: pointer;
+}
+.panel-tabs button:hover {
+  color: var(--text);
+}
+.panel-tabs button[aria-pressed='true'] {
+  border-bottom-color: var(--accent);
+  color: var(--text);
+  font-weight: 600;
+}
+.tag-filters,
+.tag-offers {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+.tag-filters {
+  margin-top: var(--space-2);
+}
+.tag-offers-label {
+  flex-basis: 100%;
+}
+.tag-btn {
+  min-height: 24px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: 500 var(--text-sm) / var(--line-sm) var(--font-ui);
+  cursor: pointer;
+}
+.tag-btn:hover {
+  background: var(--chrome-sunken);
+}
+.tag-btn[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-soft-text);
+  font-weight: 600;
+}
+.tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--chrome-sunken);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--line-sm);
+}
+.tag.is-removable {
+  gap: var(--space-1);
+  min-height: 24px;
+  padding-right: 0;
+  color: var(--text);
+}
+.tag.is-removable button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.tag.is-removable .icon {
+  width: 12px;
+  height: 12px;
+}
+.row-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+}
+.row-note {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--line-sm);
+}
+.row-words {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.row.is-selected {
+  background: var(--accent-soft);
+}
+.row.is-selected .row-sub {
+  color: var(--accent-soft-text);
+}
+.rows-heading {
+  margin-top: var(--space-2);
+  padding-left: var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: var(--line-sm);
+}
+.rows-heading:first-child {
+  margin-top: 0;
+}
+.tag-editor {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0 var(--space-1) var(--space-2) var(--space-6);
+}
+.tag-editing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--chrome-raised);
+}
+.tag-editing:focus-within {
+  outline: 2px solid var(--focus);
+}
+.tag-input {
+  flex: 1;
+  min-width: 72px;
+  height: 24px;
+  padding: 0 var(--space-1);
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: 400 var(--text-sm) / var(--line-sm) var(--font-ui);
+}
+.tag-input::placeholder {
+  color: var(--text-muted);
+}
+
+/* Rows far outside the view skip being laid out, which keeps a very long list responsive. */
+.rows .row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 48px;
+}
+.tag,
+.tag-btn {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}

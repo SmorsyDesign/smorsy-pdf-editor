@@ -1,27 +1,9 @@
 import fontkit from '@cantoo/fontkit';
-import {
-  PDFDocument,
-  PDFHexString,
-  beginText,
-  degrees,
-  endText,
-  popGraphicsState,
-  pushGraphicsState,
-  rgb,
-  rotateDegrees,
-  setFillingRgbColor,
-  setFontAndSize,
-  showText,
-  translate,
-  type PDFFont,
-  type PDFImage,
-  type PDFPage,
-} from '@cantoo/pdf-lib';
-import { displayToUser, userAngle } from '../coordinates';
+import { PDFDocument, type PDFFont, type PDFImage, type PDFPage } from '@cantoo/pdf-lib';
 import type { Annotation, SavedSource } from '../edits/annotations';
-import type { Color, PlacedSignature, TextBox } from '../edits/model';
+import type { PlacedSignature, TextBox } from '../edits/model';
 import { UNSUPPORTED_TEXT, nameCharacter } from '../errors';
-import { findEmbeddedFont, type EmbeddedFont } from '../fonts/embedded';
+import { findEmbeddedFont } from '../fonts/embedded';
 import { bundledFaceFile } from '../fonts/match';
 import { placementInPdf } from '../signatures/placement';
 import { readAnnotations, type ReadAnnotations } from './annotation-reading';
@@ -37,6 +19,7 @@ import { lockAnswers } from './lock-answers';
 import { giveOwnAnnotationList } from './page-annotations';
 import { boundsOfWhiteout, drawWhiteout, pageBoxOf, textBoxBounds } from './page-geometry';
 import { boundsOfPlacement, drawSignaturePicture } from './signature-drawing';
+import { drawCovers, drawLines, type DrawFont } from './text-drawing';
 import { FontChooser, systemFontKey, type FontBytes, type FontOutcome } from './choose-font';
 
 /** What else goes in a save, beyond text and signatures. */
@@ -58,14 +41,6 @@ export interface SaveReport {
   readonly fieldsOnTop: number;
   /** Existing annotations under a whiteout, which are now simply part of the page. */
   readonly annotationsRetired: number;
-}
-
-type DrawFont =
-  | { readonly kind: 'pdf-font'; readonly font: PDFFont }
-  | { readonly kind: 'embedded'; readonly font: EmbeddedFont };
-
-function toRgb({ r, g, b }: Color) {
-  return rgb(r, g, b);
 }
 
 /** Applies text edits to the original bytes. Every save starts again from those bytes. */
@@ -137,89 +112,6 @@ export class PdfEditor {
     return { kind: 'pdf-font', font };
   }
 
-  private drawLines(page: PDFPage, box: TextBox, font: DrawFont): void {
-    const pageBox = pageBoxOf(page);
-    const unit = pageBox.unit ?? 1;
-    const { size: displaySize, align, color } = box.style;
-    const size = displaySize / unit;
-    const radians = (box.angle * Math.PI) / 180;
-    const along = { x: Math.cos(radians), y: Math.sin(radians) };
-    const across = { x: -Math.sin(radians), y: Math.cos(radians) };
-    const angle = userAngle(box.angle, pageBox.rotation);
-
-    box.lines.forEach((line, index) => {
-      if (line === '') return;
-      const width =
-        (font.kind === 'embedded'
-          ? font.font.widthOf(line, size)
-          : font.font.widthOfTextAtSize(line, size)) * unit;
-      const indent =
-        align === 'center'
-          ? (box.rect.width - width) / 2
-          : align === 'right'
-            ? box.rect.width - width
-            : 0;
-      const down = box.firstBaseline + index * box.lineHeight;
-      const origin = displayToUser(
-        {
-          x: box.rect.x + along.x * indent + across.x * down,
-          y: box.rect.y + along.y * indent + across.y * down,
-        },
-        pageBox,
-      );
-
-      if (font.kind === 'pdf-font') {
-        page.drawText(line, {
-          x: origin.x,
-          y: origin.y,
-          size,
-          font: font.font,
-          color: toRgb(color),
-          rotate: degrees(angle),
-        });
-        return;
-      }
-      const hex = font.font.encode(line);
-      if (hex === null) throw new Error(`The file’s own font can’t draw this line: ${line}`);
-      page.pushOperators(
-        pushGraphicsState(),
-        translate(origin.x, origin.y),
-        rotateDegrees(angle),
-        setFillingRgbColor(color.r, color.g, color.b),
-        beginText(),
-        setFontAndSize(font.font.resourceName, size),
-        showText(PDFHexString.of(hex)),
-        endText(),
-        popGraphicsState(),
-      );
-    });
-  }
-
-  private drawCovers(page: PDFPage, box: TextBox): void {
-    const pageBox = pageBoxOf(page);
-    const unit = pageBox.unit ?? 1;
-    for (const { rect, angle, color } of box.covers) {
-      const radians = (angle * Math.PI) / 180;
-      // PDF rectangles grow from their lower-left corner, which is the display's bottom left.
-      const corner = displayToUser(
-        {
-          x: rect.x - Math.sin(radians) * rect.height,
-          y: rect.y + Math.cos(radians) * rect.height,
-        },
-        pageBox,
-      );
-      page.drawRectangle({
-        x: corner.x,
-        y: corner.y,
-        width: rect.width / unit,
-        height: rect.height / unit,
-        rotate: degrees(userAngle(angle, pageBox.rotation)),
-        color: toRgb(color),
-        borderWidth: 0,
-      });
-    }
-  }
-
   private async drawSignatures(
     doc: PDFDocument,
     page: PDFPage,
@@ -251,7 +143,8 @@ export class PdfEditor {
     signatures: readonly PlacedSignature[],
     { annotations: changed = [], removedSaved = [], answers = [], lock = false }: SaveExtras = {},
   ): Promise<SaveReport> {
-    // A note being retyped can be empty at the moment of saving, and it's no note until it has words.
+    // A comment being retyped can be empty at the moment of saving, and it's no comment until it
+    // has words.
     const annotations = changed.filter(
       (annotation) => annotation.kind !== 'comment' || annotation.text.trim() !== '',
     );
@@ -307,10 +200,10 @@ export class PdfEditor {
       // Under everything else, so new text can go on a space that's been cleared.
       for (const mark of whiteouts) drawWhiteout(page, mark, pageBox);
       // All covers go first, so a patch can never hide another box's new text.
-      for (const box of onPage) this.drawCovers(page, box);
+      for (const box of onPage) drawCovers(page, box);
       for (const box of onPage) {
         if (box.lines.length > 0) {
-          this.drawLines(page, box, await this.drawFont(doc, page, box, embedded));
+          drawLines(page, box, await this.drawFont(doc, page, box, embedded));
         }
       }
       // Last, because the screen shows signatures on top of everything else on the page.

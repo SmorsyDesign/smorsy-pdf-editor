@@ -7,7 +7,7 @@ export const DRAWING_KEY = 'SmorsyAnnotation';
 export const TAGS_KEY = 'SmorsyTags';
 
 export const MAX_TAGS = 50;
-const MAX_TAG_LENGTH = 60;
+export const MAX_TAG_LENGTH = 60;
 // A PDF page can't be bigger than this, so anything further away is a damaged or hostile file.
 const LARGEST_COORDINATE = 100_000;
 const MOST_POINTS = 200_000;
@@ -89,9 +89,9 @@ function listFrom<T>(value: unknown, read: (item: unknown) => T | null): readonl
   if (!Array.isArray(value) || value.length === 0 || value.length > MOST_POINTS) return null;
   const items: T[] = [];
   for (const item of value as readonly unknown[]) {
-    const read_ = read(item);
-    if (read_ === null) return null;
-    items.push(read_);
+    const one = read(item);
+    if (one === null) return null;
+    items.push(one);
   }
   return items;
 }

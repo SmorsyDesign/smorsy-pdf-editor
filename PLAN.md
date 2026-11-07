@@ -116,7 +116,11 @@ Editing PDF text isn't like editing a Word document. A PDF stores positioned gly
 - **Locking answers has its own code rather than the library's `flatten`.** That paints hidden fields, ignores how a drawing fits its box, and removes a field even after failing to paint it. Signature fields stay; a form's own buttons go.
 - **Same-named checkboxes with different meanings behave as radio buttons.** They share one value in the file, so only one can be on.
 - **A new note stays out of the edit log until it has words.** Leaving one empty then changes nothing about the file. Words are recorded as they're typed, because a shortcut can save without leaving the box.
-- **Notes already in a file can be read, not changed.** The page shows only a pin, so a saved note's words would otherwise be unreachable here.
+- **Saved annotations keep what it takes to edit them.** Each carries its drawing's geometry and tags in two keys of our own, which other apps ignore. If another app has moved one since, it's treated as that app's, because what we kept no longer describes it.
+- **Anything read from those keys is untrusted.** Every field is validated, and reading stops at a budget charged before decoding, since a small compressed file can expand a long way.
+- **Deleting erases rather than unlists.** A save writes every object it knows of, so unlisted words would still be in the file. This matters for comments to students.
+- **pdf.js is told to skip a changed saved annotation through its editor's storage.** There's no other way to stop it being drawn. It relies on an internal prefix, which pixel tests would catch moving.
+- **Other apps' annotations can have words and tags changed, or be deleted, but not be moved or recoloured.** Their drawings can't be redrawn reliably.
 - **A signature over a solid form field moves that field's looks into the page.** Viewers always paint fields last, so nothing can sit on top of a solid one. The field stays and stays fillable, but becomes see-through. Over other annotations, whose order viewers do respect, the signature becomes a stamp annotation.
 - **A filled-in field under an edit becomes part of the page, and the app says so.** Leaving it as a field would mean changing it later showed the old text underneath. A form's own buttons stay on top, also with a note.
 - **The date stamp starts off,** though the design mockup shows it ticked, so nothing is added that wasn't asked for.

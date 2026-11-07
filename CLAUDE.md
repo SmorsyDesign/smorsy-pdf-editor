@@ -44,7 +44,8 @@ Node is pinned to 26 LTS in `.nvmrc`. Use terse test reporters and show only fai
 - Saved output is checked by reopening it and reading rendered pixels (`tests/e2e/saved-output.spec.ts`, and `expectSavedToMatchScreen` for signatures), since a file can read correctly while something sits elsewhere.
 - Signatures are never stored on the computer, only held in memory while a PDF is open.
 - Viewers always paint form fields last, so anything drawn over a solid field needs `clearFieldsUnder` first. They paint all annotations over the page, so whiteout needs `clearForWhiteout` too.
-- Annotations save as real PDF annotations, on top of the page. Whiteout and images go in the page itself.
+- Annotations save as real PDF annotations, on top of the page, carrying what it takes to edit them after reopening. Whiteout and images go in the page itself.
+- Deleting erases with `eraseAnnotation`. A save writes every object it knows of, so only unlisting would leave the words in the file. Treat everything read from a file as untrusted.
 - Lock answers with `lockAnswers`, never the library's `flatten`, which paints hidden fields and can lose answers.
 - The webview has no network route. The update check runs in Rust.
 

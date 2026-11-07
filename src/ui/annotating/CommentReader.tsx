@@ -34,7 +34,7 @@ export function CommentReader({
   comments,
   hidden,
 }: CommentReaderProps) {
-  const [notes, setNotes] = useState<readonly ExistingNote[]>([]);
+  const [inFile, setInFile] = useState<readonly ExistingNote[]>([]);
   const [problem, setProblem] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
 
@@ -43,7 +43,7 @@ export function CommentReader({
     let current = true;
     document.existingNotes(pageNumber).then(
       (found) => {
-        if (current) setNotes(found);
+        if (current) setInFile(found);
       },
       (error: unknown) => {
         console.error(error);
@@ -70,7 +70,7 @@ export function CommentReader({
             id: comment.id,
             rect: boundsOfAnnotation(comment),
             text: comment.text,
-            author: notes.find((note) => note.id === comment.saved?.ref)?.author ?? '',
+            author: inFile.find((saved) => saved.id === comment.saved?.ref)?.author ?? '',
           },
         ]
       : [],
@@ -78,7 +78,7 @@ export function CommentReader({
   const refs = new Set(comments.map((comment) => comment.saved?.ref));
   const readable = [
     ...known,
-    ...notes.filter((note) => !refs.has(note.id) && !hidden.includes(note.id)),
+    ...inFile.filter((saved) => !refs.has(saved.id) && !hidden.includes(saved.id)),
   ];
 
   return readable.map((comment) => {

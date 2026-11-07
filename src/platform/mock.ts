@@ -51,7 +51,6 @@ const SHORTCUTS: Readonly<Record<string, MenuCommand>> = {
   '9': 'zoom-fit',
 };
 
-/** Stands in for the operating system when the UI runs in a plain browser for tests. */
 /** Someone looking at this in an ordinary browser, rather than a test, gets a real file picker. */
 function pickFileInBrowser(): Promise<OpenedFile | null> {
   return new Promise((resolve, reject) => {
@@ -90,6 +89,7 @@ function sayThisIsTheTestVersion(): void {
   document.body.append(notice);
 }
 
+/** Stands in for the operating system when the UI runs in a plain browser for tests. */
 export function createMockPlatform(): Platform {
   if (!navigator.webdriver) sayThisIsTheTestVersion();
   const controls: MockControls = {

@@ -1,6 +1,6 @@
 import { useRef, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { annotationLabel } from '../../engine/edits/annotation-labels';
 import {
-  annotationLabel,
   boundsOfAnnotation,
   canMove,
   movedAnnotation,

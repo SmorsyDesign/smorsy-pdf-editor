@@ -11,14 +11,9 @@ import type { Annotation, SavedSource } from '../edits/annotations';
 import { PLAIN_PROBLEM } from '../errors';
 import { DRAWING_KEY, TAGS_KEY, cleanTags, drawingOf } from '../edits/saved-data';
 import { BLEND_NAME, drawnAnnotation, type Drawn } from './annotation-drawing';
+import { eraseAnnotation, eraseHeldText } from './annotation-erasing';
 import { readPdfText } from './pdf-text';
-import {
-  boundsAround,
-  eraseAnnotation,
-  eraseHeldText,
-  name,
-  type UserBounds,
-} from './page-annotations';
+import { boundsAround, name, type UserBounds } from './page-annotations';
 
 const PRINT_FLAG = 4;
 const HIGHLIGHT_BLEND = 'Multiply';

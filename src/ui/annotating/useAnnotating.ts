@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import {
   LINE_WIDTH,
   PIN_SIZE,
-  boundsOfAnnotation,
   canRecolour,
   WHITE,
   annotationMovedTo,
@@ -109,12 +108,12 @@ export function useAnnotating(
     }
   };
 
-  /** A note opens to be typed in. Its own text box takes focus, so nothing else should ask for it. */
-  const startComment = (note: Annotation) => {
-    setNewComment(note);
-    setOpenCommentId(note.id);
-    setSelectedId(note.id);
-    // One note at a time: a click on the page shouldn't leave another one behind this one.
+  /** A comment opens to be typed in. Its own text box takes focus, so nothing else should ask. */
+  const startComment = (comment: Annotation) => {
+    setNewComment(comment);
+    setOpenCommentId(comment.id);
+    setSelectedId(comment.id);
+    // One comment at a time: a click on the page shouldn't leave another one behind this one.
     setTool(null);
   };
 
@@ -145,7 +144,7 @@ export function useAnnotating(
     color: colorFor(kind),
   });
 
-  /** A shape, arrow or note at a point, for when there's been no dragging to give it a size. */
+  /** A shape, arrow or comment at a point, for when there's been no dragging to give it a size. */
   const placeAt = (
     kind: AnnotationTool,
     pageNumber: number,
@@ -228,8 +227,8 @@ export function useAnnotating(
 
   return {
     annotations: shown,
-    /** Just what's real so far, without a new comment that has no words yet. */
-    saved: annotations,
+    /** What the panel lists: everything so far, without a new comment that has no words yet. */
+    listed: annotations,
     /** Picks it from the list, wherever it is. */
     goTo: (annotation: Annotation) => {
       setSelectedId(annotation.id);
@@ -237,7 +236,6 @@ export function useAnnotating(
       setTool(null);
       setFocusId(annotation.id);
     },
-    topOf: (annotation: Annotation) => boundsOfAnnotation(annotation).y,
     tool,
     pickTool: (next: AnnotationTool) => {
       setTool((current) => (current === next ? null : next));

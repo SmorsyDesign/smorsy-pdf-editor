@@ -200,6 +200,17 @@ test.describe('the filters', () => {
     await expect(rows(page)).toHaveCount(0);
   });
 
+  test('stay on Comments when a new comment is placed', async ({ page }) => {
+    await open(page);
+    await tabButton(page, 'Comments').click();
+    await tool(page, 'Comment').click();
+    await clickOnPage(page, [300, 300]);
+    await page.keyboard.type('Stays on this tab');
+    await page.waitForTimeout(200);
+    await expect(tabButton(page, 'Comments')).toHaveAttribute('aria-pressed', 'true');
+    await expect(rows(page).locator('.row-words')).toHaveText('Stays on this tab');
+  });
+
   test('keep showing a tag spelled with other capitals', async ({ page }) => {
     await open(page);
     await drawRectangle(page);

@@ -1,17 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import {
-  annotationCategory,
-  canTag,
-  type Annotation,
-  type AnnotationCategory,
-} from '../../engine/edits/annotations';
+import { annotationCategory, type AnnotationCategory } from '../../engine/edits/annotation-labels';
+import { canTag, type Annotation } from '../../engine/edits/annotations';
 import type { PlacedSignature } from '../../engine/edits/model';
 import { allTags } from '../../engine/edits/saved-data';
 
 export type ListScope = 'page' | 'all';
 export type ListTab = 'all' | AnnotationCategory;
 
-export type ListItem =
+type ListItem =
   | { readonly type: 'annotation'; readonly id: string; readonly annotation: Annotation }
   | { readonly type: 'image'; readonly id: string; readonly image: PlacedSignature };
 
@@ -60,7 +56,11 @@ export function useAnnotationList(
   // at the moment it's picked, so filtering the list afterwards still does what it's asked.
   const selectedId = selected?.id ?? null;
   const selectedIsListed = useRef(false);
-  selectedIsListed.current = items.some((item) => item.id === selectedId);
+  // By what it is rather than what's in the list, as a new comment isn't until it has words.
+  selectedIsListed.current =
+    selected !== null &&
+    inTab({ type: 'annotation', id: selected.id, annotation: selected }, tab) &&
+    (tag === null || hasTag({ type: 'annotation', id: selected.id, annotation: selected }, tag));
   useEffect(() => {
     if (selectedId === null || selectedIsListed.current) return;
     setTab('all');

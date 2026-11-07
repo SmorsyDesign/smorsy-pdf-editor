@@ -11,6 +11,7 @@ import {
   type PDFObject,
   type PDFPage,
 } from '@cantoo/pdf-lib';
+import { eraseAnnotation } from './annotation-erasing';
 import {
   appearanceOf,
   blankLooks,
@@ -20,13 +21,7 @@ import {
   moveFieldLooksIntoPage,
   paintsSolid,
 } from './field-looks';
-import {
-  annotationsOver,
-  isWidget,
-  name,
-  eraseAnnotation,
-  type UserBounds,
-} from './page-annotations';
+import { annotationsOver, isWidget, name, type UserBounds } from './page-annotations';
 
 const MAX_FIELD_DEPTH = 16;
 

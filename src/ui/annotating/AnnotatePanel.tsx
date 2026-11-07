@@ -1,34 +1,10 @@
 import { Fragment } from 'react';
-import {
-  annotationCategory,
-  annotationDetail,
-  annotationLabel,
-  canTag,
-  type Annotation,
-} from '../../engine/edits/annotations';
+import { canTag } from '../../engine/edits/annotations';
 import type { PlacedSignature } from '../../engine/edits/model';
-import { Icon, type IconName } from '../Icon';
 import type { Signing } from '../signing/useSigning';
-import { TagEditor } from './TagEditor';
+import { AnnotationRow, ImageRow } from './AnnotationRow';
 import type { Annotating } from './useAnnotating';
 import { useAnnotationList, type ListScope, type ListTab } from './useAnnotationList';
-
-const ICONS: Readonly<Record<Exclude<Annotation['kind'], 'foreign'>, IconName>> = {
-  highlight: 'marker',
-  underline: 'underline',
-  strikeout: 'strike',
-  pen: 'pen',
-  rect: 'rect',
-  ellipse: 'ellipse',
-  arrow: 'arrow',
-  comment: 'comment',
-  whiteout: 'whiteout',
-};
-
-const iconOf = (annotation: Annotation): IconName => {
-  if (annotation.kind !== 'foreign') return ICONS[annotation.kind];
-  return annotationCategory(annotation) === 'markup' ? 'marker' : 'pen';
-};
 
 const TABS: readonly (readonly [ListTab, string, string])[] = [
   ['all', 'All', 'annotations'],
@@ -55,12 +31,6 @@ interface AnnotatePanelProps {
   readonly onGoTo: (pageNumber: number, y: number) => void;
 }
 
-function foreignNote(annotation: Annotation): string {
-  return annotation.kind === 'comment'
-    ? 'Made in another app. You can change its words and tags, or delete it.'
-    : 'Made in another app. You can change its tags, or delete it.';
-}
-
 export function AnnotatePanel({
   annotating,
   signing,
@@ -70,12 +40,22 @@ export function AnnotatePanel({
   onGoTo,
 }: AnnotatePanelProps) {
   const { selected } = annotating;
-  const list = useAnnotationList(annotating.saved, images, currentPage, selected);
+  const list = useAnnotationList(annotating.listed, images, currentPage, selected);
   const { scope, tab, tag, items, total } = list;
   const filtered = tab !== 'all' || tag !== null;
   const tabName = TABS.find(([value]) => value === tab)?.[2] ?? 'annotations';
   const where = scope === 'page' ? 'on this page' : 'in this document';
   const editing = selected !== null && canTag(selected);
+
+  let emptyHint =
+    scope === 'page'
+      ? 'Pick a tool, then use it on the page.'
+      : 'Nothing yet. Pick a tool, then use it on a page.';
+  if (tag !== null) {
+    emptyHint = `Nothing tagged “${tag}” ${where}.`;
+  } else if (filtered) {
+    emptyHint = `No ${tabName} ${where}.`;
+  }
 
   let foot = `${IMAGE_AND_WHITEOUT_LIMIT} Your original file stays unchanged.`;
   if (editing) {
@@ -140,115 +120,26 @@ export function AnnotatePanel({
           ))}
         </div>
       )}
-      {items.length === 0 && (
-        <p className="hint">
-          {tag !== null
-            ? `Nothing tagged “${tag}” ${where}.`
-            : filtered
-              ? `No ${tabName} ${where}.`
-              : scope === 'page'
-                ? 'Pick a tool, then use it on the page.'
-                : 'Nothing yet. Pick a tool, then use it on a page.'}
-        </p>
-      )}
+      {items.length === 0 && <p className="hint">{emptyHint}</p>}
       <ul className="rows">
         {items.map((item, index) => {
           const pageNumber = list.pageOf(item);
           const previous = items[index - 1];
           const startsPage = scope === 'all' && (!previous || list.pageOf(previous) !== pageNumber);
-          const heading = startsPage ? <li className="rows-heading">Page {pageNumber}</li> : null;
-          if (item.type === 'image') {
-            return (
-              <Fragment key={item.id}>
-                {heading}
-                <li className={signing.selected?.id === item.id ? 'row is-selected' : 'row'}>
-                  <Icon name="image" />
-                  <button
-                    type="button"
-                    className="row-text"
-                    onClick={() => {
-                      annotating.clearTool();
-                      annotating.select(null);
-                      if (scope === 'all') onGoTo(pageNumber, item.image.rect.y);
-                      signing.select(item.id);
-                    }}
-                  >
-                    <span className="row-title">Image</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="icon-btn"
-                    aria-label="Delete image"
-                    onClick={() => {
-                      signing.remove(item.id);
-                    }}
-                  >
-                    <Icon name="trash" />
-                  </button>
-                </li>
-              </Fragment>
-            );
-          }
-          const { annotation } = item;
-          const label = annotationLabel(annotation);
-          const detail = annotationDetail(annotation);
-          const isSelected = selected?.id === annotation.id;
-          const tags = annotation.tags ?? [];
+          const rowProps = {
+            annotating,
+            signing,
+            bringIntoView: (y: number) => {
+              if (scope === 'all') onGoTo(pageNumber, y);
+            },
+          };
           return (
             <Fragment key={item.id}>
-              {heading}
-              <li className={isSelected ? 'row is-selected' : 'row'}>
-                <Icon name={iconOf(annotation)} />
-                <button
-                  type="button"
-                  className="row-text"
-                  {...(isSelected ? { 'aria-current': true } : {})}
-                  onClick={() => {
-                    signing.select(null);
-                    annotating.goTo(annotation);
-                    if (scope === 'all') onGoTo(pageNumber, annotating.topOf(annotation));
-                  }}
-                >
-                  {annotation.kind === 'comment' ? (
-                    <span className="row-words">{detail || 'Comment with no words'}</span>
-                  ) : (
-                    <>
-                      <span className="row-title">{label}</span>
-                      {detail && <span className="row-sub">{detail}</span>}
-                    </>
-                  )}
-                  {isSelected && annotation.saved?.foreign && (
-                    <span className="row-note">{foreignNote(annotation)}</span>
-                  )}
-                  {!isSelected && tags.length > 0 && (
-                    <span className="row-tags">
-                      {tags.map((one) => (
-                        <span key={one} className="tag">
-                          {one}
-                        </span>
-                      ))}
-                    </span>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  className="icon-btn"
-                  aria-label={`Delete ${label.toLowerCase()}`}
-                  onClick={() => {
-                    annotating.remove(annotation.id);
-                  }}
-                >
-                  <Icon name="trash" />
-                </button>
-              </li>
-              {isSelected && canTag(annotation) && (
-                <TagEditor
-                  tags={tags}
-                  offers={list.tags}
-                  onChange={(next) => {
-                    annotating.change({ ...annotation, tags: next });
-                  }}
-                />
+              {startsPage && <li className="rows-heading">Page {pageNumber}</li>}
+              {item.type === 'image' ? (
+                <ImageRow image={item.image} {...rowProps} />
+              ) : (
+                <AnnotationRow annotation={item.annotation} tagOffers={list.tags} {...rowProps} />
               )}
             </Fragment>
           );
