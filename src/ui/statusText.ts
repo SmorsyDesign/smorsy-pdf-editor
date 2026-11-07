@@ -3,7 +3,10 @@ import { isMarkupTool, type Annotating } from './annotating/useAnnotating';
 import type { Signing } from './signing/useSigning';
 import type { EditorMode } from './TopBar';
 
-function annotateHint({ tool, moving, selected }: Annotating, pageIsScan: boolean): string {
+function annotateHint(
+  { tool, moving, selected, openCommentId }: Annotating,
+  pageIsScan: boolean,
+): string {
   if (isMarkupTool(tool)) {
     return pageIsScan
       ? 'This page is a scan with no text to mark. Use the pen or a shape instead'
@@ -13,7 +16,8 @@ function annotateHint({ tool, moving, selected }: Annotating, pageIsScan: boolea
   if (tool === 'comment') return 'Click where the comment goes';
   if (tool) return 'Drag on the page, or click for a standard size';
   if (moving) return 'Click where it goes on the page';
-  if (selected && canTag(selected)) return 'Type a tag and press Return, or pick one from the list';
+  if (selected && !openCommentId && canTag(selected))
+    return 'Type a tag and press Return, or pick one from the list';
   return 'Pick a tool, or click something on the page to change it';
 }
 

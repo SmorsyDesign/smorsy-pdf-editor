@@ -1,10 +1,8 @@
 import {
   PDFArray,
   PDFDict,
-  PDFHexString,
   PDFName,
   PDFRef,
-  PDFString,
   type PDFContext,
   type PDFDocument,
   type PDFObject,
@@ -18,7 +16,9 @@ import {
   readDrawing,
   readTags,
   type SavedDrawing,
+  LONGEST_DRAWING,
 } from '../edits/saved-data';
+import { isPdfText, readPdfText } from './pdf-text';
 import { annotationBounds } from './annotation-writing';
 import { isShown, name, numbersIn, rectOf, type UserBounds } from './page-annotations';
 import { pageBoxOf } from './page-geometry';
@@ -28,11 +28,11 @@ const NOT_ANNOTATIONS = new Set(['Link', 'Widget', 'Popup', 'PrinterMark', 'Trap
 // A little over what rounding can add up to, so only a real move counts as one.
 const MOVED_BY = 1.5;
 const GREY: Color = { r: 0.5, g: 0.5, b: 0.5 };
-const LONG_TEXT = 10_000;
 // Far past any real document. A small hostile file can repeat one long string thousands of times,
 // which would otherwise fill the memory of the window it's sent to.
 const MOST_ANNOTATIONS = 20_000;
-const MOST_TEXT = 16_000_000;
+const MOST_TEXT = 32_000_000;
+const LONGEST_TAGS = 64_000;
 
 /** What's in a file, and how much of it couldn't be offered for editing. */
 export interface ReadAnnotations {
@@ -40,15 +40,22 @@ export interface ReadAnnotations {
   readonly skipped: number;
 }
 
-function textIn(context: PDFContext, value: PDFObject | undefined): string {
-  const text = context.lookup(value);
-  if (!(text instanceof PDFString || text instanceof PDFHexString)) return '';
-  // The library's own decoding fails on long text, such as a long comment or pen stroke.
-  const bytes = text.asBytes();
-  if (bytes[0] === 0xfe && bytes[1] === 0xff) {
-    return new TextDecoder('utf-16be').decode(bytes.subarray(2));
+/** A running total of how much text has been read, which a hostile file can't get past. */
+class ReadingBudget {
+  private left = MOST_TEXT;
+
+  isSpent(): boolean {
+    return this.left <= 0;
   }
-  return bytes.length < LONG_TEXT ? text.decodeText() : new TextDecoder('latin1').decode(bytes);
+
+  /** Charged before reading, because the reading itself is what uses up the memory. */
+  text(context: PDFContext, value: PDFObject | undefined, longest = Infinity): string {
+    const text = context.lookup(value);
+    if (!isPdfText(text)) return '';
+    const size = text.asBytes().length;
+    this.left -= size;
+    return size > longest || this.isSpent() ? '' : readPdfText(text);
+  }
 }
 
 function colorOf(context: PDFContext, annotation: PDFDict): Color {
@@ -106,19 +113,13 @@ function isListable(context: PDFContext, dict: PDFDict): boolean {
   );
 }
 
-function textLengthOf(annotation: Annotation): number {
-  const words = 'text' in annotation ? annotation.text.length : 0;
-  const tags = (annotation.tags ?? []).join('').length;
-  const drawn = annotation.kind === 'pen' ? annotation.points.length * 16 : 0;
-  return words + tags + drawn;
-}
-
 function readOne(
   context: PDFContext,
   dict: PDFDict,
   ref: PDFRef,
   pageNumber: number,
   box: PageBox,
+  budget: ReadingBudget,
 ): Annotation | null {
   const subtypeName = context.lookup(dict.get(name('Subtype')));
   const rect = rectOf(context, dict);
@@ -131,18 +132,19 @@ function readOne(
     pageNumber,
     color: colorOf(context, dict),
   };
-  const words = textIn(context, dict.get(name('Contents')));
-  const tags = readTags(textIn(context, dict.get(name(TAGS_KEY))));
+  const words = budget.text(context, dict.get(name('Contents')));
+  const tags = readTags(budget.text(context, dict.get(name(TAGS_KEY)), LONGEST_TAGS));
   const tagged = tags.length > 0 ? { tags } : {};
 
-  const drawing = readDrawing(textIn(context, dict.get(name(DRAWING_KEY))));
+  const drawing = readDrawing(budget.text(context, dict.get(name(DRAWING_KEY)), LONGEST_DRAWING));
   if (drawing) {
     const ours = fromDrawing(drawing, common, words);
     if (stillMatches(ours, rect, box)) return { ...ours, ...tagged, saved: source(false) };
   }
   const place = displayRect(rect, box);
   if (subtype === 'Text') {
-    const hasLook = context.lookup(dict.get(name('AP'))) instanceof PDFDict;
+    const looks = context.lookup(dict.get(name('AP')));
+    const hasLook = looks instanceof PDFDict && looks.has(name('N'));
     return {
       ...common,
       ...tagged,
@@ -168,7 +170,7 @@ export function readAnnotations(doc: PDFDocument): ReadAnnotations {
   const { context } = doc;
   const annotations: Annotation[] = [];
   let skipped = 0;
-  let textUsed = 0;
+  const budget = new ReadingBudget();
   doc.getPages().forEach((page, index) => {
     const list = context.lookup(page.node.getInheritableAttribute(name('Annots')));
     if (!(list instanceof PDFArray)) return;
@@ -180,20 +182,23 @@ export function readAnnotations(doc: PDFDocument): ReadAnnotations {
       skipped += list.size();
       return;
     }
-    for (const entry of list.asArray()) {
+    // A file can list the same one twice, which is still only one.
+    for (const entry of new Set(list.asArray())) {
       const dict = context.lookup(entry);
       if (!(dict instanceof PDFDict) || !isListable(context, dict)) continue;
       // One held directly in the list has no name for saving or hiding to find it by.
-      if (!(entry instanceof PDFRef) || annotations.length >= MOST_ANNOTATIONS) {
+      if (
+        !(entry instanceof PDFRef) ||
+        annotations.length >= MOST_ANNOTATIONS ||
+        budget.isSpent()
+      ) {
         skipped += 1;
         continue;
       }
       try {
-        const found = readOne(context, dict, entry, index + 1, box);
-        if (!found) continue;
-        textUsed += textLengthOf(found);
-        if (textUsed > MOST_TEXT) skipped += 1;
-        else annotations.push(found);
+        const found = readOne(context, dict, entry, index + 1, box, budget);
+        if (budget.isSpent()) skipped += 1;
+        else if (found) annotations.push(found);
       } catch (error) {
         console.error(error);
         skipped += 1;

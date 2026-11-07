@@ -30,9 +30,9 @@ export function TagEditor({ tags, offers, onChange }: TagEditorProps) {
     }
   };
 
-  const unused = offers.filter(
-    (offer) => !tags.some((tag) => tag.toLowerCase() === offer.toLowerCase()),
-  );
+  const unused = isFull
+    ? []
+    : offers.filter((offer) => !tags.some((tag) => tag.toLowerCase() === offer.toLowerCase()));
   return (
     <li className="tag-editor">
       <div className="tag-editing">
@@ -54,7 +54,7 @@ export function TagEditor({ tags, offers, onChange }: TagEditorProps) {
         ))}
         <input
           ref={inputRef}
-          disabled={isFull}
+          readOnly={isFull}
           className="tag-input"
           type="text"
           aria-label="Add a tag"

@@ -6,6 +6,7 @@ import {
   PDFHexString,
   PDFName,
   PDFNumber,
+  PDFRef,
   PDFStream,
   PDFString,
   degrees,
@@ -209,8 +210,8 @@ describe('reading a file that says something strange', () => {
     });
   }
 
-  it('ignores tags that aren’t a list of words', async () => {
-    for (const text of ['nope', '{"a":1}', '[1,2,null]']) {
+  it('ignores tags that aren’t a list of words, or are far too long', async () => {
+    for (const text of ['nope', '{"a":1}', '[1,2,null]', JSON.stringify(['x'.repeat(70_000)])]) {
       const odd = await tamper(await saveWith([KINDS[4] as Annotation]), (dict) => {
         dict.set(PDFName.of('SmorsyTags'), PDFHexString.fromText(text));
       });
@@ -221,7 +222,7 @@ describe('reading a file that says something strange', () => {
 
   it('keeps a mountain of tags to a sensible number and length', async () => {
     const many = JSON.stringify(
-      Array.from({ length: 500 }, (_, i) => `${String(i)}${'x'.repeat(200)}`),
+      Array.from({ length: 200 }, (_, i) => `${String(i)}${'x'.repeat(200)}`),
     );
     const odd = await tamper(await saveWith([KINDS[4] as Annotation]), (dict) => {
       dict.set(PDFName.of('SmorsyTags'), PDFHexString.fromText(many));
@@ -253,6 +254,69 @@ describe('reading a file made to cause trouble', () => {
     const { annotations, skipped } = await new PdfEditor(hostile, fonts).existingAnnotations();
     expect(annotations.length).toBeLessThan(1_000);
     expect(skipped).toBeGreaterThan(0);
+  });
+
+  it('reads text in any of the encodings PDFs use', async () => {
+    const bom = (start: readonly number[], text: string) =>
+      PDFHexString.of(
+        [...start, ...new TextEncoder().encode(text)]
+          .map((byte) => byte.toString(16).padStart(2, '0'))
+          .join(''),
+      );
+    const encoded = await blank((doc) => {
+      const { context } = doc;
+      doc.getPage(0).node.addAnnot(
+        context.register(
+          context.obj({
+            Type: 'Annot',
+            Subtype: 'Text',
+            Rect: [100, 100, 120, 120],
+            Contents: bom([0xef, 0xbb, 0xbf], 'Café'),
+          }),
+        ),
+      );
+    });
+    expect((await read(encoded))[0]).toMatchObject({ text: 'Café' });
+  });
+
+  it('lists something listed twice only once', async () => {
+    const twice = await blank((doc) => {
+      const { context } = doc;
+      const stamp = context.register(
+        context.obj({ Type: 'Annot', Subtype: 'Stamp', Rect: [1, 1, 9, 9] }),
+      );
+      doc.getPage(0).node.addAnnot(stamp);
+      doc.getPage(0).node.addAnnot(stamp);
+    });
+    const found = await read(twice);
+    expect(found).toHaveLength(1);
+    if (!found[0]?.saved) throw new Error('It should have been read.');
+    const saved = await new PdfEditor(twice, fonts).save([], [], {
+      removedSaved: [found[0].saved],
+    });
+    expect(await read(saved)).toEqual([]);
+  });
+
+  it('stops reading, and says how many it left, once the file has used its allowance', async () => {
+    const hostile = await blank((doc) => {
+      const { context } = doc;
+      const huge = context.register(PDFHexString.fromText('x'.repeat(4_000_000)));
+      for (let index = 0; index < 40; index += 1) {
+        doc.getPage(0).node.addAnnot(
+          context.register(
+            context.obj({
+              Type: 'Annot',
+              Subtype: 'Stamp',
+              Rect: [1, 1, 9, 9],
+              SmorsyAnnotation: huge,
+            }),
+          ),
+        );
+      }
+    });
+    const { annotations, skipped } = await new PdfEditor(hostile, fonts).existingAnnotations();
+    expect(annotations.length).toBeLessThan(40);
+    expect(annotations.length + skipped).toBe(40);
   });
 
   it('keeps the others when one can’t be read', async () => {
@@ -550,6 +614,156 @@ describe('saving changes to what was already there', () => {
         removedSaved: [comment.saved],
       });
       expect(await everythingIn(deleted)).not.toContain(SECRET);
+    });
+
+    it('isn’t stopped by a broken entry in some page’s list', async () => {
+      const { bytes, found } = await reopened([secret]);
+      const doc = await PDFDocument.load(bytes);
+      doc.getPage(1).node.set(PDFName.of('Annots'), doc.context.obj([PDFRef.of(99_999)]));
+      const broken = await doc.save();
+      const source = found[0]?.saved;
+      if (!source) throw new Error('It should have been read.');
+      const saved = await new PdfEditor(broken, fonts).save([], [], { removedSaved: [source] });
+      expect(await everythingIn(saved)).not.toContain(SECRET);
+    });
+
+    it('erases words held in a drawing nested inside its appearance', async () => {
+      const MARK = 'NestedDrawingMark';
+      const original = await blank((doc) => {
+        const { context } = doc;
+        const inner = context.register(
+          context.formXObject([], { BBox: [0, 0, 9, 9], Mark: PDFHexString.fromText(MARK) }),
+        );
+        const outer = context.register(
+          context.formXObject([], { BBox: [0, 0, 9, 9], Resources: { XObject: { FRM: inner } } }),
+        );
+        doc.getPage(0).node.addAnnot(
+          context.register(
+            context.obj({
+              Type: 'Annot',
+              Subtype: 'Stamp',
+              Rect: [1, 1, 9, 9],
+              AP: { N: outer },
+            }),
+          ),
+        );
+      });
+      const [stamp] = await read(original);
+      if (!stamp?.saved) throw new Error('It should have been read.');
+      const saved = await new PdfEditor(original, fonts).save([], [], {
+        removedSaved: [stamp.saved],
+      });
+      const doc = await PDFDocument.load(saved);
+      const marks = doc.context
+        .enumerateIndirectObjects()
+        .filter(
+          ([, object]) =>
+            object instanceof PDFStream && decoded(object.dict.get(PDFName.of('Mark'))) === MARK,
+        );
+      expect(marks).toEqual([]);
+    });
+
+    it('keeps a drawing the page itself also uses', async () => {
+      const original = await blank((doc) => {
+        const { context } = doc;
+        const look = context.register(context.formXObject([], { BBox: [0, 0, 9, 9] }));
+        const page = doc.getPage(0);
+        page.node.newXObject('Shared', look);
+        page.node.addAnnot(
+          context.register(
+            context.obj({ Type: 'Annot', Subtype: 'Stamp', Rect: [1, 1, 9, 9], AP: { N: look } }),
+          ),
+        );
+      });
+      const [stamp] = await read(original);
+      if (!stamp?.saved) throw new Error('It should have been read.');
+      const saved = await new PdfEditor(original, fonts).save([], [], {
+        removedSaved: [stamp.saved],
+      });
+      const page = (await PDFDocument.load(saved)).getPage(0);
+      const drawings = page.node.Resources()?.lookup(PDFName.of('XObject'), PDFDict);
+      expect(drawings?.lookup(drawings.keys()[0] as PDFName)).toBeInstanceOf(PDFStream);
+    });
+
+    it('updates a reworded comment’s pop-up too, leaving no old words', async () => {
+      const original = await blank((doc) => {
+        const { context } = doc;
+        const popup = context.register(
+          context.obj({
+            Type: 'Annot',
+            Subtype: 'Popup',
+            Rect: [0, 0, 9, 9],
+            Contents: PDFHexString.fromText(SECRET),
+          }),
+        );
+        const page = doc.getPage(0);
+        page.node.addAnnot(
+          context.register(
+            context.obj({
+              Type: 'Annot',
+              Subtype: 'Text',
+              Rect: [100, 100, 120, 120],
+              Contents: PDFHexString.fromText(SECRET),
+              Popup: popup,
+            }),
+          ),
+        );
+        page.node.addAnnot(popup);
+      });
+      const [comment] = await read(original);
+      const saved = await new PdfEditor(original, fonts).save([], [], {
+        annotations: [{ ...(comment as Annotation), text: 'New' } as Annotation],
+      });
+      expect(await everythingIn(saved)).not.toContain(SECRET);
+    });
+
+    it('leaves the words of another comment that shared them', async () => {
+      const original = await blank((doc) => {
+        const { context } = doc;
+        const words = context.register(PDFHexString.fromText('Shared words'));
+        for (const y of [100, 200]) {
+          doc.getPage(0).node.addAnnot(
+            context.register(
+              context.obj({
+                Type: 'Annot',
+                Subtype: 'Text',
+                Rect: [100, y, 120, y + 20],
+                Contents: words,
+              }),
+            ),
+          );
+        }
+      });
+      const [first] = await read(original);
+      if (!first?.saved) throw new Error('It should have been read.');
+      const saved = await new PdfEditor(original, fonts).save([], [], {
+        removedSaved: [first.saved],
+      });
+      const [left] = await read(saved);
+      expect(left).toMatchObject({ kind: 'comment', text: 'Shared words' });
+    });
+
+    it('keeps formatted words when only its tags change', async () => {
+      const original = await blank((doc) => {
+        const { context } = doc;
+        doc.getPage(0).node.addAnnot(
+          context.register(
+            context.obj({
+              Type: 'Annot',
+              Subtype: 'Text',
+              Rect: [100, 100, 120, 120],
+              Contents: PDFHexString.fromText('Words'),
+              RC: PDFHexString.fromText('<b>Words</b>'),
+            }),
+          ),
+        );
+      });
+      const [comment] = await read(original);
+      const saved = await new PdfEditor(original, fonts).save([], [], {
+        annotations: [{ ...(comment as Annotation), tags: ['Chapter 1'] }],
+      });
+      const dict = (await PDFDocument.load(saved)).getPage(0).node.Annots()?.lookup(0, PDFDict);
+      expect(dict?.has(PDFName.of('RC'))).toBe(true);
     });
 
     it('keeps a drawing another annotation is also using', async () => {

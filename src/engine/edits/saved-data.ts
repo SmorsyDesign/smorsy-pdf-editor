@@ -12,7 +12,7 @@ const MAX_TAG_LENGTH = 60;
 const LARGEST_COORDINATE = 100_000;
 const MOST_POINTS = 200_000;
 // Far past a real pen stroke, and short enough that a hostile one can't hold up reading the file.
-const LONGEST_DRAWING = 8_000_000;
+export const LONGEST_DRAWING = 8_000_000;
 
 /** The geometry that a saved annotation's appearance can't give back. */
 export type SavedDrawing =
@@ -139,7 +139,7 @@ function parsed(json: string): unknown {
 
 /** Reads what a file says about a drawing. A file can say anything, so nothing is assumed. */
 export function readDrawing(json: string): SavedDrawing | null {
-  if (json === '' || json.length > LONGEST_DRAWING) return null;
+  if (json === '') return null;
   const data = parsed(json);
   return isRecord(data) ? drawingFromRecord(data) : null;
 }

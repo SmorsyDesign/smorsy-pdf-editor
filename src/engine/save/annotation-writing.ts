@@ -11,7 +11,14 @@ import type { Annotation, SavedSource } from '../edits/annotations';
 import { PLAIN_PROBLEM } from '../errors';
 import { DRAWING_KEY, TAGS_KEY, cleanTags, drawingOf } from '../edits/saved-data';
 import { BLEND_NAME, drawnAnnotation, type Drawn } from './annotation-drawing';
-import { boundsAround, eraseAnnotation, name, type UserBounds } from './page-annotations';
+import { readPdfText } from './pdf-text';
+import {
+  boundsAround,
+  eraseAnnotation,
+  eraseHeldText,
+  name,
+  type UserBounds,
+} from './page-annotations';
 
 const PRINT_FLAG = 4;
 const HIGHLIGHT_BLEND = 'Multiply';
@@ -69,19 +76,24 @@ export function removeSaved(page: PDFPage, source: SavedSource): void {
   eraseAnnotation(page, findSaved(page, source));
 }
 
+const wordsIn = (page: PDFPage, dict: PDFDict) =>
+  readPdfText(page.doc.context.lookup(dict.get(name('Contents'))));
+
 /** Changes what's safe to change about another app's annotation, leaving how it looks alone. */
 export function updateForeign(page: PDFPage, annotation: Annotation): void {
   if (!annotation.saved) return;
   const dict = findSaved(page, annotation.saved);
-  if (annotation.kind === 'comment') {
-    const { context } = page.doc;
-    const before = dict.get(name('Contents'));
-    if (before instanceof PDFRef) context.delete(before);
-    dict.set(name('Contents'), PDFHexString.fromText(annotation.text));
-    // Its formatted copy of the old words, which some viewers would show instead of the new ones.
-    const formatted = dict.get(name('RC'));
-    if (formatted instanceof PDFRef) context.delete(formatted);
+  if (annotation.kind === 'comment' && annotation.text !== wordsIn(page, dict)) {
+    // Every copy of the old words: the file's formatted copy, and the one its pop-up shows.
+    eraseHeldText(page, dict, 'Contents');
+    eraseHeldText(page, dict, 'RC');
     dict.delete(name('RC'));
+    dict.set(name('Contents'), PDFHexString.fromText(annotation.text));
+    const popup = page.doc.context.lookup(dict.get(name('Popup')));
+    if (popup instanceof PDFDict && popup.has(name('Contents'))) {
+      eraseHeldText(page, popup, 'Contents');
+      popup.set(name('Contents'), PDFHexString.fromText(annotation.text));
+    }
   }
   const tags = cleanTags(annotation.tags ?? []);
   if (tags.length > 0) dict.set(name(TAGS_KEY), hex(tags));

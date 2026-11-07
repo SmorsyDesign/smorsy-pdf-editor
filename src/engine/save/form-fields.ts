@@ -150,8 +150,8 @@ export function clearForWhiteout(page: PDFPage, areas: readonly UserBounds[]): C
       blankLooks(context, annotation, look);
       if (holdsAnswer && retireField(doc, annotation)) retired += 1;
     } else {
-      // Its look has just gone into the page, so that has to stay.
-      eraseAnnotation(page, annotation, true);
+      // Its look has just gone into the page, which is what keeps that from being erased with it.
+      eraseAnnotation(page, annotation);
       annotations += 1;
     }
   }
