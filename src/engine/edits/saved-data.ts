@@ -12,7 +12,7 @@ const MAX_TAG_LENGTH = 60;
 const LARGEST_COORDINATE = 100_000;
 const MOST_POINTS = 200_000;
 // Far past a real pen stroke, and short enough that a hostile one can't hold up reading the file.
-export const LONGEST_DRAWING = 8_000_000;
+export const LONGEST_DRAWING = 32_000_000;
 
 /** The geometry that a saved annotation's appearance can't give back. */
 export type SavedDrawing =

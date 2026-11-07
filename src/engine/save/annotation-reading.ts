@@ -31,8 +31,9 @@ const GREY: Color = { r: 0.5, g: 0.5, b: 0.5 };
 // Far past any real document. A small hostile file can repeat one long string thousands of times,
 // which would otherwise fill the memory of the window it's sent to.
 const MOST_ANNOTATIONS = 20_000;
-const MOST_TEXT = 32_000_000;
-const LONGEST_TAGS = 64_000;
+// In the size text takes up in the file, which is about four times its length in letters.
+const MOST_TEXT = 64_000_000;
+const LONGEST_TAGS = 128_000;
 
 /** What's in a file, and how much of it couldn't be offered for editing. */
 export interface ReadAnnotations {
@@ -52,7 +53,7 @@ class ReadingBudget {
   text(context: PDFContext, value: PDFObject | undefined, longest = Infinity): string {
     const text = context.lookup(value);
     if (!isPdfText(text)) return '';
-    const size = text.asBytes().length;
+    const size = text.sizeInBytes();
     this.left -= size;
     return size > longest || this.isSpent() ? '' : readPdfText(text);
   }

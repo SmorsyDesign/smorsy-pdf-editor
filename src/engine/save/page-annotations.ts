@@ -83,12 +83,14 @@ export function giveOwnAnnotationList(page: PDFPage): void {
 /** Every annotation that any page still lists. */
 function everyListedAnnotation(page: PDFPage): readonly PDFDict[] {
   const { context } = page.doc;
-  return page.doc.getPages().flatMap((one) =>
-    (one.node.Annots()?.asArray() ?? []).flatMap((entry) => {
+  return page.doc.getPages().flatMap((one) => {
+    // Looked up by hand, because the library's shortcut stops the save on a list that isn't one.
+    const list = context.lookup(one.node.get(name('Annots')));
+    return (list instanceof PDFArray ? list.asArray() : []).flatMap((entry) => {
       const dict = context.lookup(entry);
       return dict instanceof PDFDict ? [dict] : [];
-    }),
-  );
+    });
+  });
 }
 
 /** Everything a drawing is made of, including drawings inside it, as some apps build stamps. */
