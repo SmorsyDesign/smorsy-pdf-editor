@@ -1,8 +1,18 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { PDFDict, PDFDocument, PDFHexString, PDFName, PDFNumber, degrees } from '@cantoo/pdf-lib';
+import {
+  PDFDict,
+  PDFDocument,
+  PDFHexString,
+  PDFName,
+  PDFNumber,
+  PDFStream,
+  PDFString,
+  degrees,
+} from '@cantoo/pdf-lib';
 import { describe, expect, it } from 'vitest';
 import type { Annotation } from '../edits/annotations';
+import { PLAIN_PROBLEM } from '../errors';
 import type { FontBytes } from './choose-font';
 import { PdfEditor } from './editor';
 
@@ -45,7 +55,8 @@ async function blank(change?: (doc: PDFDocument) => void): Promise<Uint8Array> {
 const saveWith = async (annotations: readonly Annotation[], change?: (doc: PDFDocument) => void) =>
   new PdfEditor(await blank(change), fonts).save([], [], { annotations });
 
-const read = (bytes: Uint8Array) => new PdfEditor(bytes, fonts).existingAnnotations();
+const read = async (bytes: Uint8Array) =>
+  (await new PdfEditor(bytes, fonts).existingAnnotations()).annotations;
 
 /** Changes the file the way another app, or someone tampering with it, might. */
 async function tamper(bytes: Uint8Array, change: (dict: PDFDict, doc: PDFDocument) => void) {
@@ -103,9 +114,43 @@ describe('reading back what this app saved', () => {
     expect(found[0]?.saved?.pageNumber).toBe(2);
   });
 
-  it('gives each a different id, even when pages share one', async () => {
+  it('gives each a different id', async () => {
     const found = await read(await saveWith(KINDS));
     expect(new Set(found.map((one) => one.id)).size).toBe(KINDS.length);
+  });
+
+  it('lists one shared by two pages on each, under different ids', async () => {
+    const shared = await blank((doc) => {
+      const { context } = doc;
+      const stamp = context.register(
+        context.obj({ Type: 'Annot', Subtype: 'Stamp', Rect: [100, 100, 200, 200] }),
+      );
+      doc.getPage(0).node.addAnnot(stamp);
+      doc.getPage(1).node.addAnnot(stamp);
+    });
+    const found = await read(shared);
+    expect(found.map((one) => one.pageNumber)).toEqual([1, 2]);
+    expect(new Set(found.map((one) => one.id)).size).toBe(2);
+  });
+
+  it('reads back a very long pen stroke and comment', async () => {
+    const points = Array.from({ length: 30_000 }, (_, index) => ({
+      x: 100 + (index % 300),
+      y: 100 + (index % 500),
+    }));
+    const long: readonly Annotation[] = [
+      { ...common, kind: 'pen', points, width: 2 },
+      { ...common, id: 'y', kind: 'comment', at: { x: 5, y: 40 }, text: 'é'.repeat(100_000) },
+    ];
+    const { annotations, skipped } = await new PdfEditor(
+      await saveWith(long),
+      fonts,
+    ).existingAnnotations();
+    expect(skipped).toBe(0);
+    expect(annotations.map((one) => one.kind).sort()).toEqual(['comment', 'pen']);
+    expect(annotations.every((one) => one.saved?.foreign === false)).toBe(true);
+    const comment = annotations.find((one) => one.kind === 'comment');
+    expect(comment?.kind === 'comment' ? comment.text.length : 0).toBe(100_000);
   });
 
   it('brings tags back', async () => {
@@ -184,6 +229,61 @@ describe('reading a file that says something strange', () => {
     const [found] = await read(odd);
     expect(found?.tags?.length).toBeLessThanOrEqual(50);
     expect(found?.tags?.[0]?.length).toBeLessThanOrEqual(60);
+  });
+});
+
+describe('reading a file made to cause trouble', () => {
+  it('stops at a sensible amount when one long text is repeated thousands of times', async () => {
+    const hostile = await blank((doc) => {
+      const { context } = doc;
+      const words = context.register(PDFHexString.fromText('x'.repeat(40_000)));
+      for (let index = 0; index < 1_000; index += 1) {
+        doc.getPage(0).node.addAnnot(
+          context.register(
+            context.obj({
+              Type: 'Annot',
+              Subtype: 'Stamp',
+              Rect: [100, 100, 200, 200],
+              Contents: words,
+            }),
+          ),
+        );
+      }
+    });
+    const { annotations, skipped } = await new PdfEditor(hostile, fonts).existingAnnotations();
+    expect(annotations.length).toBeLessThan(1_000);
+    expect(skipped).toBeGreaterThan(0);
+  });
+
+  it('keeps the others when one can’t be read', async () => {
+    const odd = await blank((doc) => {
+      const { context } = doc;
+      const page = doc.getPage(0);
+      page.node.addAnnot(
+        context.register(context.obj({ Type: 'Annot', Subtype: 'Stamp', Rect: [1, 1, 'x', 4] })),
+      );
+      page.node.addAnnot(
+        context.register(
+          context.obj({ Type: 'Annot', Subtype: 'Stamp', Rect: [100, 100, 200, 200] }),
+        ),
+      );
+    });
+    const { annotations } = await new PdfEditor(odd, fonts).existingAnnotations();
+    expect(annotations.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('counts one held directly in the list, so the person can be told', async () => {
+    const direct = await blank((doc) => {
+      const { context } = doc;
+      doc
+        .getPage(0)
+        .node.addAnnot(
+          context.obj({ Type: 'Annot', Subtype: 'Stamp', Rect: [1, 1, 2, 2] }) as never,
+        );
+    });
+    const { annotations, skipped } = await new PdfEditor(direct, fonts).existingAnnotations();
+    expect(annotations).toEqual([]);
+    expect(skipped).toBe(1);
   });
 });
 
@@ -337,11 +437,174 @@ describe('saving changes to what was already there', () => {
     });
   });
 
-  it('ignores a reference that this page doesn’t list', async () => {
+  it('stops rather than saying it saved, when what changed can’t be found', async () => {
     const { bytes } = await reopened([KINDS[4] as Annotation]);
-    const saved = await new PdfEditor(bytes, fonts).save([], [], {
+    const attempt = new PdfEditor(bytes, fonts).save([], [], {
       removedSaved: [{ ref: '99999R', pageNumber: 1, foreign: false }],
     });
-    expect(await countOn(saved)).toBe(1);
+    await expect(attempt).rejects.toThrow(PLAIN_PROBLEM);
+  });
+
+  describe('leaves no trace of what’s gone', () => {
+    /** Everything in the file, whether or not any page still lists it. */
+    const everythingIn = async (bytes: Uint8Array) => {
+      const doc = await PDFDocument.load(bytes);
+      return doc.context
+        .enumerateIndirectObjects()
+        .map(([, object]) => {
+          if (object instanceof PDFDict) {
+            return object
+              .entries()
+              .map(([, value]) => decoded(value))
+              .join(' ');
+          }
+          return decoded(object);
+        })
+        .join(' ');
+    };
+
+    const decoded = (value: unknown) =>
+      value instanceof PDFHexString || value instanceof PDFString ? value.decodeText() : '';
+
+    const SECRET = 'Private words about a student';
+    const secret: Annotation = { ...common, kind: 'comment', at: { x: 300, y: 300 }, text: SECRET };
+
+    it('erases a deleted comment’s words', async () => {
+      const { bytes, found } = await reopened([secret]);
+      expect(await everythingIn(bytes)).toContain(SECRET);
+      const source = found[0]?.saved;
+      if (!source) throw new Error('It should have been read.');
+      const saved = await new PdfEditor(bytes, fonts).save([], [], { removedSaved: [source] });
+      expect(await everythingIn(saved)).not.toContain(SECRET);
+    });
+
+    it('erases the old words of one reworded', async () => {
+      const { bytes, found } = await reopened([secret]);
+      const reworded = { ...(found[0] as Annotation), text: 'Something else' } as Annotation;
+      const saved = await new PdfEditor(bytes, fonts).save([], [], { annotations: [reworded] });
+      const everything = await everythingIn(saved);
+      expect(everything).not.toContain(SECRET);
+      expect(everything).toContain('Something else');
+    });
+
+    it('erases one cleared and saved while still in the box', async () => {
+      const { bytes, found } = await reopened([secret]);
+      const cleared = { ...(found[0] as Annotation), text: '' } as Annotation;
+      const saved = await new PdfEditor(bytes, fonts).save([], [], { annotations: [cleared] });
+      expect(await everythingIn(saved)).not.toContain(SECRET);
+      expect(await countOn(saved)).toBe(0);
+    });
+
+    it('erases a deleted highlight’s words and tags', async () => {
+      const marked: Annotation = {
+        ...common,
+        kind: 'highlight',
+        rects: [rect],
+        text: SECRET,
+        tags: ['Confidential tag'],
+      };
+      const { bytes, found } = await reopened([marked]);
+      const source = found[0]?.saved;
+      if (!source) throw new Error('It should have been read.');
+      const everything = await everythingIn(
+        await new PdfEditor(bytes, fonts).save([], [], { removedSaved: [source] }),
+      );
+      expect(everything).not.toContain(SECRET);
+      expect(everything).not.toContain('Confidential tag');
+    });
+
+    it('removes a pop-up and a formatted copy of the words from another app’s comment', async () => {
+      const original = await blank((doc) => {
+        const { context } = doc;
+        const popup = context.register(
+          context.obj({
+            Type: 'Annot',
+            Subtype: 'Popup',
+            Rect: [0, 0, 10, 10],
+            Contents: PDFHexString.fromText(SECRET),
+          }),
+        );
+        const page = doc.getPage(0);
+        page.node.addAnnot(
+          context.register(
+            context.obj({
+              Type: 'Annot',
+              Subtype: 'Text',
+              Rect: [100, 100, 120, 120],
+              Contents: PDFHexString.fromText(SECRET),
+              RC: PDFHexString.fromText(SECRET),
+              Popup: popup,
+            }),
+          ),
+        );
+        page.node.addAnnot(popup);
+      });
+      const [comment] = await read(original);
+      const reworded = await new PdfEditor(original, fonts).save([], [], {
+        annotations: [{ ...(comment as Annotation), text: 'New' } as Annotation],
+      });
+      const dict = (await PDFDocument.load(reworded)).getPage(0).node.Annots()?.lookup(0, PDFDict);
+      expect(dict?.has(PDFName.of('RC'))).toBe(false);
+      if (!comment?.saved) throw new Error('It should have been read.');
+      const deleted = await new PdfEditor(original, fonts).save([], [], {
+        removedSaved: [comment.saved],
+      });
+      expect(await everythingIn(deleted)).not.toContain(SECRET);
+    });
+
+    it('keeps a drawing another annotation is also using', async () => {
+      const original = await blank((doc) => {
+        const { context } = doc;
+        const look = context.register(context.formXObject([], { BBox: [0, 0, 10, 10] }));
+        for (const y of [100, 200]) {
+          doc.getPage(0).node.addAnnot(
+            context.register(
+              context.obj({
+                Type: 'Annot',
+                Subtype: 'Stamp',
+                Rect: [100, y, 110, y + 10],
+                AP: { N: look },
+              }),
+            ),
+          );
+        }
+      });
+      const [first] = await read(original);
+      if (!first?.saved) throw new Error('It should have been read.');
+      const saved = await new PdfEditor(original, fonts).save([], [], {
+        removedSaved: [first.saved],
+      });
+      const left = (await PDFDocument.load(saved)).getPage(0).node.Annots()?.lookup(0, PDFDict);
+      const ap = left?.lookup(PDFName.of('AP'), PDFDict);
+      expect(ap?.lookup(PDFName.of('N'))).toBeInstanceOf(PDFStream);
+    });
+  });
+
+  describe('another app’s comment with no words', () => {
+    const empty = () =>
+      blank((doc) => {
+        const { context } = doc;
+        doc
+          .getPage(0)
+          .node.addAnnot(
+            context.register(
+              context.obj({ Type: 'Annot', Subtype: 'Text', Rect: [100, 100, 120, 120] }),
+            ),
+          );
+      });
+
+    it('keeps its tags', async () => {
+      const original = await empty();
+      const [comment] = await read(original);
+      const saved = await new PdfEditor(original, fonts).save([], [], {
+        annotations: [{ ...(comment as Annotation), tags: ['Chapter 1'] }],
+      });
+      expect((await read(saved))[0]?.tags).toEqual(['Chapter 1']);
+    });
+
+    it('is marked as needing a pin, since the file has no drawing of it', async () => {
+      const [comment] = await read(await empty());
+      expect(comment?.saved?.noLook).toBe(true);
+    });
   });
 });

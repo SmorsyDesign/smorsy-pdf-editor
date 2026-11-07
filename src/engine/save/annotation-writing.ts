@@ -8,9 +8,10 @@ import {
 } from '@cantoo/pdf-lib';
 import type { PageBox } from '../coordinates';
 import type { Annotation, SavedSource } from '../edits/annotations';
+import { PLAIN_PROBLEM } from '../errors';
 import { DRAWING_KEY, TAGS_KEY, cleanTags, drawingOf } from '../edits/saved-data';
 import { BLEND_NAME, drawnAnnotation, type Drawn } from './annotation-drawing';
-import { boundsAround, name, removeAnnotation, type UserBounds } from './page-annotations';
+import { boundsAround, eraseAnnotation, name, type UserBounds } from './page-annotations';
 
 const PRINT_FLAG = 4;
 const HIGHLIGHT_BLEND = 'Multiply';
@@ -44,28 +45,43 @@ function keptData(annotation: Annotation) {
   };
 }
 
-/** The object a saved annotation's name refers to, as long as this page really lists it. */
-function findSaved(page: PDFPage, { ref }: SavedSource) {
+/**
+ * The saved annotation a name refers to. Not finding it stops the save, because otherwise something
+ * the person deleted would still be in a file that says it saved.
+ */
+function findSaved(page: PDFPage, { ref }: SavedSource): PDFDict {
   const match = /^(\d+)R(\d*)$/.exec(ref);
-  if (!match) return null;
-  const wanted = PDFRef.of(Number(match[1]), Number(match[2] ?? 0));
-  const listed = page.node.Annots()?.asArray().includes(wanted);
-  return listed === true ? page.doc.context.lookupMaybe(wanted, PDFDict) : null;
+  const wanted = match ? PDFRef.of(Number(match[1]), Number(match[2] ?? 0)) : null;
+  const dict =
+    wanted && page.node.Annots()?.asArray().includes(wanted)
+      ? page.doc.context.lookupMaybe(wanted, PDFDict)
+      : undefined;
+  if (!dict) {
+    throw new Error(
+      `${PLAIN_PROBLEM}An annotation you changed couldn’t be found in the file any more, so nothing was saved. Undo that change, or open the file again.`,
+    );
+  }
+  return dict;
 }
 
 /** Takes a saved annotation off its page, because something's replacing it or it's been deleted. */
 export function removeSaved(page: PDFPage, source: SavedSource): void {
-  const dict = findSaved(page, source);
-  if (dict) removeAnnotation(page, dict);
+  eraseAnnotation(page, findSaved(page, source));
 }
 
 /** Changes what's safe to change about another app's annotation, leaving how it looks alone. */
 export function updateForeign(page: PDFPage, annotation: Annotation): void {
   if (!annotation.saved) return;
   const dict = findSaved(page, annotation.saved);
-  if (!dict) return;
   if (annotation.kind === 'comment') {
+    const { context } = page.doc;
+    const before = dict.get(name('Contents'));
+    if (before instanceof PDFRef) context.delete(before);
     dict.set(name('Contents'), PDFHexString.fromText(annotation.text));
+    // Its formatted copy of the old words, which some viewers would show instead of the new ones.
+    const formatted = dict.get(name('RC'));
+    if (formatted instanceof PDFRef) context.delete(formatted);
+    dict.delete(name('RC'));
   }
   const tags = cleanTags(annotation.tags ?? []);
   if (tags.length > 0) dict.set(name(TAGS_KEY), hex(tags));

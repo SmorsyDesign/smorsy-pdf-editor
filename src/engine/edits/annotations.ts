@@ -12,6 +12,8 @@ export interface SavedSource {
   readonly pageNumber: number;
   /** Another app made it, so only its words and tags are safe to change. */
   readonly foreign: boolean;
+  /** The file holds no drawing of it, so a comment from another app needs a pin drawn for it. */
+  readonly noLook?: boolean;
 }
 
 interface Common {
@@ -112,11 +114,18 @@ export function defaultRect(centre: Point): Rect {
 }
 
 function boundsAround(points: readonly Point[]): Rect {
-  const xs = points.map((point) => point.x);
-  const ys = points.map((point) => point.y);
-  const x = Math.min(...xs);
-  const y = Math.min(...ys);
-  return { x, y, width: Math.max(...xs) - x, height: Math.max(...ys) - y };
+  // A loop, because a long pen stroke has more points than a function can take as arguments.
+  let left = Infinity;
+  let right = -Infinity;
+  let top = Infinity;
+  let bottom = -Infinity;
+  for (const { x, y } of points) {
+    left = Math.min(left, x);
+    right = Math.max(right, x);
+    top = Math.min(top, y);
+    bottom = Math.max(bottom, y);
+  }
+  return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
 export function boundsOfAnnotation(annotation: Annotation): Rect {

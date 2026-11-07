@@ -6,11 +6,13 @@ import type { Rect } from './model';
 export const DRAWING_KEY = 'SmorsyAnnotation';
 export const TAGS_KEY = 'SmorsyTags';
 
-const MAX_TAGS = 50;
+export const MAX_TAGS = 50;
 const MAX_TAG_LENGTH = 60;
 // A PDF page can't be bigger than this, so anything further away is a damaged or hostile file.
 const LARGEST_COORDINATE = 100_000;
-const MOST_POINTS = 500_000;
+const MOST_POINTS = 200_000;
+// Far past a real pen stroke, and short enough that a hostile one can't hold up reading the file.
+const LONGEST_DRAWING = 8_000_000;
 
 /** The geometry that a saved annotation's appearance can't give back. */
 export type SavedDrawing =
@@ -137,19 +139,25 @@ function parsed(json: string): unknown {
 
 /** Reads what a file says about a drawing. A file can say anything, so nothing is assumed. */
 export function readDrawing(json: string): SavedDrawing | null {
+  if (json === '' || json.length > LONGEST_DRAWING) return null;
   const data = parsed(json);
   return isRecord(data) ? drawingFromRecord(data) : null;
 }
 
 /** The same tag in different capitals is the same tag, spelled as it was first typed. */
-export function cleanTags(tags: readonly string[]): readonly string[] {
+function tidiedTags(tags: readonly string[]): readonly string[] {
   const kept = new Map<string, string>();
   for (const tag of tags) {
     const clean = tag.replace(/\s+/g, ' ').trim().slice(0, MAX_TAG_LENGTH);
     const key = clean.toLowerCase();
     if (clean !== '' && !kept.has(key)) kept.set(key, clean);
   }
-  return [...kept.values()].slice(0, MAX_TAGS);
+  return [...kept.values()];
+}
+
+/** The tags for one annotation, up to the most it can have. */
+export function cleanTags(tags: readonly string[]): readonly string[] {
+  return tidiedTags(tags).slice(0, MAX_TAGS);
 }
 
 export function readTags(json: string): readonly string[] {
@@ -160,7 +168,7 @@ export function readTags(json: string): readonly string[] {
 
 /** Every tag in use, in alphabetical order, for offering and filtering. */
 export function allTags(annotations: readonly Annotation[]): readonly string[] {
-  return [...cleanTags(annotations.flatMap((annotation) => annotation.tags ?? []))].sort(
+  return [...tidiedTags(annotations.flatMap((annotation) => annotation.tags ?? []))].sort(
     (one, two) => one.localeCompare(two, undefined, { numeric: true }),
   );
 }

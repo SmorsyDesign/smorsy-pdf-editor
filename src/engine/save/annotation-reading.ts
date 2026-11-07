@@ -8,7 +8,6 @@ import {
   type PDFContext,
   type PDFDocument,
   type PDFObject,
-  type PDFPage,
 } from '@cantoo/pdf-lib';
 import { rectFromCorners, userToDisplay, type PageBox } from '../coordinates';
 import type { Annotation, SavedSource } from '../edits/annotations';
@@ -29,10 +28,27 @@ const NOT_ANNOTATIONS = new Set(['Link', 'Widget', 'Popup', 'PrinterMark', 'Trap
 // A little over what rounding can add up to, so only a real move counts as one.
 const MOVED_BY = 1.5;
 const GREY: Color = { r: 0.5, g: 0.5, b: 0.5 };
+const LONG_TEXT = 10_000;
+// Far past any real document. A small hostile file can repeat one long string thousands of times,
+// which would otherwise fill the memory of the window it's sent to.
+const MOST_ANNOTATIONS = 20_000;
+const MOST_TEXT = 16_000_000;
+
+/** What's in a file, and how much of it couldn't be offered for editing. */
+export interface ReadAnnotations {
+  readonly annotations: readonly Annotation[];
+  readonly skipped: number;
+}
 
 function textIn(context: PDFContext, value: PDFObject | undefined): string {
   const text = context.lookup(value);
-  return text instanceof PDFString || text instanceof PDFHexString ? text.decodeText() : '';
+  if (!(text instanceof PDFString || text instanceof PDFHexString)) return '';
+  // The library's own decoding fails on long text, such as a long comment or pen stroke.
+  const bytes = text.asBytes();
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) {
+    return new TextDecoder('utf-16be').decode(bytes.subarray(2));
+  }
+  return bytes.length < LONG_TEXT ? text.decodeText() : new TextDecoder('latin1').decode(bytes);
 }
 
 function colorOf(context: PDFContext, annotation: PDFDict): Color {
@@ -80,6 +96,23 @@ function stillMatches(annotation: Annotation, rect: UserBounds, box: PageBox): b
   );
 }
 
+/** Whether it's something a person put on the page to read, and that viewers show. */
+function isListable(context: PDFContext, dict: PDFDict): boolean {
+  const subtype = context.lookup(dict.get(name('Subtype')));
+  return (
+    subtype instanceof PDFName &&
+    !NOT_ANNOTATIONS.has(subtype.decodeText()) &&
+    isShown(context, dict)
+  );
+}
+
+function textLengthOf(annotation: Annotation): number {
+  const words = 'text' in annotation ? annotation.text.length : 0;
+  const tags = (annotation.tags ?? []).join('').length;
+  const drawn = annotation.kind === 'pen' ? annotation.points.length * 16 : 0;
+  return words + tags + drawn;
+}
+
 function readOne(
   context: PDFContext,
   dict: PDFDict,
@@ -88,10 +121,9 @@ function readOne(
   box: PageBox,
 ): Annotation | null {
   const subtypeName = context.lookup(dict.get(name('Subtype')));
-  if (!(subtypeName instanceof PDFName)) return null;
-  const subtype = subtypeName.decodeText();
   const rect = rectOf(context, dict);
-  if (NOT_ANNOTATIONS.has(subtype) || !rect || !isShown(context, dict)) return null;
+  if (!(subtypeName instanceof PDFName) || !rect) return null;
+  const subtype = subtypeName.decodeText();
   const refText = refName(ref);
   const source = (foreign: boolean): SavedSource => ({ ref: refText, pageNumber, foreign });
   const common = {
@@ -110,13 +142,14 @@ function readOne(
   }
   const place = displayRect(rect, box);
   if (subtype === 'Text') {
+    const hasLook = context.lookup(dict.get(name('AP'))) instanceof PDFDict;
     return {
       ...common,
       ...tagged,
       kind: 'comment',
       at: { x: place.x, y: place.y },
       text: words,
-      saved: source(true),
+      saved: { ...source(true), ...(hasLook ? {} : { noLook: true }) },
     };
   }
   return {
@@ -130,21 +163,42 @@ function readOne(
   };
 }
 
-function readPage(page: PDFPage, pageNumber: number): readonly Annotation[] {
-  const { context } = page.doc;
-  const list = context.lookup(page.node.getInheritableAttribute(name('Annots')));
-  if (!(list instanceof PDFArray)) return [];
-  const box = pageBoxOf(page);
-  return list.asArray().flatMap((entry) => {
-    // One held directly in the list has no name for saving or hiding to find it by.
-    if (!(entry instanceof PDFRef)) return [];
-    const dict = context.lookup(entry);
-    if (!(dict instanceof PDFDict)) return [];
-    return readOne(context, dict, entry, pageNumber, box) ?? [];
+/** Everything people have put on the pages. One that can't be read doesn't spoil the rest. */
+export function readAnnotations(doc: PDFDocument): ReadAnnotations {
+  const { context } = doc;
+  const annotations: Annotation[] = [];
+  let skipped = 0;
+  let textUsed = 0;
+  doc.getPages().forEach((page, index) => {
+    const list = context.lookup(page.node.getInheritableAttribute(name('Annots')));
+    if (!(list instanceof PDFArray)) return;
+    let box: PageBox;
+    try {
+      box = pageBoxOf(page);
+    } catch (error) {
+      console.error(error);
+      skipped += list.size();
+      return;
+    }
+    for (const entry of list.asArray()) {
+      const dict = context.lookup(entry);
+      if (!(dict instanceof PDFDict) || !isListable(context, dict)) continue;
+      // One held directly in the list has no name for saving or hiding to find it by.
+      if (!(entry instanceof PDFRef) || annotations.length >= MOST_ANNOTATIONS) {
+        skipped += 1;
+        continue;
+      }
+      try {
+        const found = readOne(context, dict, entry, index + 1, box);
+        if (!found) continue;
+        textUsed += textLengthOf(found);
+        if (textUsed > MOST_TEXT) skipped += 1;
+        else annotations.push(found);
+      } catch (error) {
+        console.error(error);
+        skipped += 1;
+      }
+    }
   });
-}
-
-/** Everything people have put on the pages, for listing and editing. */
-export function readAnnotations(doc: PDFDocument): readonly Annotation[] {
-  return doc.getPages().flatMap((page, index) => readPage(page, index + 1));
+  return { annotations, skipped };
 }

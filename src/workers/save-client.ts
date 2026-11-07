@@ -1,5 +1,5 @@
-import type { Annotation } from '../engine/edits/annotations';
 import type { PlacedSignature, TextBox } from '../engine/edits/model';
+import type { ReadAnnotations } from '../engine/save/annotation-reading';
 import type { FontOutcome, SystemFontStyle } from '../engine/save/choose-font';
 import type { SaveExtras, SaveReport } from '../engine/save/editor';
 import type { SaveRequest, SaveResponse } from './save-worker';
@@ -48,9 +48,9 @@ export class SaveClient {
     throw new Error('The save worker gave an unexpected reply.');
   }
 
-  async existingAnnotations(): Promise<readonly Annotation[]> {
+  async existingAnnotations(): Promise<ReadAnnotations> {
     const response = await this.request((id) => ({ type: 'read-annotations', id }));
-    if ('annotations' in response) return response.annotations;
+    if ('existing' in response) return response.existing;
     throw new Error('The save worker gave an unexpected reply.');
   }
 

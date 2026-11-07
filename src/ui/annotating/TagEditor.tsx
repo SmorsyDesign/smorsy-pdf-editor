@@ -1,5 +1,5 @@
-import { useState, type KeyboardEvent } from 'react';
-import { cleanTags } from '../../engine/edits/saved-data';
+import { useRef, useState, type KeyboardEvent } from 'react';
+import { MAX_TAGS, cleanTags } from '../../engine/edits/saved-data';
 import { Icon } from '../Icon';
 
 interface TagEditorProps {
@@ -12,6 +12,8 @@ interface TagEditorProps {
 /** Sits inside the selected row, so it's clear which annotation the tags are for. */
 export function TagEditor({ tags, offers, onChange }: TagEditorProps) {
   const [typed, setTyped] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const isFull = tags.length >= MAX_TAGS;
 
   const add = (tag: string) => {
     const next = cleanTags([...tags, tag]);
@@ -42,6 +44,8 @@ export function TagEditor({ tags, offers, onChange }: TagEditorProps) {
               aria-label={`Remove tag ${tag}`}
               onClick={() => {
                 onChange(tags.filter((one) => one !== tag));
+                // The button's just gone, so focus needs somewhere to go.
+                inputRef.current?.focus();
               }}
             >
               <Icon name="close" />
@@ -49,10 +53,12 @@ export function TagEditor({ tags, offers, onChange }: TagEditorProps) {
           </span>
         ))}
         <input
+          ref={inputRef}
+          disabled={isFull}
           className="tag-input"
           type="text"
           aria-label="Add a tag"
-          placeholder="Add a tag"
+          placeholder={isFull ? `${String(MAX_TAGS)} tags is the most` : 'Add a tag'}
           maxLength={60}
           value={typed}
           onChange={(event) => {
@@ -75,6 +81,7 @@ export function TagEditor({ tags, offers, onChange }: TagEditorProps) {
               className="tag-btn"
               onClick={() => {
                 add(offer);
+                inputRef.current?.focus();
               }}
             >
               {offer}

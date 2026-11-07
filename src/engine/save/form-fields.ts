@@ -24,7 +24,7 @@ import {
   annotationsOver,
   isWidget,
   name,
-  removeAnnotation,
+  eraseAnnotation,
   type UserBounds,
 } from './page-annotations';
 
@@ -150,7 +150,8 @@ export function clearForWhiteout(page: PDFPage, areas: readonly UserBounds[]): C
       blankLooks(context, annotation, look);
       if (holdsAnswer && retireField(doc, annotation)) retired += 1;
     } else {
-      removeAnnotation(page, annotation);
+      // Its look has just gone into the page, so that has to stay.
+      eraseAnnotation(page, annotation, true);
       annotations += 1;
     }
   }

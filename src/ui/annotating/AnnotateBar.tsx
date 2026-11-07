@@ -75,6 +75,10 @@ export function AnnotateBar({ annotating, currentPage, centre, onChooseImage }: 
           key={swatch.name}
           type="button"
           className="swatch-btn"
+          // Keeps focus in a comment being written, which leaving would close or discard.
+          onMouseDown={(event) => {
+            event.preventDefault();
+          }}
           aria-label={`Colour: ${swatch.name}`}
           aria-pressed={annotating.swatch === swatch}
           onClick={() => {

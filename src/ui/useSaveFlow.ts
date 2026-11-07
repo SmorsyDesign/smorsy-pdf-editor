@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { copyFileName } from '../engine/copy';
-import { FIELD_PROBLEM, UNSUPPORTED_TEXT } from '../engine/errors';
+import { PLAIN_PROBLEM, UNSUPPORTED_TEXT } from '../engine/errors';
 import { openDocument } from '../engine/document';
 import { SaveFailure, type OpenedFile, type Platform, type SaveFailureKind } from '../platform';
 import type { DocumentEditor } from './editing/useDocumentEditor';
@@ -20,11 +20,11 @@ function failureDialog(error: unknown, otherwise: SaveFailureKind): SaveDialog {
     return { kind: 'save-failed', failure: error.kind, detail: error.message };
   }
   const detail = error instanceof Error ? error.message : String(error);
-  if (detail.startsWith(FIELD_PROBLEM)) {
+  if (detail.startsWith(PLAIN_PROBLEM)) {
     return {
       kind: 'save-failed',
-      failure: 'field-problem',
-      detail: detail.slice(FIELD_PROBLEM.length),
+      failure: 'plain-problem',
+      detail: detail.slice(PLAIN_PROBLEM.length),
     };
   }
   return detail.startsWith(UNSUPPORTED_TEXT)

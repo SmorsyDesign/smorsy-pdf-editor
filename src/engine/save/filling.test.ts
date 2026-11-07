@@ -11,7 +11,7 @@ import {
 } from '@cantoo/pdf-lib';
 import { describe, expect, it } from 'vitest';
 import { openDocument } from '../document';
-import { FIELD_PROBLEM, UNSUPPORTED_TEXT } from '../errors';
+import { PLAIN_PROBLEM, UNSUPPORTED_TEXT } from '../errors';
 import type { FontBytes } from './choose-font';
 import { PdfEditor } from './editor';
 import type { FieldAnswers } from './field-filling';
@@ -59,12 +59,12 @@ describe('text answers', () => {
       field.addToPage(doc.getPage(0), box);
     });
     const failure = fill(limited, [['student.first_name', 'Too long']]);
-    await expect(failure).rejects.toThrow(FIELD_PROBLEM);
+    await expect(failure).rejects.toThrow(PLAIN_PROBLEM);
     await expect(failure).rejects.toThrow('Student first name');
   });
 
   it('says so when a field has gone from the file', async () => {
-    await expect(fill(await notes(), [['elsewhere', 'x']])).rejects.toThrow(FIELD_PROBLEM);
+    await expect(fill(await notes(), [['elsewhere', 'x']])).rejects.toThrow(PLAIN_PROBLEM);
   });
 });
 
@@ -187,7 +187,7 @@ describe('locking answers', () => {
     const normal = widget?.dict.lookup(PDFName.of('AP'), PDFDict).lookup(PDFName.of('N'));
     if (!(normal instanceof PDFStream)) throw new Error('No drawing to break.');
     normal.dict.set(PDFName.of('BBox'), broken.context.obj([0, 0, 0, 0]));
-    await expect(fill(await broken.save(), [], true)).rejects.toThrow(FIELD_PROBLEM);
+    await expect(fill(await broken.save(), [], true)).rejects.toThrow(PLAIN_PROBLEM);
   });
 
   it('doesn’t stop for a field with no size, which nobody can see', async () => {

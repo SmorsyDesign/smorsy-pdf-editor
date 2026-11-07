@@ -162,7 +162,7 @@ describe.each(files)('%s', (name) => {
 
   it.skipIf(password !== undefined)('survives its annotations being read and changed', async () => {
     const editor = new PdfEditor(original, fonts);
-    const found = await editor.existingAnnotations();
+    const { annotations: found } = await editor.existingAnnotations();
     const before = await inspect(original);
     const tagged = found.map((annotation) => ({ ...annotation, tags: ['Chapter 1'] }));
     const saved = await editor.save([], [], { annotations: tagged });
@@ -174,10 +174,38 @@ describe.each(files)('%s', (name) => {
     expect(after.links).toBe(before.links);
     expect(after.outlineItems).toBe(before.outlineItems);
     expect(after.annotations).toBe(before.annotations);
-    const again = await new PdfEditor(saved, fonts).existingAnnotations();
+    const { annotations: again } = await new PdfEditor(saved, fonts).existingAnnotations();
     expect(again.length).toBe(found.length);
     expect(again.every((annotation) => annotation.tags?.includes('Chapter 1'))).toBe(true);
   });
+
+  it.skipIf(password !== undefined)(
+    'survives this app’s annotations being reopened and rewritten',
+    async () => {
+      const color = { r: 1, g: 0, b: 0 };
+      const common = { pageNumber: 1, color };
+      const area = { x: 72, y: 72, width: 120, height: 40 };
+      const first = await new PdfEditor(original, fonts).save([], [], {
+        annotations: [
+          { ...common, id: 'a', kind: 'highlight', rects: [area], text: 'marked' },
+          { ...common, id: 'b', kind: 'rect', rect: area, width: 2 },
+          { ...common, id: 'c', kind: 'comment', at: area, text: 'Words' },
+        ],
+      });
+      const { annotations: found } = await new PdfEditor(first, fonts).existingAnnotations();
+      const ours = found.filter((annotation) => annotation.saved?.foreign === false);
+      expect(ours).toHaveLength(3);
+      const before = await inspect(first);
+      const second = await new PdfEditor(first, fonts).save([], [], { annotations: ours });
+      const path = join(temp, `rewritten-${name}`);
+      writeFileSync(path, second);
+      expect([0, 3]).toContain(qpdfStatus(path));
+      const after = await inspect(second);
+      expect(after.pages).toBe(before.pages);
+      expect(after.annotations).toBe(before.annotations);
+      expect(after.links).toBe(before.links);
+    },
+  );
 
   it.skipIf(password !== undefined)('survives filling in and locking its form', async () => {
     const form = (await PDFDocument.load(original, { ignoreEncryption: true })).getForm();

@@ -3,6 +3,7 @@ import {
   PDFDict,
   PDFName,
   PDFNumber,
+  PDFRef,
   type PDFContext,
   type PDFObject,
   type PDFPage,
@@ -27,14 +28,18 @@ export const name = (text: string) => PDFName.of(text);
 
 /** The smallest box holding all of these points. */
 export function boundsAround(points: readonly Point[]): UserBounds {
-  const xs = points.map((point) => point.x);
-  const ys = points.map((point) => point.y);
-  return {
-    left: Math.min(...xs),
-    bottom: Math.min(...ys),
-    right: Math.max(...xs),
-    top: Math.max(...ys),
-  };
+  // A loop, because a long pen stroke has more points than a function can take as arguments.
+  let left = Infinity;
+  let right = -Infinity;
+  let bottom = Infinity;
+  let top = -Infinity;
+  for (const { x, y } of points) {
+    left = Math.min(left, x);
+    right = Math.max(right, x);
+    bottom = Math.min(bottom, y);
+    top = Math.max(top, y);
+  }
+  return { left, bottom, right, top };
 }
 
 export function numbersIn(context: PDFContext, value: PDFObject | undefined): readonly number[] {
@@ -74,14 +79,62 @@ export function giveOwnAnnotationList(page: PDFPage): void {
   if (list instanceof PDFArray) page.node.set(name('Annots'), list.clone(context));
 }
 
-/** Takes an annotation off the page, along with the pop-up that belongs to it. */
-export function removeAnnotation(page: PDFPage, annotation: PDFDict): void {
+/** Every entry in every page's list, to tell whether something's still in use elsewhere. */
+function everyListedAnnotation(page: PDFPage): readonly PDFObject[] {
+  return page.doc.getPages().flatMap((one) => one.node.Annots()?.asArray() ?? []);
+}
+
+/** The drawings an annotation can show, which might be shared with another annotation. */
+function looksOf(context: PDFContext, annotation: PDFDict): readonly PDFRef[] {
+  const looks = context.lookup(annotation.get(name('AP')));
+  if (!(looks instanceof PDFDict)) return [];
+  return looks.values().flatMap((value) => {
+    if (value instanceof PDFRef) {
+      const target = context.lookup(value);
+      return target instanceof PDFDict
+        ? [value, ...target.values().filter((one) => one instanceof PDFRef)]
+        : [value];
+    }
+    return value instanceof PDFDict ? value.values().filter((one) => one instanceof PDFRef) : [];
+  });
+}
+
+const eraseIfHeldApart = (context: PDFContext, value: PDFObject | undefined) => {
+  if (value instanceof PDFRef) context.delete(value);
+};
+
+/**
+ * Erases an annotation from the file, rather than only taking it off the page's list. A save writes
+ * every object it knows of, so anything just unlisted would still be there for a PDF tool to find.
+ * Its drawing goes too, which can hold its words, unless something else still needs it.
+ */
+export function eraseAnnotation(page: PDFPage, annotation: PDFDict, keepLook = false): void {
   const { context } = page.doc;
   const list = page.node.Annots();
   if (!list) return;
   const going = new Set([annotation, context.lookup(annotation.get(name('Popup')))]);
+  const refs: PDFRef[] = [];
   for (let index = list.size() - 1; index >= 0; index -= 1) {
-    if (going.has(context.lookup(list.get(index)))) list.remove(index);
+    const entry = list.get(index);
+    if (going.has(context.lookup(entry))) {
+      list.remove(index);
+      if (entry instanceof PDFRef) refs.push(entry);
+    }
+  }
+  // Another page can list the same annotation, which then has to stay as it is.
+  const remaining = everyListedAnnotation(page);
+  if (remaining.some((entry) => going.has(context.lookup(entry)))) return;
+  const looks = keepLook ? [] : looksOf(context, annotation);
+  const looksInUse = new Set(
+    remaining.flatMap((entry) => {
+      const other = context.lookup(entry);
+      return other instanceof PDFDict ? looksOf(context, other) : [];
+    }),
+  );
+  eraseIfHeldApart(context, annotation.get(name('Contents')));
+  eraseIfHeldApart(context, annotation.get(name('RC')));
+  for (const ref of [...refs, ...looks.filter((look) => !looksInUse.has(look))]) {
+    context.delete(ref);
   }
 }
 

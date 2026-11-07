@@ -15,6 +15,8 @@ export function CommentCard({ comment, annotating, scale, page }: CommentCardPro
   // Mounted once per opening, so all the typing in one visit is one undo.
   const [typing] = useState(() => `comment-${crypto.randomUUID()}`);
   const fieldRef = useRef<HTMLTextAreaElement>(null);
+  // Another app's comment can have no words to begin with, and just looking at it shouldn't delete it.
+  const [wasEmpty] = useState(() => comment.saved !== undefined && comment.text.trim() === '');
 
   // Ready to type straight away. Leaving the box is also what closes the card.
   useEffect(() => {
@@ -42,7 +44,7 @@ export function CommentCard({ comment, annotating, scale, page }: CommentCardPro
         onKeyDown={(event) => {
           if (event.key === 'Escape') {
             event.stopPropagation();
-            const empty = event.currentTarget.value.trim() === '';
+            const empty = event.currentTarget.value.trim() === '' && !wasEmpty;
             event.currentTarget.blur();
             // An empty comment has gone by now, and removing it has already moved focus on.
             if (!empty) annotating.focus(comment.id);
@@ -56,7 +58,7 @@ export function CommentCard({ comment, annotating, scale, page }: CommentCardPro
           // A comment with nothing in it would just be a stray mark on the page.
           // Part of the same undo as the typing, so undoing can't bring back one with no words.
           // Focus only needs rescuing when it isn't already on its way somewhere else.
-          if (event.target.value.trim() === '') {
+          if (event.target.value.trim() === '' && !wasEmpty) {
             annotating.remove(comment.id, { group: typing, focusPages: !event.relatedTarget });
           }
           annotating.closeComment();

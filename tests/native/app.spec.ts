@@ -271,7 +271,7 @@ describe('the built app', () => {
     expect(saved.getPage(0).node.Annots()?.size()).toBe(1);
   });
 
-  it('reopens a saved comment with its tag, and changes it, through the real app', async () => {
+  it('reopens a saved comment with its tag, and deletes it, through the real app', async () => {
     await openFromStartScreen(plainText);
     await waitForPageDrawn();
     await $('button=Annotate').click();

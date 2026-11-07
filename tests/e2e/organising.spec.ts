@@ -13,77 +13,27 @@ import {
   waitForRedraw,
   whatChanged,
 } from './editing-helpers';
-import { expectOpenDocument, expectPageDrawn, openFixture } from './helpers';
+import {
+  PLAIN,
+  addComment,
+  annotate,
+  bar,
+  clickOnPage,
+  count,
+  dragOnPage,
+  drawRectangle,
+  filters,
+  markFirstLine,
+  open,
+  panel,
+  rows,
+  scopeButton,
+  tabButton,
+  tagInput,
+  tool,
+} from './annotating-helpers';
+import { openFixture } from './helpers';
 import { queueImage } from './signing-helpers';
-
-const PLAIN = 'test-pdfs/01-plain-text.pdf';
-
-const bar = (page: Page) => page.getByRole('toolbar', { name: 'Annotation tools' });
-const tool = (page: Page, name: string) => bar(page).getByRole('button', { name, exact: true });
-const annotate = (page: Page) =>
-  page.getByRole('button', { name: 'Annotate', exact: true }).click();
-const panel = (page: Page) => page.getByRole('complementary', { name: 'Annotations' });
-const count = (page: Page) => panel(page).locator('.panel-head [role="status"]');
-const tabButton = (page: Page, name: string) =>
-  panel(page).getByRole('group', { name: 'Kind of annotation' }).getByRole('button', { name });
-const scopeButton = (page: Page, name: string) =>
-  panel(page).getByRole('group', { name: 'Show annotations from' }).getByRole('button', { name });
-const filters = (page: Page) => panel(page).getByRole('group', { name: 'Show only this tag' });
-const rows = (page: Page) => panel(page).locator('.row');
-const tagInput = (page: Page) => panel(page).getByRole('textbox', { name: 'Add a tag' });
-
-async function open(page: Page, fixture = PLAIN, pageCount = 3) {
-  await openFixture(page, fixture, 'Lease.pdf');
-  await expectOpenDocument(page, pageCount);
-  await expectPageDrawn(page);
-  await annotate(page);
-  await expect(bar(page)).toBeVisible();
-  await waitForRedraw(page, 1);
-}
-
-async function dragOnPage(
-  page: Page,
-  from: readonly [number, number],
-  to: readonly [number, number],
-  pageNumber = 1,
-) {
-  await pageElement(page, pageNumber).scrollIntoViewIfNeeded();
-  const sheet = await pageElement(page, pageNumber).boundingBox();
-  if (!sheet) throw new Error('The page isn’t on screen.');
-  await page.mouse.move(sheet.x + from[0], sheet.y + from[1]);
-  await page.mouse.down();
-  await page.mouse.move(sheet.x + to[0], sheet.y + to[1], { steps: 6 });
-  await page.mouse.up();
-}
-
-async function clickOnPage(page: Page, at: readonly [number, number], pageNumber = 1) {
-  const sheet = await pageElement(page, pageNumber).boundingBox();
-  if (!sheet) throw new Error('The page isn’t on screen.');
-  await page.mouse.click(sheet.x + at[0], sheet.y + at[1]);
-}
-
-const drawRectangle = async (page: Page, pageNumber = 1) => {
-  await tool(page, 'Rectangle').click();
-  await dragOnPage(page, [150, 400], [350, 520], pageNumber);
-  await page.keyboard.press('Escape');
-};
-
-const addComment = async (page: Page, words: string) => {
-  await tool(page, 'Comment').click();
-  await clickOnPage(page, [420, 300]);
-  await page.keyboard.type(words);
-  await clickOnPage(page, [40, 700]);
-};
-
-const markFirstLine = async (page: Page) => {
-  await tool(page, 'Underline').click();
-  const line = pageElement(page, 1)
-    .getByRole('button', { name: /^Mark line:/ })
-    .first();
-  await line.focus();
-  await page.keyboard.press('Enter');
-  await page.keyboard.press('Escape');
-};
 
 test.describe('tabs', () => {
   test('sort what’s on the page by purpose', async ({ page }) => {
@@ -415,12 +365,19 @@ test.describe('annotations saved earlier', () => {
   test('a deleted comment can’t be read outside Annotate mode either', async ({ page }) => {
     await open(page);
     await addComment(page, 'Gone soon');
+    await tool(page, 'Comment').click();
+    await clickOnPage(page, [200, 500]);
+    await page.keyboard.type('Stays');
+    await clickOnPage(page, [40, 700]);
     await saveTo(page);
     await reopenSaved(page, 3);
     await annotate(page);
-    await panel(page).getByRole('button', { name: 'Delete comment' }).click();
+    await panel(page).getByRole('button', { name: 'Delete comment' }).first().click();
     await page.getByRole('button', { name: 'Select', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Read comment' })).toHaveCount(0);
+    // The other is there to show the list has loaded, as none at all would pass too soon.
+    await expect(page.getByRole('button', { name: 'Read comment' })).toHaveCount(1);
+    await page.getByRole('button', { name: 'Read comment' }).click();
+    await expect(page.getByRole('note')).toContainText('Stays');
   });
 
   test('a new comment can be read in Select mode, before it’s saved', async ({ page }) => {
@@ -508,7 +465,7 @@ test.describe('annotations from another app', () => {
     expect((await paintIn(page, 1, region)).dark).toBe(0);
   });
 
-  test('comments can be reworded, keeping the app’s own pin', async ({ page }) => {
+  test('comments can be reworded', async ({ page }) => {
     await open(page, 'test-pdfs/11-annotations-links.pdf', 2);
     await tabButton(page, 'Comments').click();
     await rows(page).locator('.row-text').click();

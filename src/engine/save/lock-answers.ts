@@ -9,7 +9,7 @@ import {
   type PDFFont,
   type PDFPage,
 } from '@cantoo/pdf-lib';
-import { FIELD_PROBLEM } from '../errors';
+import { PLAIN_PROBLEM } from '../errors';
 import { friendlyName } from '../forms/fields';
 import { checkCharacters } from './field-filling';
 import { currentLook, drawLooksIntoPage } from './field-looks';
@@ -58,7 +58,7 @@ function paintWidgets(doc: PDFDocument, field: PDFField): void {
     const painted = look !== null && drawLooksIntoPage(page, widget.dict, look);
     if (!painted && hasValue(context, widget.dict)) {
       throw new Error(
-        `${FIELD_PROBLEM}The answer in “${friendlyName(field.getName())}” couldn’t be made part of the page, so nothing was saved. Try saving without locking answers.`,
+        `${PLAIN_PROBLEM}The answer in “${friendlyName(field.getName())}” couldn’t be made part of the page, so nothing was saved. Try saving without locking answers.`,
       );
     }
   });

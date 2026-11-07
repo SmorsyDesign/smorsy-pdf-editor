@@ -54,7 +54,7 @@ export function AppDialogs<LeaveAction>({
     case 'save-failed':
       // Another location wouldn't help with any of these, so it isn't offered.
       return dialog.failure === 'unsupported-text' ||
-        dialog.failure === 'field-problem' ||
+        dialog.failure === 'plain-problem' ||
         dialog.failure === 'build-failed' ? (
         <AlertDialog
           icon="warn"

@@ -277,7 +277,8 @@ function drawnComment(
       setFillingRgbColor(color.r, color.g, color.b),
       ...bubble,
       fill(),
-      ...inkSetup({ r: 0.2, g: 0.16, b: 0.04 }, 1 / unit),
+      // Its own colour, darkened, so the outline stays quiet like the pin on screen.
+      ...inkSetup({ r: color.r * 0.75, g: color.g * 0.75, b: color.b * 0.75 }, 1 / unit),
       ...bubble,
       stroke(),
       ...inkSetup({ r: 0.2, g: 0.16, b: 0.04 }, 2 / unit),

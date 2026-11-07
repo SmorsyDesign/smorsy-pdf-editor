@@ -11,6 +11,7 @@ interface Readable {
   readonly rect: Rect;
   readonly text: string;
   readonly author: string;
+  readonly noLook?: boolean;
 }
 
 interface CommentReaderProps {
@@ -86,7 +87,7 @@ export function CommentReader({
       <span key={comment.id}>
         <button
           type="button"
-          className="comment-read"
+          className={comment.noLook ? 'comment-read has-pin' : 'comment-read'}
           aria-label={isOpen ? 'Close comment' : 'Read comment'}
           aria-expanded={isOpen}
           style={{

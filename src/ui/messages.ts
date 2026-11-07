@@ -89,7 +89,7 @@ export function explainFormChanges(retired: number, onTop: number, annotations =
 
 export function explainSaveFailure(kind: SaveFailureKind, detail = ''): string {
   switch (kind) {
-    case 'field-problem':
+    case 'plain-problem':
       return detail;
     case 'unsupported-text':
       return `No font available to the app has these characters: ${detail}. Change or remove them, then save again.`;

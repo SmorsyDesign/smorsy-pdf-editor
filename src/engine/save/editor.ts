@@ -24,7 +24,7 @@ import { UNSUPPORTED_TEXT, nameCharacter } from '../errors';
 import { findEmbeddedFont, type EmbeddedFont } from '../fonts/embedded';
 import { bundledFaceFile } from '../fonts/match';
 import { placementInPdf } from '../signatures/placement';
-import { readAnnotations } from './annotation-reading';
+import { readAnnotations, type ReadAnnotations } from './annotation-reading';
 import {
   annotationBounds,
   removeSaved,
@@ -87,7 +87,7 @@ export class PdfEditor {
   }
 
   /** Everything people have put on the pages already. */
-  async existingAnnotations(): Promise<readonly Annotation[]> {
+  async existingAnnotations(): Promise<ReadAnnotations> {
     return readAnnotations(await this.load());
   }
 
@@ -249,15 +249,10 @@ export class PdfEditor {
   async saveWithReport(
     boxes: readonly TextBox[],
     signatures: readonly PlacedSignature[],
-    {
-      annotations: allAnnotations = [],
-      removedSaved = [],
-      answers = [],
-      lock = false,
-    }: SaveExtras = {},
+    { annotations: changed = [], removedSaved = [], answers = [], lock = false }: SaveExtras = {},
   ): Promise<SaveReport> {
     // A note being retyped can be empty at the moment of saving, and it's no note until it has words.
-    const annotations = allAnnotations.filter(
+    const annotations = changed.filter(
       (annotation) => annotation.kind !== 'comment' || annotation.text.trim() !== '',
     );
     const doc = await this.load();
@@ -274,7 +269,8 @@ export class PdfEditor {
     // Before anything else looks at the pages, so what's being replaced can't be mistaken for
     // something a new whiteout has to deal with.
     for (const source of removedSaved) removeSaved(doc.getPage(source.pageNumber - 1), source);
-    for (const annotation of annotations) {
+    // All of them, because a saved comment emptied just now still has its old words to erase.
+    for (const annotation of changed) {
       const { saved } = annotation;
       if (saved?.foreign) updateForeign(doc.getPage(saved.pageNumber - 1), annotation);
       else if (saved) removeSaved(doc.getPage(saved.pageNumber - 1), saved);

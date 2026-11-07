@@ -7,6 +7,8 @@ export interface ExistingNote {
   readonly rect: Rect;
   readonly text: string;
   readonly author: string;
+  /** The file has no drawing of it, so there's no pin on the page unless the app adds one. */
+  readonly noLook: boolean;
 }
 
 /** The parts of pdf.js's description of an annotation that a note needs. */
@@ -17,6 +19,7 @@ export interface NoteData {
   readonly contentsObj?: { readonly str?: string };
   readonly titleObj?: { readonly str?: string };
   readonly annotationFlags?: number;
+  readonly hasAppearance?: boolean;
 }
 
 const HIDDEN_OR_NO_VIEW = 2 | 32;
@@ -35,5 +38,6 @@ export function noteFromAnnotation(
     rect: rectFromCorners(x1, y1, x2, y2),
     text,
     author: data.titleObj?.str?.trim() ?? '',
+    noLook: data.hasAppearance === false,
   };
 }

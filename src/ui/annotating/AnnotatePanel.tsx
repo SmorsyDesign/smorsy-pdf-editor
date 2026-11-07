@@ -50,6 +50,8 @@ interface AnnotatePanelProps {
   readonly signing: Signing;
   readonly images: readonly PlacedSignature[];
   readonly currentPage: number;
+  /** How many annotations in the file can't be listed here. */
+  readonly unread: number;
   readonly onGoTo: (pageNumber: number, y: number) => void;
 }
 
@@ -64,6 +66,7 @@ export function AnnotatePanel({
   signing,
   images,
   currentPage,
+  unread,
   onGoTo,
 }: AnnotatePanelProps) {
   const { selected } = annotating;
@@ -165,6 +168,7 @@ export function AnnotatePanel({
                     className="row-text"
                     onClick={() => {
                       annotating.clearTool();
+                      annotating.select(null);
                       if (scope === 'all') onGoTo(pageNumber, item.image.rect.y);
                       signing.select(item.id);
                     }}
@@ -198,13 +202,15 @@ export function AnnotatePanel({
                 <button
                   type="button"
                   className="row-text"
+                  {...(isSelected ? { 'aria-current': true } : {})}
                   onClick={() => {
+                    signing.select(null);
                     annotating.goTo(annotation);
                     if (scope === 'all') onGoTo(pageNumber, annotating.topOf(annotation));
                   }}
                 >
                   {annotation.kind === 'comment' ? (
-                    <span className="row-words">{detail}</span>
+                    <span className="row-words">{detail || 'Comment with no words'}</span>
                   ) : (
                     <>
                       <span className="row-title">{label}</span>
@@ -249,6 +255,13 @@ export function AnnotatePanel({
         })}
       </ul>
       <div className="panel-foot">
+        {unread > 0 && (
+          <p>
+            {unread === 1
+              ? 'One more annotation in this file can’t be listed or changed here.'
+              : `${String(unread)} more annotations in this file can’t be listed or changed here.`}
+          </p>
+        )}
         <p>{foot}</p>
       </div>
     </aside>

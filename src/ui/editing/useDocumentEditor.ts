@@ -57,6 +57,8 @@ export interface DocumentEditor {
   readonly hiddenAnnotations: ReadonlyMap<number, readonly string[]>;
   /** Whether the app draws this, rather than the page showing the file's own drawing of it. */
   readonly isDrawnByApp: (annotation: Annotation) => boolean;
+  /** Annotations the file has that can't be offered for editing, which people should hear about. */
+  readonly unreadAnnotations: number;
   /** Form answers that have been changed, by field name. */
   readonly answers: ReadonlyMap<string, FieldValue>;
   /** Whether saving makes answers part of the page. */
@@ -96,6 +98,7 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
   const [problem, setProblem] = useState<string | null>(null);
   const [outcomes, setOutcomes] = useState<ReadonlyMap<string, FontOutcome>>(() => new Map());
   const [existing, setExisting] = useState<readonly Annotation[]>([]);
+  const [unreadAnnotations, setUnreadAnnotations] = useState(0);
   const existingRef = useRef(existing);
   existingRef.current = existing;
   // Kept in step with the state, because saving straight after an edit must include that edit.
@@ -144,6 +147,7 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
 
   useEffect(() => {
     setExisting([]);
+    setUnreadAnnotations(0);
     const client = clientRef.current;
     // A protected file can't be changed anyway, and comments in it can still be read another way.
     if (!file || !client || isEncrypted(file.bytes)) return;
@@ -151,7 +155,9 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
     client
       .then((opened) => opened.existingAnnotations())
       .then((found) => {
-        if (current) setExisting(found);
+        if (!current) return;
+        setExisting(found.annotations);
+        setUnreadAnnotations(found.skipped);
       })
       .catch((error: unknown) => {
         console.error(error);
@@ -293,7 +299,9 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
     signatures,
     annotations,
     hiddenAnnotations,
-    isDrawnByApp: (annotation: Annotation) => !annotation.saved || redrawn.has(annotation.id),
+    isDrawnByApp: (annotation: Annotation) =>
+      !annotation.saved || annotation.saved.noLook === true || redrawn.has(annotation.id),
+    unreadAnnotations,
     answers,
     locksAnswers,
     setLocksAnswers: (lock: boolean) => {

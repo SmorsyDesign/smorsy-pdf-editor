@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   annotationCategory,
   canTag,
@@ -41,7 +41,7 @@ export function useAnnotationList(
 
   const tags = allTags(annotations);
   // Removing a tag from the last thing that had it leaves nothing to filter by.
-  const tag = chosenTag !== null && tags.includes(chosenTag) ? chosenTag : null;
+  const tag = tags.find((one) => one.toLowerCase() === chosenTag?.toLowerCase()) ?? null;
 
   const everything: readonly ListItem[] = [
     ...annotations.map((annotation): ListItem => ({
@@ -56,14 +56,16 @@ export function useAnnotationList(
     .filter((item) => inTab(item, tab) && (tag === null || hasTag(item, tag)))
     .sort((one, two) => pageOf(one) - pageOf(two));
 
-  // Something picked on the page has to be in the list, or there'd be nowhere to tag it.
+  // Something just picked on the page has to be in the list, or there'd be nowhere to tag it. Only
+  // at the moment it's picked, so filtering the list afterwards still does what it's asked.
   const selectedId = selected?.id ?? null;
-  const selectedIsListed = items.some((item) => item.id === selectedId);
+  const selectedIsListed = useRef(false);
+  selectedIsListed.current = items.some((item) => item.id === selectedId);
   useEffect(() => {
-    if (selectedId === null || selectedIsListed) return;
+    if (selectedId === null || selectedIsListed.current) return;
     setTab('all');
     setChosenTag(null);
-  }, [selectedId, selectedIsListed]);
+  }, [selectedId]);
 
   return {
     scope,

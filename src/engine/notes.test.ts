@@ -23,6 +23,7 @@ describe('reading a note already in a file', () => {
       rect: { x: 100, y: 68, width: 24, height: 24 },
       text: 'Ask about the fee',
       author: 'Sam',
+      noLook: false,
     });
   });
 

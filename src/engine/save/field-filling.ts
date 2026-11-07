@@ -9,7 +9,7 @@ import {
   type PDFDocument,
   type PDFFont,
 } from '@cantoo/pdf-lib';
-import { FIELD_PROBLEM, UNSUPPORTED_TEXT, nameCharacter } from '../errors';
+import { PLAIN_PROBLEM, UNSUPPORTED_TEXT, nameCharacter } from '../errors';
 import { friendlyName, type FieldValue } from '../forms/fields';
 import { name } from './page-annotations';
 
@@ -98,7 +98,7 @@ export function fillFields(doc: PDFDocument, answers: FieldAnswers, font: PDFFon
     const label = friendlyName(fieldName);
     const field = form.getFieldMaybe(fieldName);
     if (!field) {
-      throw new Error(`${FIELD_PROBLEM}The form field “${label}” couldn’t be found in the file.`);
+      throw new Error(`${PLAIN_PROBLEM}The form field “${label}” couldn’t be found in the file.`);
     }
     let filled = false;
     try {
@@ -109,7 +109,7 @@ export function fillFields(doc: PDFDocument, answers: FieldAnswers, font: PDFFon
     }
     if (!filled) {
       throw new Error(
-        `${FIELD_PROBLEM}The form field “${label}” can’t hold that answer, so nothing was saved. Change the answer and save again.`,
+        `${PLAIN_PROBLEM}The form field “${label}” can’t hold that answer, so nothing was saved. Change the answer and save again.`,
       );
     }
   }

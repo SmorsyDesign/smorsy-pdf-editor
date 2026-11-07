@@ -11,8 +11,8 @@ type EngineErrorCode =
 /** Starts the error sent back when text can't be saved, followed by the characters. */
 export const UNSUPPORTED_TEXT = 'unsupported-text:';
 
-/** Starts the error sent back when a form answer can't be saved, followed by what to tell people. */
-export const FIELD_PROBLEM = 'field-problem:';
+/** Starts an error that says, in plain words, why a save couldn't go ahead. */
+export const PLAIN_PROBLEM = 'plain-problem:';
 
 /** A character as a person can read it, including the ones that can't be seen. */
 export function nameCharacter(character: string): string {

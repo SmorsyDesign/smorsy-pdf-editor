@@ -43,6 +43,7 @@ export function SidePanel({
         signing={signing}
         images={editor.signatures.filter((item) => item.purpose === 'image')}
         currentPage={currentPage}
+        unread={editor.unreadAnnotations}
         onGoTo={onGoToPage}
       />
     );
