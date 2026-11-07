@@ -74,45 +74,77 @@ const screens = {
   ${status({ hint: 'Click a line to edit it, or click an empty area to add text', extra: tickKey, toggle: false })}`,
   }),
 
-  annotate: ({ p }) => {
-    const swatch = (color, label, on = false) => `<button class="swatch-btn" aria-label="Colour: ${label}" aria-pressed="${on}"><span class="tool-swatch" style="background:${color}"></span></button>`;
-    const tool = (name, label, on = false) => `<button class="icon-btn" aria-label="${label}" title="${label}" aria-pressed="${on}">${icon(name)}</button>`;
-    const row = (name, title, sub) => `<li class="row">${icon(name)}<span class="row-text"><span class="row-title">${title}</span><span class="row-sub">${sub}</span></span><button class="icon-btn" aria-label="Delete ${title.toLowerCase()}">${icon('trash')}</button></li>`;
-    return {
-      title: 'Annotate', file: LEASE,
-      content: `${bar({ p, mode: 'note', file: LEASE, state: '7 unsaved changes' })}
+  annotate: ({ p }) => ({
+    title: 'Annotate', file: LEASE,
+    content: `${bar({ p, mode: 'note', file: LEASE, state: '7 unsaved changes' })}
   <div class="body">
     ${thumbs(7)}
-    ${stage(lease({
-      swap: [
+    ${stage(lease({ swap: [
         ['A late fee of $45', 'A <mark>late fee of $45</mark>'],
         ['60 days in writing', '<span class="a-under">60 days in writing</span>'],
         ['Pets remain subject to', '<span class="a-strike">Pets remain subject to</span>'],
-        ['<td><span class="ln">$1,760</span>', '<td><span class="ln"><span class="a-circle">$1,760<svg viewBox="0 0 72 36" aria-hidden="true"><path d="M8 20C6 8 28 2 44 3c14 1 26 8 24 17-2 10-22 14-38 13C16 32 4 28 6 16"/></svg></span></span>'],
-      ],
-      overlay: `<button class="note-pin" style="left:536px;top:296px" aria-label="Open note">${icon('pin')}</button>
-        <div class="note-card" style="left:536px;top:328px"><strong>Mara</strong>Ask Daniel whether the late fee can go down to $30.</div>`,
-    }), `<div class="float-bar at-top-center" role="toolbar" aria-label="Annotation tools">
-        ${tool('marker', 'Highlight', true)}${tool('underline', 'Underline')}${tool('strike', 'Strikethrough')}<span class="sep"></span>
-        ${tool('pen', 'Pen')}${tool('rect', 'Rectangle')}${tool('ellipse', 'Ellipse')}${tool('arrow', 'Arrow')}<span class="sep"></span>
-        ${tool('pin', 'Sticky note')}${tool('image', 'Image')}${tool('whiteout', 'Whiteout box')}<span class="sep"></span>
-        ${swatch('#ffe98a', 'yellow', true)}${swatch('#a8e6b0', 'green')}${swatch('#f7b6c2', 'pink')}${swatch('#9fd4f5', 'blue')}
-      </div>`)}
-    <aside class="panel" aria-label="Annotations on this page">
-      <div class="panel-head"><h2>On this page</h2><span class="kbd">5 annotations</span></div>
+        ['<td><span class="ln">$1,760</span>', '<td><span class="ln"><span class="a-circle">$1,760<svg viewBox="0 0 72 36" aria-hidden="true"><path d="M8 20C6 8 28 2 44 3c16 1 26 8 24 16-2 9-18 14-34 13C18 31 6 26 8 16"/></svg></span></span>'],
+      ], overlay: commentPin(536, 296) }), annotateBar('marker'))}
+    <aside class="panel" aria-label="Annotations">
+      ${panelTop({ tab: 'All', count: '5 annotations', filters: ['Chapter 1', 'Ask Daniel'] })}
       <ul class="rows">
-        ${row('marker', 'Highlight', 'late fee of $45')}
-        ${row('pin', 'Note', 'Ask Daniel whether the late fee can go down to $30.')}
-        ${row('pen', 'Pen drawing', 'Around $1,760')}
-        ${row('underline', 'Underline', '60 days in writing')}
-        ${row('strike', 'Strikethrough', 'Pets remain subject to')}
+        ${row({ kind: 'marker', title: 'Highlight', sub: 'late fee of $45', tags: ['Chapter 1'] })}
+        ${row({ kind: 'comment', words: 'Ask Daniel whether the late fee can go down to $30.', tags: ['Ask Daniel'] })}
+        ${row({ kind: 'pen', title: 'Pen drawing', sub: 'Around $1,760' })}
+        ${row({ kind: 'underline', title: 'Underline', sub: '60 days in writing' })}
+        ${row({ kind: 'strike', title: 'Strikethrough', sub: 'Pets remain subject to' })}
       </ul>
-      <div class="panel-foot"><p>Annotations can be changed later in other PDF apps. Your original file stays unchanged.</p></div>
+      <div class="panel-foot"><p>Annotations can be changed after saving, too. Your original file stays unchanged.</p></div>
     </aside>
   </div>
   ${status({ hint: 'Pick a tool, then drag on the page', extra: '' })}`,
-    };
-  },
+  }),
+
+  'annotations-markup': ({ p }) => ({
+    title: 'Annotate', file: LEASE,
+    content: `${bar({ p, mode: 'note', file: LEASE, state: '7 unsaved changes' })}
+  <div class="body">
+    ${thumbs(7)}
+    ${stage(lease({ swap: [
+        ['A late fee of $45', 'A <mark>late fee of $45</mark>'],
+        ['60 days in writing', '<span class="a-under">60 days in writing</span>'],
+        ['Pets remain subject to', '<span class="a-strike">Pets remain subject to</span>'],
+        ['<td><span class="ln">$1,760</span>', '<td><span class="ln"><span class="a-circle">$1,760<svg viewBox="0 0 72 36" aria-hidden="true"><path d="M8 20C6 8 28 2 44 3c16 1 26 8 24 16-2 9-18 14-34 13C18 31 6 26 8 16"/></svg></span></span>'],
+      ], overlay: commentPin(536, 296) }), annotateBar('marker'))}
+    <aside class="panel" aria-label="Annotations">
+      ${panelTop({ tab: 'Markup', count: '3 of 5', filters: ['Chapter 1', 'Ask Daniel'] })}
+      <ul class="rows">
+        ${row({ kind: 'marker', title: 'Highlight', sub: 'late fee of $45', tags: ['Chapter 1'] })}
+        ${row({ kind: 'underline', title: 'Underline', sub: '60 days in writing' })}
+        ${row({ kind: 'strike', title: 'Strikethrough', sub: 'Pets remain subject to' })}
+      </ul>
+      <div class="panel-foot"><p>Annotations can be changed after saving, too. Your original file stays unchanged.</p></div>
+    </aside>
+  </div>
+  ${status({ hint: 'Pick a tool, then drag on the page', extra: '' })}`,
+  }),
+
+  'annotations-drawings': ({ p }) => ({
+    title: 'Annotate', file: LEASE,
+    content: `${bar({ p, mode: 'note', file: LEASE, state: '7 unsaved changes' })}
+  <div class="body">
+    ${thumbs(7)}
+    ${stage(lease({ swap: [
+        ['A late fee of $45', 'A <mark>late fee of $45</mark>'],
+        ['60 days in writing', '<span class="a-under">60 days in writing</span>'],
+        ['Pets remain subject to', '<span class="a-strike">Pets remain subject to</span>'],
+        ['<td><span class="ln">$1,760</span>', '<td><span class="ln"><span class="a-circle">$1,760<svg viewBox="0 0 72 36" aria-hidden="true"><path d="M8 20C6 8 28 2 44 3c16 1 26 8 24 16-2 9-18 14-34 13C18 31 6 26 8 16"/></svg></span></span>'],
+      ], overlay: commentPin(536, 296) }), annotateBar('marker'))}
+    <aside class="panel" aria-label="Annotations">
+      ${panelTop({ tab: 'Drawings', count: '1 of 5', filters: ['Chapter 1', 'Ask Daniel'] })}
+      <ul class="rows">
+        ${row({ kind: 'pen', title: 'Pen drawing', sub: 'Around $1,760' })}
+      </ul>
+      <div class="panel-foot"><p>Annotations can be changed after saving, too. Your original file stays unchanged.</p></div>
+    </aside>
+  </div>
+  ${status({ hint: 'Pick a tool, then drag on the page', extra: '' })}`,
+  }),
 
   // ---------- Phase 4b: comments, tabs and tags ----------
   comment: ({ p }) => ({
@@ -498,9 +530,9 @@ function signatureDialog({ p }, tab) {
 
 const groups = [
   ['Start', ['start']],
-  ['Editor modes', ['select', 'edit-text', 'annotate', 'sign', 'pages']],
+  ['Editor modes', ['select', 'edit-text', 'sign', 'pages']],
   ['Signature dialog', ['signature-draw', 'signature-type', 'signature-upload']],
-  ['Comments, tabs and tags', ['comment', 'annotations-document', 'annotations-tagging', 'annotations-saved']],
+  ['Comments, tabs and tags', ['annotate', 'comment', 'annotations-markup', 'annotations-drawings', 'annotations-document', 'annotations-tagging', 'annotations-saved']],
   ['Forms', ['form']],
   ['Notices and errors', ['font-notice', 'update', 'error-open', 'error-save']],
   ['Signed and scanned PDFs', ['signed-view', 'signed-warning', 'scanned-page']],

@@ -79,22 +79,23 @@ a.tool { color: inherit; text-decoration: none; }
 
 /* The annotation panel: where they're from, what kind, and which tag. */
 .scope { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-1); padding: var(--space-1); border-radius: var(--radius-md); background: var(--chrome-sunken); }
-.scope button { height: 24px; padding: 0 var(--space-2); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-muted); font: 500 var(--text-sm) / var(--line-sm) var(--font-ui); cursor: pointer; }
-.scope button:hover { color: var(--text); }
-.scope button[aria-pressed="true"] { background: var(--chrome-raised); color: var(--text); font-weight: 600; box-shadow: 0 0 0 1px var(--line); }
+.scope a { display: grid; place-items: center; height: 24px; text-decoration: none; padding: 0 var(--space-2); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-muted); font: 500 var(--text-sm) / var(--line-sm) var(--font-ui); cursor: pointer; }
+.scope a:hover { color: var(--text); }
+.scope a[aria-current="true"] { background: var(--chrome-raised); color: var(--text); font-weight: 600; box-shadow: 0 0 0 1px var(--line); }
 .panel-tabs { display: flex; gap: var(--space-3); margin-top: var(--space-2); border-bottom: 1px solid var(--line); }
-.panel-tabs button { height: 32px; padding: 0; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--text-muted); font: 500 var(--text-sm) / var(--line-sm) var(--font-ui); cursor: pointer; }
-.panel-tabs button:hover { color: var(--text); }
-.panel-tabs button[aria-selected="true"] { border-bottom-color: var(--accent); color: var(--text); font-weight: 600; }
+.panel-tabs a { display: grid; place-items: center; height: 32px; text-decoration: none; padding: 0; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--text-muted); font: 500 var(--text-sm) / var(--line-sm) var(--font-ui); cursor: pointer; }
+.panel-tabs a:hover { color: var(--text); }
+.panel-tabs a[aria-selected="true"] { border-bottom-color: var(--accent); color: var(--text); font-weight: 600; }
 .tag-filters, .tag-offers { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); }
 .tag-filters { margin-top: var(--space-2); }
-.tag-btn { min-height: 24px; padding: 0 var(--space-2); border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: transparent; color: var(--text); font: 500 var(--text-sm) / var(--line-sm) var(--font-ui); cursor: pointer; }
+.tag-btn { display: inline-grid; place-items: center; text-decoration: none; min-height: 24px; padding: 0 var(--space-2); border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: transparent; color: var(--text); font: 500 var(--text-sm) / var(--line-sm) var(--font-ui); cursor: pointer; }
 .tag-btn:hover { background: var(--chrome-sunken); }
-.tag-btn[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-soft-text); font-weight: 600; }
+.tag-btn[aria-current="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-soft-text); font-weight: 600; }
 .tag { display: inline-flex; align-items: center; min-height: 20px; padding: 0 var(--space-1); border-radius: var(--radius-sm); background: var(--chrome-sunken); color: var(--text-muted); font-size: var(--text-sm); line-height: var(--line-sm); }
 .tag.is-removable { gap: var(--space-1); min-height: 24px; padding-right: 0; color: var(--text); }
 .tag.is-removable button { display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; background: transparent; color: var(--text-muted); cursor: pointer; }
 .tag.is-removable .icon { width: 12px; height: 12px; }
+.row-link { color: inherit; text-decoration: none; }
 .tag-offers-label { flex-basis: 100%; }
 .row-words { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .row-tags { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-top: var(--space-1); }
