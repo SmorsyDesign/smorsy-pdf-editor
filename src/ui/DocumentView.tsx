@@ -316,6 +316,7 @@ export function DocumentView({
           (signedLocked ? 'Signature unchanged' : 'Your original file stays unchanged')
         }
         percent={percent}
+        showsZoom={!pagesMode}
         fitting={zoom.fitting}
         onFit={fit}
         onZoomOut={() => {

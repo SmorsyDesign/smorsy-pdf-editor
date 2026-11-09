@@ -235,9 +235,11 @@ export function PagesView({
         {layout.map((slot, index) => {
           const position = index + 1;
           const size = pageSizes[index];
-          const zoom = size
-            ? Math.floor(Math.min(SHEET.width / size.width, SHEET.height / size.height) * 100)
-            : 1;
+          // Fitted on screen pixels, which is what a zoom of 100 per cent gives.
+          const natural = size ? displayedPageSize(size, 100) : SHEET;
+          const zoom = Math.floor(
+            Math.min(SHEET.width / natural.width, SHEET.height / natural.height) * 100,
+          );
           const shown = size ? displayedPageSize(size, zoom) : SHEET;
           const isSelected = selected.has(position);
           const changes = changesOn(position);

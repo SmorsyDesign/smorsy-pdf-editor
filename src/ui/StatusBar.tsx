@@ -13,6 +13,8 @@ interface StatusBarProps {
   readonly onFit: () => void;
   readonly onZoomOut: () => void;
   readonly onZoomIn: () => void;
+  /** Pages mode shows every page small, which zooming doesn't apply to. */
+  readonly showsZoom?: boolean;
 }
 
 export function StatusBar({
@@ -26,6 +28,7 @@ export function StatusBar({
   onFit,
   onZoomOut,
   onZoomIn,
+  showsZoom = true,
 }: StatusBarProps) {
   return (
     <footer className="status">
@@ -41,36 +44,38 @@ export function StatusBar({
       </div>
       <div className="status-part">
         <span role="status">{message}</span>
-        <div className="zoom" role="group" aria-label="Zoom">
-          <button
-            className="icon-btn"
-            aria-label="Fit to width"
-            title={`Fit to width (${shortcutLabel(os, '9')})`}
-            aria-pressed={fitting}
-            onClick={onFit}
-          >
-            <Icon name="fit" />
-          </button>
-          <button
-            className="icon-btn"
-            aria-label="Zoom out"
-            title={`Zoom out (${shortcutLabel(os, '-')})`}
-            onClick={onZoomOut}
-          >
-            <Icon name="minus" />
-          </button>
-          <span className="zoom-value" data-testid="zoom-value" aria-live="polite">
-            {percent}%
-          </span>
-          <button
-            className="icon-btn"
-            aria-label="Zoom in"
-            title={`Zoom in (${shortcutLabel(os, '=')})`}
-            onClick={onZoomIn}
-          >
-            <Icon name="plus" />
-          </button>
-        </div>
+        {showsZoom && (
+          <div className="zoom" role="group" aria-label="Zoom">
+            <button
+              className="icon-btn"
+              aria-label="Fit to width"
+              title={`Fit to width (${shortcutLabel(os, '9')})`}
+              aria-pressed={fitting}
+              onClick={onFit}
+            >
+              <Icon name="fit" />
+            </button>
+            <button
+              className="icon-btn"
+              aria-label="Zoom out"
+              title={`Zoom out (${shortcutLabel(os, '-')})`}
+              onClick={onZoomOut}
+            >
+              <Icon name="minus" />
+            </button>
+            <span className="zoom-value" data-testid="zoom-value" aria-live="polite">
+              {percent}%
+            </span>
+            <button
+              className="icon-btn"
+              aria-label="Zoom in"
+              title={`Zoom in (${shortcutLabel(os, '=')})`}
+              onClick={onZoomIn}
+            >
+              <Icon name="plus" />
+            </button>
+          </div>
+        )}
       </div>
     </footer>
   );
