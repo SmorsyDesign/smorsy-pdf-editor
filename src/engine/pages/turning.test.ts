@@ -44,11 +44,11 @@ describe('turning a page', () => {
 describe('turning what’s on a page', () => {
   const common = { id: 'a', pageNumber: 1, color: { r: 0, g: 0, b: 0 } };
 
-  it('keeps a comment upright, with its corner on the same spot', () => {
+  it('puts a comment where a viewer draws it once the page turns', () => {
     const comment: Annotation = { ...common, kind: 'comment', at: { x: 100, y: 76 }, text: 'x' };
-    const turned = turnAnnotation(comment, page, 1);
-    // The spot was (100, 100). A quarter turn puts it at (700, 100).
-    expect(turned).toMatchObject({ at: { x: 700, y: 76 } });
+    // Its box ran from (100, 76) to (124, 100). A quarter turn puts that at (700, 100) to (724, 124).
+    expect(turnAnnotation(comment, page, 1)).toMatchObject({ at: { x: 700, y: 100 } });
+    expect(turnAnnotation(comment, page, 2)).toMatchObject({ at: { x: 476, y: 700 } });
   });
 
   it('turns a text box about its corner, and its angle with it', () => {

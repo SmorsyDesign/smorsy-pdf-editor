@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { copyFileName, extractFileName } from '../engine/copy';
 import { PLAIN_PROBLEM, UNSUPPORTED_TEXT } from '../engine/errors';
 import { openDocument } from '../engine/document';
@@ -68,6 +68,11 @@ export function useSaveFlow({
   } | null>(null);
   const afterSave = useRef<(() => void) | null>(null);
   const [extracted, setExtracted] = useState('');
+  // Only until something changes, after which it would be news about a document that's moved on.
+  const { changes } = editor;
+  useEffect(() => {
+    setExtracted('');
+  }, [changes, file]);
   const saveNote = useRef<string | null>(null);
   const shownNote = useRef<string | null>(null);
   const current = saved?.file === file ? saved : null;
@@ -106,6 +111,7 @@ export function useSaveFlow({
 
   const writeTo = useCallback(
     async (target: OpenedFile, path: string, overOriginal: boolean): Promise<Outcome> => {
+      setExtracted('');
       try {
         const { bytes, edited, entry, fieldsRetired, fieldsOnTop, annotationsRetired } =
           await buildBytes();
@@ -204,13 +210,16 @@ export function useSaveFlow({
             });
             return 'stopped';
           }
-          const { bytes } = await buildBytes(positions);
+          const { bytes, fieldsRetired, fieldsOnTop, annotationsRetired } =
+            await buildBytes(positions);
           const check = await openDocument(bytes);
           await check.close();
           await platform.writeFile(path, bytes);
           setExtracted(
             positions.size === 1 ? 'Page saved as a new file' : 'Pages saved as a new file',
           );
+          // The same notes as any save, since the new file can have had fields flattened too.
+          reportProblem(explainFormChanges(fieldsRetired, fieldsOnTop, annotationsRetired));
           return 'saved';
         } catch (error) {
           showDialog(failureDialog(error, 'build-failed'));
@@ -228,7 +237,9 @@ export function useSaveFlow({
   }, [settle]);
 
   return {
-    announcement: extracted || (current?.message ?? ''),
+    announcement: current?.message ?? '',
+    /** Says pages went to a new file, which is news whether or not this document has unsaved changes. */
+    extracted,
     /** What to say about the original, once saying it's unchanged would be untrue. */
     originalNote: current?.originalChanged
       ? current.overOriginal

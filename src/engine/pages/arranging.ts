@@ -32,6 +32,8 @@ export function editsOnFilePages(
   // Which page a text box or signature is on, for edits that name only its id.
   const pageOfText = new Map<string, number>();
   const pageOfSignature = new Map<string, number>();
+  // As kept on the file's page, for a signature moved without its angle being restated.
+  const angleOfSignature = new Map<string, number>();
   const result: Edit[] = [];
 
   /** Undoes the page's turning, from how it's shown at this moment back to the file's own page. */
@@ -77,6 +79,10 @@ export function editsOnFilePages(
         const page = onFilePage(edit.placement.pageNumber);
         if (!page) break;
         pageOfSignature.set(edit.placement.id, page.source);
+        angleOfSignature.set(
+          edit.placement.id,
+          turnSignatureAngle(edit.placement.angle, page.back),
+        );
         result.push({
           ...edit,
           placement: {
@@ -97,7 +103,22 @@ export function editsOnFilePages(
           result.push(edit);
           break;
         }
+        // Moved to a page turned differently, it keeps looking the way it did, so its angle on the
+        // file's page changes even though the move didn't mention one.
+        let { angle } = changes;
+        if (
+          angle === undefined &&
+          changes.pageNumber !== undefined &&
+          currentSource !== undefined
+        ) {
+          const fromPosition = positionOf(layout, currentSource);
+          const fromSlot = fromPosition === null ? undefined : layout[fromPosition - 1];
+          const before = angleOfSignature.get(edit.id);
+          if (fromSlot && before !== undefined) angle = turnSignatureAngle(before, fromSlot.turns);
+        }
         if (changes.pageNumber !== undefined) pageOfSignature.set(edit.id, page.source);
+        const fileAngle = angle === undefined ? undefined : turnSignatureAngle(angle, page.back);
+        if (fileAngle !== undefined) angleOfSignature.set(edit.id, fileAngle);
         result.push({
           ...edit,
           changes: {
@@ -106,9 +127,7 @@ export function editsOnFilePages(
             ...(changes.rect
               ? { rect: turnPlacementRect(changes.rect, page.shown, page.back) }
               : {}),
-            ...(changes.angle === undefined
-              ? {}
-              : { angle: turnSignatureAngle(changes.angle, page.back) }),
+            ...(fileAngle === undefined ? {} : { angle: fileAngle }),
           },
         });
         break;

@@ -144,6 +144,29 @@ describe('text boxes and signatures', () => {
     expect(shownBox?.angle).toBe(90);
   });
 
+  it('a signature moved to a page turned differently keeps looking the same', () => {
+    const placed = {
+      id: 's',
+      pageNumber: 1,
+      rect: { x: 100, y: 100, width: 200, height: 100 },
+      angle: 0,
+      image: { id: 'i' },
+    } as unknown as PlacedSignature;
+    const turned = turnPages(identityLayout(3), new Set([2]), 1);
+    const edits: Edit[] = [
+      { kind: 'place-signature', placement: placed },
+      arrange(turned),
+      { kind: 'update-signature', id: 's', changes: { pageNumber: 2, rect: placed.rect } },
+    ];
+    const layout = deriveLayout(edits, 3);
+    const [shownPlaced] = signaturesShown(
+      deriveSignatures(editsOnFilePages(edits, sizes)),
+      layout,
+      sizes,
+    );
+    expect(shownPlaced).toMatchObject({ pageNumber: 2, angle: 0, rect: placed.rect });
+  });
+
   it('a signature moved to a turned page lands where it was put', () => {
     const placed = {
       id: 's',

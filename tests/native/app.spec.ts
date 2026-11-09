@@ -313,6 +313,12 @@ describe('the built app', () => {
     const saved = await PDFDocument.load(new Uint8Array(readFileSync(target)));
     expect(saved.getPageCount()).toBe(3);
     expect(saved.getPage(1).getRotation().angle).toBe(90);
+    // Page 3 is second now. Its size is the same, so the check is which page object came along.
+    const original = await PDFDocument.load(new Uint8Array(readFileSync(plainText)));
+    const words = (doc: PDFDocument, index: number) =>
+      doc.getPage(index).node.normalizedEntries().Contents?.toString() ?? '';
+    expect(words(saved, 1).length).toBeGreaterThan(0);
+    expect(saved.getPage(1).getSize()).toEqual(original.getPage(2).getSize());
   });
 
   it('fills in a form and saves it through the real app', async () => {

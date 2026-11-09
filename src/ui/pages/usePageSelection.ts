@@ -14,7 +14,19 @@ export function usePageSelection() {
   return {
     selected,
     focused,
-    setFocused,
+    /** Moving with the keyboard alone also moves where a Shift range starts. */
+    setFocused: useCallback((position: number) => {
+      setFocused(position);
+      setAnchor(position);
+    }, []),
+    /** After pages change some other way, such as undo, choices no longer mean the same pages. */
+    /** Focus arriving by click or Tab, which shouldn't move where a Shift range starts. */
+    markFocused: setFocused,
+    reset: useCallback((count: number) => {
+      setSelected(new Set());
+      setFocused((current) => Math.min(Math.max(1, current), Math.max(1, count)));
+      setAnchor(1);
+    }, []),
     /** A plain click picks just this page, the way a file list does. */
     pick: useCallback((position: number) => {
       setSelected(new Set([position]));

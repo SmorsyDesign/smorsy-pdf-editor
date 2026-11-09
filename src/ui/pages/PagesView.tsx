@@ -1,4 +1,4 @@
-import { useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { PdfDocument } from '../../engine/document';
 import {
   movePages,
@@ -27,6 +27,8 @@ interface PagesViewProps {
   readonly onArrange: (layout: Layout, group?: string) => void;
   readonly onExtract: (positions: ReadonlySet<number>) => void;
   readonly onOpenPage: (position: number) => void;
+  /** Turning works from each page's size, so nothing can change until every page is measured. */
+  readonly ready: boolean;
 }
 
 interface Dragging {
@@ -48,16 +50,30 @@ export function PagesView({
   onArrange,
   onExtract,
   onOpenPage,
+  ready,
 }: PagesViewProps) {
   const gridRef = useRef<HTMLOListElement>(null);
   const visible = useVisibleItems(gridRef, 'data-tile', '400px 0px', layout.length);
   const [dragging, setDragging] = useState<Dragging | null>(null);
   const [said, setSaid] = useState('');
+  // The layout this view last produced. Any other one came from undo or redo.
+  const produced = useRef(layout);
+  useEffect(() => {
+    if (layout === produced.current) return;
+    produced.current = layout;
+    selection.reset(layout.length);
+  }, [layout, selection]);
+  /** A live region repeats nothing, so the same words twice need telling apart. */
+  const say = (message: string) => {
+    setSaid((current) => (current === message ? `${message}\u00a0` : message));
+  };
   const pressed = useRef<{ x: number; y: number; position: number } | null>(null);
   const { selected, focused } = selection;
   const count = layout.length;
-  // Something to act on: what's chosen, or failing that the page with the keyboard.
-  const target = selected.size > 0 ? selected : new Set([focused]);
+  // Something to act on: what's chosen, or failing that the page with the keyboard. Only pages that
+  // exist, in case anything is out of step.
+  const chosen = new Set([...selected].filter((position) => position >= 1 && position <= count));
+  const target = chosen.size > 0 ? chosen : new Set([Math.min(focused, count)]);
   const everything = target.size >= count;
   const pageWord = (size: number) => (size === 1 ? 'page' : 'pages');
 
@@ -70,18 +86,20 @@ export function PagesView({
   /** Turning keeps pages where they are, and moving keeps the same slots, so either can be followed. */
   const rearrange = (next: Layout, moving: ReadonlySet<number>, message: string) => {
     const slots = [...moving].map((position) => layout[position - 1]).filter(Boolean) as PageSlot[];
+    produced.current = next;
     onArrange(next);
     const found = positionsOf(slots, next);
     const after = found.size === moving.size ? found : moving;
     const focus = Math.min(...after);
     selection.replace(after, focus);
-    setSaid(message);
+    say(message);
     requestAnimationFrame(() => {
       focusTile(focus);
     });
   };
 
   const turn = (by: 1 | -1) => {
+    if (!ready) return;
     rearrange(
       turnPages(layout, target, by),
       target,
@@ -90,24 +108,35 @@ export function PagesView({
   };
 
   const move = (before: number, moving: ReadonlySet<number> = target) => {
+    if (!ready) return;
     const next = movePages(layout, moving, before);
     if (next.every((slot, index) => slot === layout[index])) return;
     rearrange(next, moving, `Moved ${String(moving.size)} ${pageWord(moving.size)}`);
   };
 
   const remove = () => {
-    if (everything) return;
+    if (everything || !ready) {
+      say(
+        everything
+          ? 'A document needs at least one page, so they can’t all be deleted.'
+          : 'Still measuring the pages. Try again in a moment.',
+      );
+      return;
+    }
     const first = Math.min(...target);
-    onArrange(removePages(layout, target));
+    const next = removePages(layout, target);
+    produced.current = next;
+    onArrange(next);
     selection.clear();
     const focus = Math.min(first, count - target.size);
     selection.setFocused(focus);
-    setSaid(`Deleted ${String(target.size)} ${pageWord(target.size)}. Undo brings them back.`);
+    say(`Deleted ${String(target.size)} ${pageWord(target.size)}. Undo brings them back.`);
     requestAnimationFrame(() => {
       focusTile(focus);
     });
   };
 
+  const measuring = ready ? null : 'Still measuring the pages. Try again in a moment.';
   const earliest = Math.min(...target);
   const latest = Math.max(...target);
 
@@ -169,8 +198,19 @@ export function PagesView({
     return x < box.left + box.width / 2 ? position : position + 1;
   };
 
-  const tool = (icon: IconName, label: string, action: () => void, disabled: boolean) => (
-    <button type="button" className="tool" title={label} disabled={disabled} onClick={action}>
+  /** Unavailable tools stay focusable, so the reason they can't be used can be heard and seen. */
+  const tool = (icon: IconName, label: string, action: () => void, unavailable: string | null) => (
+    <button
+      type="button"
+      className="tool"
+      title={unavailable ?? label}
+      aria-disabled={unavailable !== null}
+      {...(unavailable ? { 'aria-description': unavailable } : {})}
+      onClick={() => {
+        if (unavailable === null) action();
+        else say(unavailable);
+      }}
+    >
       <Icon name={icon} />
       <span className="tool-label">{label}</span>
     </button>
@@ -185,7 +225,7 @@ export function PagesView({
           () => {
             turn(-1);
           },
-          false,
+          measuring,
         )}
         {tool(
           'rotr',
@@ -193,7 +233,7 @@ export function PagesView({
           () => {
             turn(1);
           },
-          false,
+          measuring,
         )}
         <span className="sep" />
         {tool(
@@ -202,7 +242,7 @@ export function PagesView({
           () => {
             move(Math.max(1, earliest - 1));
           },
-          earliest <= 1,
+          measuring ?? (earliest <= 1 ? 'The first page can’t move any earlier.' : null),
         )}
         {tool(
           'down',
@@ -210,17 +250,22 @@ export function PagesView({
           () => {
             move(Math.min(count + 1, latest + 2));
           },
-          latest >= count,
+          measuring ?? (latest >= count ? 'The last page can’t move any later.' : null),
         )}
         <span className="sep" />
-        {tool('trash', 'Delete', remove, everything)}
+        {tool(
+          'trash',
+          'Delete',
+          remove,
+          measuring ?? (everything ? 'A document needs at least one page.' : null),
+        )}
         {tool(
           'extract',
           'Extract',
           () => {
             onExtract(target);
           },
-          false,
+          null,
         )}
       </div>
       <p className="visually-hidden" role="status">
@@ -258,7 +303,7 @@ export function PagesView({
                 aria-label={`Page ${String(position)}${tag ? `, ${tag}` : ''}`}
                 tabIndex={position === focused ? 0 : -1}
                 onFocus={() => {
-                  selection.setFocused(position);
+                  selection.markFocused(position);
                 }}
                 onClick={(event) => {
                   const modifier = event.metaKey || event.ctrlKey;
@@ -277,7 +322,7 @@ export function PagesView({
                   const start = pressed.current;
                   if (!start) return;
                   const travelled = Math.hypot(event.clientX - start.x, event.clientY - start.y);
-                  if (!dragging && travelled < DRAG_START) return;
+                  if (!ready || (!dragging && travelled < DRAG_START)) return;
                   if (!dragging) {
                     event.currentTarget.setPointerCapture(event.pointerId);
                     const moving = selected.has(start.position)

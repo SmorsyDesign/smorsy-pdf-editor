@@ -37,6 +37,7 @@ interface DocumentViewProps {
   readonly document: PdfDocument;
   readonly os: OsFamily;
   readonly announcement: string;
+  readonly extracted: string;
   readonly originalNote: string | null;
   readonly onUnsavedWorkChange: (unsaved: boolean) => void;
   readonly editor: DocumentEditor;
@@ -54,6 +55,7 @@ export function DocumentView({
   document: filePdf,
   os,
   announcement,
+  extracted,
   originalNote,
   onUnsavedWorkChange,
   editor,
@@ -194,6 +196,7 @@ export function DocumentView({
               editor.apply({ kind: 'arrange-pages', layout: next });
             }}
             onExtract={onExtract}
+            ready={fileSizes.every((size) => size !== undefined)}
             onOpenPage={(position) => {
               setMode('select');
               requestAnimationFrame(() => scrollToPageRef.current?.(position));
@@ -312,7 +315,7 @@ export function DocumentView({
         }
         fontsReplaced={editor.substitutedFonts}
         message={
-          ((editor.changes === 0 && announcement) || originalNote) ??
+          (extracted || (editor.changes === 0 && announcement) || originalNote) ??
           (signedLocked ? 'Signature unchanged' : 'Your original file stays unchanged')
         }
         percent={percent}

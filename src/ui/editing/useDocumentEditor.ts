@@ -226,6 +226,11 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
       const filled = [...deriveFieldAnswers(edits)];
       const lock = deriveLock(edits);
       const layout = keep ? keepPages(now.layout, keep) : now.layout;
+      const kept = new Set(layout.map((slot) => slot.source));
+      const keptOnly = <T extends { readonly pageNumber: number }>(items: readonly T[]) =>
+        fileSizesRef.current.length === 0
+          ? items
+          : items.filter((item) => kept.has(item.pageNumber));
       const nothingToDo =
         active.length === 0 &&
         placed.length === 0 &&
@@ -253,8 +258,8 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
         clientRef.current = createClientRef.current();
         client = await clientRef.current;
       }
-      const report = await client.save(active, placed, {
-        annotations: marks,
+      const report = await client.save(keptOnly(active), keptOnly(placed), {
+        annotations: keptOnly(marks),
         removedSaved: removed,
         answers: filled,
         lock,

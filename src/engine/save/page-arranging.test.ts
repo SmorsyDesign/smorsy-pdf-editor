@@ -237,15 +237,88 @@ describe('saving arranged pages', () => {
     expect(notes.map((note) => note.text)).toEqual(['On page two']);
   });
 
+  it('erases a removed page’s thumbnail, picture masks, attached files and tags', async () => {
+    const original = await numbered(2, (doc) => {
+      const { context } = doc;
+      const secret = (mark: string) =>
+        context.register(
+          context.formXObject([], { BBox: [0, 0, 1, 1], Mark: PDFHexString.fromText(mark) }),
+        );
+      const page = doc.getPage(1);
+      page.node.set(PDFName.of('Thumb'), secret('Removed thumbnail'));
+      const mask = secret('Removed mask');
+      const picture = context.register(
+        context.formXObject([], { BBox: [0, 0, 1, 1], SMask: mask }),
+      );
+      page.node.newXObject('Picture', picture);
+      const file = secret('Removed attachment');
+      page.node.addAnnot(
+        context.register(
+          context.obj({
+            Type: 'Annot',
+            Subtype: 'FileAttachment',
+            Rect: [1, 1, 9, 9],
+            FS: { Type: 'Filespec', EF: { F: file } },
+          }),
+        ),
+      );
+      const tag = context.register(
+        context.obj({
+          Type: 'StructElem',
+          S: 'P',
+          Alt: PDFHexString.fromText('Removed tag'),
+          Pg: page.ref,
+        }),
+      );
+      doc.catalog.set(
+        PDFName.of('StructTreeRoot'),
+        context.register(context.obj({ Type: 'StructTreeRoot', K: tag })),
+      );
+    });
+    const saved = await arranged(original, removePages(identityLayout(2), new Set([2])));
+    const doc = await PDFDocument.load(saved);
+    const everything = [...doc.context.enumerateIndirectObjects()]
+      .map(([, object]) => (object instanceof PDFStream ? object.dict.toString() : String(object)))
+      .join(' ');
+    expect(everything).not.toContain('Removed');
+    expect(doc.catalog.has(PDFName.of('StructTreeRoot'))).toBe(false);
+  });
+
+  it('doesn’t open on a page that’s gone', async () => {
+    const original = await numbered(2, (doc) => {
+      doc.catalog.set(PDFName.of('OpenAction'), doc.context.obj([doc.getPage(1).ref, 'Fit']));
+    });
+    const saved = await PDFDocument.load(
+      await arranged(original, removePages(identityLayout(2), new Set([2]))),
+    );
+    expect(saved.catalog.has(PDFName.of('OpenAction'))).toBe(false);
+  });
+
+  it('keeps a field’s boxes on pages that stay, and their looks', async () => {
+    const original = await numbered(2, (doc) => {
+      const group = doc.getForm().createRadioGroup('choice');
+      group.addOptionToPage('a', doc.getPage(0));
+      group.addOptionToPage('b', doc.getPage(1));
+    });
+    const saved = await PDFDocument.load(
+      await arranged(original, removePages(identityLayout(2), new Set([2]))),
+    );
+    const widgets = saved.getForm().getRadioGroup('choice').acroField.getWidgets();
+    expect(widgets).toHaveLength(1);
+    expect(widgets[0]?.getNormalAppearance()).toBeDefined();
+  });
+
   it('makes a new file of just some pages', async () => {
     const saved = await arranged(await numbered(), keepPages(identityLayout(4), new Set([3, 1])));
     expect(await firstLines(saved)).toEqual(['Page 1 words', 'Page 3 words']);
   });
 
-  it('leaves the file as it was when nothing has moved', async () => {
+  it('leaves the pages alone when nothing has moved', async () => {
     const original = await numbered(2);
-    const before = await PDFDocument.load(original);
     const saved = await PDFDocument.load(await arranged(original, identityLayout(2)));
-    expect(saved.getPageCount()).toBe(before.getPageCount());
+    const before = await PDFDocument.load(original);
+    expect(saved.getPages().map((page) => page.ref.toString())).toEqual(
+      before.getPages().map((page) => page.ref.toString()),
+    );
   });
 });

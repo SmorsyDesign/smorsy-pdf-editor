@@ -4,6 +4,7 @@ import {
   PDFName,
   PDFNumber,
   PDFRef,
+  PDFStream,
   degrees,
   type PDFContext,
   type PDFDocument,
@@ -11,55 +12,78 @@ import {
   type PDFPage,
 } from '@cantoo/pdf-lib';
 import { isIdentity, type Layout } from '../pages/layout';
-import { eraseAnnotation, looksOf, partsInResources } from './annotation-erasing';
+import { eraseAnnotation } from './annotation-erasing';
 import { name } from './page-annotations';
 
 // A page inherits these from the page tree above it, which it leaves when it's moved.
 const INHERITED = ['MediaBox', 'CropBox', 'Rotate', 'Resources'];
-const WORDS_KEYS = ['Contents', 'RC', 'T', 'Subj'];
 
-function refsIn(context: PDFContext, value: PDFObject | undefined, found: Set<PDFRef>): void {
-  if (value instanceof PDFRef) found.add(value);
-  const target = context.lookup(value);
-  if (target instanceof PDFArray) {
-    for (const item of target.asArray()) if (item instanceof PDFRef) found.add(item);
+/**
+ * Everything reachable from a starting object: its drawing, pictures and their masks, fonts,
+ * thumbnails, attached files, annotations and the rest. It stops at other pages and at what points
+ * back up, so a page's own things come out, not the whole document. Run for the pages that stay as
+ * well as the ones that go, so anything they share is kept.
+ */
+function reachable(
+  context: PDFContext,
+  start: PDFObject | undefined,
+  found: Set<PDFRef>,
+  self?: PDFDict,
+): void {
+  const stack: (PDFObject | undefined)[] = [start];
+  const seen = new Set<object>();
+  while (stack.length > 0) {
+    const value = stack.pop();
+    if (value instanceof PDFRef) {
+      if (found.has(value)) continue;
+      const target = context.lookup(value);
+      // Another page is reached through a link, and it isn't this page's to take.
+      if (
+        target instanceof PDFDict &&
+        target !== self &&
+        target.get(name('Type')) === PDFName.of('Page')
+      ) {
+        continue;
+      }
+      found.add(value);
+      stack.push(target);
+      continue;
+    }
+    if (value === undefined || seen.has(value)) continue;
+    seen.add(value);
+    const dict = value instanceof PDFStream ? value.dict : value;
+    if (dict instanceof PDFDict) {
+      for (const [key, item] of dict.entries()) {
+        if (!UPWARD.has(key.decodeText())) stack.push(item);
+      }
+    } else if (dict instanceof PDFArray) {
+      stack.push(...dict.asArray());
+    }
   }
 }
 
-/** Everything a page holds that's its own: its drawing, pictures and annotations. */
+// Keys that point back up to the page tree, a parent field or the page an annotation is on.
+const UPWARD = new Set(['Parent', 'P', 'Pg', 'Obj', 'StructTreeRoot']);
+
 function partsOfPage(context: PDFContext, page: PDFPage, found: Set<PDFRef>): void {
   found.add(page.ref);
-  refsIn(context, page.node.get(name('Contents')), found);
-  partsInResources(context, page.node.get(name('Resources')), found);
-  const list = page.node.get(name('Annots'));
-  refsIn(context, list, found);
-  const annotations = context.lookup(list);
-  if (!(annotations instanceof PDFArray)) return;
-  for (const entry of annotations.asArray()) {
-    const annotation = context.lookup(entry);
-    if (!(annotation instanceof PDFDict)) continue;
-    looksOf(context, annotation, found);
-    refsIn(context, annotation.get(name('Popup')), found);
-    for (const key of WORDS_KEYS) refsIn(context, annotation.get(name(key)), found);
-  }
+  reachable(context, page.node, found, page.node);
 }
 
-/** Every object a form's fields refer to, which stays even if one of its boxes was on a page that went. */
+/** Everything the form refers to, which stays whichever pages its fields were on. */
 function formParts(doc: PDFDocument, found: Set<PDFRef>): void {
-  const { context } = doc;
-  const form = context.lookup(doc.catalog.get(name('AcroForm')));
-  if (!(form instanceof PDFDict)) return;
-  const visit = (value: PDFObject | undefined, depth: number) => {
-    if (depth > 32) return;
-    if (value instanceof PDFRef) {
-      if (found.has(value)) return;
-      found.add(value);
-    }
-    const target = context.lookup(value);
-    if (target instanceof PDFArray) for (const item of target.asArray()) visit(item, depth + 1);
-    if (target instanceof PDFDict) visit(target.get(name('Kids')), depth + 1);
-  };
-  visit(form.get(name('Fields')), 0);
+  reachable(doc.context, doc.catalog.get(name('AcroForm')), found);
+}
+
+/**
+ * The tags screen readers use describe every page, including any text on pages that are going. A
+ * tree can't be trimmed reliably, so it goes, which also takes those pages' words out of the file.
+ */
+function dropStructure(doc: PDFDocument, going: Set<PDFRef>): void {
+  const { context, catalog } = doc;
+  reachable(context, catalog.get(name('StructTreeRoot')), going);
+  catalog.delete(name('StructTreeRoot'));
+  catalog.delete(name('MarkInfo'));
 }
 
 /** Which page an internal link or bookmark goes to, if it's one of these. */
@@ -75,6 +99,12 @@ function goesTo(context: PDFContext, item: PDFDict, gone: ReadonlySet<PDFRef>): 
 /** Links to a page that's gone would go nowhere, so they go too. Bookmarks keep their names. */
 function dropWaysToPages(doc: PDFDocument, kept: readonly PDFPage[], gone: ReadonlySet<PDFRef>) {
   const { context } = doc;
+  // A document set to open on a page that's gone would open nowhere.
+  const opening = context.lookup(doc.catalog.get(name('OpenAction')));
+  const openingTarget = opening instanceof PDFArray ? opening : null;
+  if (openingTarget?.get(0) instanceof PDFRef && gone.has(openingTarget.get(0) as PDFRef)) {
+    doc.catalog.delete(name('OpenAction'));
+  }
   for (const page of kept) {
     const list = context.lookup(page.node.get(name('Annots')));
     if (!(list instanceof PDFArray)) continue;
@@ -112,6 +142,14 @@ function dropFieldsOn(doc: PDFDocument, going: ReadonlySet<PDFRef>): void {
     });
     if (pages.length > 0 && pages.every((page) => page !== undefined && going.has(page))) {
       form.removeField(field);
+      continue;
+    }
+    // A field on several pages loses only its boxes on the pages that are going.
+    for (let index = pages.length - 1; index >= 0; index -= 1) {
+      const page = pages[index];
+      if (page !== undefined && going.has(page) && field.acroField.getWidgets().length > 1) {
+        field.acroField.removeWidget(index);
+      }
     }
   }
 }
@@ -178,6 +216,7 @@ export function arrangePages(doc: PDFDocument, layout: Layout): void {
   dropWaysToPages(doc, kept, leavingRefs);
   const going = new Set<PDFRef>();
   for (const page of leaving) partsOfPage(context, page, going);
+  dropStructure(doc, going);
   const staying = new Set<PDFRef>();
   for (const page of kept) partsOfPage(context, page, staying);
   formParts(doc, staying);

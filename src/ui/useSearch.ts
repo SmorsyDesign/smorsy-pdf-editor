@@ -20,7 +20,8 @@ function useSearch(
   const [query, setQuery] = useState('');
   const [matches, setMatches] = useState<readonly SearchMatch[]>([]);
   const [searching, setSearching] = useState(false);
-  const pages = useMemo(() => new Map<number, Promise<readonly TextBlock[]>>(), []);
+  // One per arrangement of the pages, as page numbers mean other pages once they move.
+  const pages = useMemo(() => new Map<number, Promise<readonly TextBlock[]>>(), [readPage]);
 
   useEffect(() => {
     setMatches([]);

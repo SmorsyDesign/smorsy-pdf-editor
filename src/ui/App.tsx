@@ -214,6 +214,7 @@ export function App({ platform }: { platform: Platform }) {
           document={session.document}
           os={platform.os}
           announcement={saving.announcement}
+          extracted={saving.extracted}
           originalNote={saving.originalNote}
           onUnsavedWorkChange={onUnsavedWorkChange}
           editor={editor}

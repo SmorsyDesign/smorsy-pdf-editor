@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { PDFDocument } from '@cantoo/pdf-lib';
 import { expect, test, type Page } from '@playwright/test';
 import { openDocument } from '../../src/engine/document';
@@ -71,7 +72,7 @@ test.describe('Pages mode', () => {
     await grid(page).focus();
     await tile(page, 1).focus();
     await page.keyboard.press('ControlOrMeta+a');
-    await expect(pageTool(page, 'Delete')).toBeDisabled();
+    await expect(pageTool(page, 'Delete')).toHaveAttribute('aria-disabled', 'true');
   });
 
   test('isn’t available on a PDF protected against changes', async ({ page }) => {
@@ -136,7 +137,8 @@ test.describe('reordering', () => {
     await expect(page.getByText('1 unsaved change')).toBeVisible();
     await page.getByRole('button', { name: 'Undo' }).click();
     await saveTo(page);
-    expect((await savedFirstLines(page))[0]).toBe('Plain text, page 1');
+    const saved = Uint8Array.from((await lastWrite(page))?.bytes ?? []);
+    expect(Buffer.compare(saved, readFileSync(PLAIN))).toBe(0);
   });
 
   test('the pages follow in the other modes, and search finds the moved one', async ({ page }) => {
@@ -146,9 +148,10 @@ test.describe('reordering', () => {
     await pageTool(page, 'Move earlier').click();
     await backToPages(page);
     await page.keyboard.press('ControlOrMeta+f');
-    await page.getByRole('searchbox').fill('page 3');
+    // Page 2 is last now, so finding it means search reads the pages as they are.
+    await page.getByRole('searchbox').fill('page 2');
     await page.keyboard.press('Enter');
-    await expect(status(page)).toHaveText('Page 1 of 3');
+    await expect(status(page)).toHaveText('Page 3 of 3');
   });
 });
 
@@ -174,6 +177,42 @@ test.describe('rotating', () => {
     await saveTo(page);
     const saved = await PDFDocument.load(Uint8Array.from((await lastWrite(page))?.bytes ?? []));
     expect(saved.getPage(1).getRotation().angle).toBe(0);
+  });
+});
+
+test.describe('the keyboard in the grid', () => {
+  test('Home, End and Backspace do what they say', async ({ page }) => {
+    await openPages(page);
+    await tile(page, 1).focus();
+    await page.keyboard.press('End');
+    await expect(tile(page, 3)).toBeFocused();
+    await page.keyboard.press('Home');
+    await expect(tile(page, 1)).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press(' ');
+    await page.keyboard.press('Backspace');
+    await expect(grid(page).getByRole('button')).toHaveCount(2);
+  });
+
+  test('Shift with an arrow picks from the page the keyboard is on', async ({ page }) => {
+    await openPages(page);
+    await tile(page, 1).focus();
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('Shift+ArrowLeft');
+    await expect(tile(page, 2)).toHaveAttribute('aria-pressed', 'true');
+    await expect(tile(page, 3)).toHaveAttribute('aria-pressed', 'true');
+    await expect(tile(page, 1)).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  test('an unavailable tool says why, rather than doing nothing', async ({ page }) => {
+    await openPages(page);
+    await tile(page, 1).click();
+    // Forced, as the test tool won't click something marked unavailable, though a person can.
+    await pageTool(page, 'Move earlier').click({ force: true });
+    await expect(
+      page.getByRole('status').filter({ hasText: 'can’t move any earlier' }),
+    ).toBeAttached();
   });
 });
 
@@ -216,8 +255,9 @@ test.describe('extracting', () => {
     await openPages(page);
     await tile(page, 2).click();
     await pageTool(page, 'Extract').click();
-    const suggested = await page.evaluate(() => window.smorsyMock?.lastSuggestedName ?? null);
-    expect(suggested).toBe('Lease (page 2).pdf');
+    await expect
+      .poll(() => page.evaluate(() => window.smorsyMock?.lastSuggestedName ?? null))
+      .toBe('Lease (page 2).pdf');
   });
 
   test('won’t write over the file being worked on', async ({ page }) => {
@@ -324,7 +364,38 @@ test.describe('edits on pages that move or turn', () => {
     await tile(page, 1).click();
     await pageTool(page, 'Move later').click();
     await backToPages(page, 6);
-    await expect(pageElement(page, 2).locator('input.form-field').first()).toBeAttached();
+    const field = pageElement(page, 2).locator('input.form-field[type="text"]').first();
+    await field.fill('Theo Okafor');
     await expect(pageElement(page, 1).locator('input.form-field')).toHaveCount(0);
+    await saveTo(page);
+    const doc = await openDocument(Uint8Array.from((await lastWrite(page))?.bytes ?? []));
+    const fields = await doc.formFields();
+    await doc.close();
+    expect(fields.find((one) => one.value === 'Theo Okafor')?.pageNumber).toBe(2);
+  });
+
+  test('answers on a deleted page go, and the rest stay', async ({ page }) => {
+    await openFixture(page, 'test-pdfs/16-irs-form-w9.pdf', 'W9.pdf');
+    await expectOpenDocument(page, 6);
+    await page.getByRole('button', { name: 'Edit anyway' }).click();
+    await page
+      .getByRole('alertdialog', { name: 'Editing will break the signature' })
+      .getByRole('button', { name: 'Edit anyway' })
+      .click();
+    await page.getByRole('button', { name: 'Select', exact: true }).click();
+    await pageElement(page, 1).locator('input.form-field[type="text"]').first().fill('Kept answer');
+    await pageElement(page, 2).scrollIntoViewIfNeeded();
+    const second = pageElement(page, 2).locator('input.form-field[type="text"]').first();
+    const hasSecond = (await second.count()) > 0;
+    if (hasSecond) await second.fill('Deleted answer');
+    await pagesMode(page).click();
+    await tile(page, 2).click();
+    await pageTool(page, 'Delete').click();
+    await saveTo(page);
+    const doc = await openDocument(Uint8Array.from((await lastWrite(page))?.bytes ?? []));
+    const values = (await doc.formFields()).map((one) => one.value);
+    await doc.close();
+    expect(values).toContain('Kept answer');
+    expect(values).not.toContain('Deleted answer');
   });
 });

@@ -31,13 +31,12 @@
   font: 500 var(--text-md) / var(--line-md) var(--font-ui);
   cursor: pointer;
 }
-.pages-tools .tool:hover:not(:disabled) {
+.pages-tools .tool:hover:not([aria-disabled='true']) {
   background: var(--chrome-sunken);
 }
-.pages-tools .tool:disabled {
+.pages-tools .tool[aria-disabled='true'] {
   color: var(--text-muted);
   cursor: default;
-  opacity: 0.6;
 }
 .pages-tools .sep {
   flex: none;
@@ -78,7 +77,8 @@
   color: var(--text);
   font: 400 var(--text-md) / var(--line-md) var(--font-ui);
   cursor: pointer;
-  touch-action: none;
+  /* Scrolling by touch still works, and dragging a page starts only once it's clearly a drag. */
+  touch-action: pan-y;
 }
 .tile:hover {
   background: var(--chrome-sunken);

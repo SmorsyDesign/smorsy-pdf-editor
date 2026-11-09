@@ -4,7 +4,8 @@ import type { PageText } from '../engine/extract';
 
 /** Reads each page's text once. A failure isn't kept, so a later try can still work. */
 export function usePageText(document: PdfDocument) {
-  const cache = useMemo(() => new Map<number, Promise<PageText>>(), []);
+  // One per arrangement, because page numbers mean other pages once pages move or turn.
+  const cache = useMemo(() => new Map<number, Promise<PageText>>(), [document]);
   return useCallback(
     (pageNumber: number) => {
       let cached = cache.get(pageNumber);

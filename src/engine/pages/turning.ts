@@ -89,9 +89,9 @@ export function turnAnnotation(annotation: Annotation, size: PageSize, turns: nu
     case 'arrow':
       return { ...annotation, from: point(annotation.from), to: point(annotation.to) };
     case 'comment': {
-      // The pin stays upright, with its square corner still on the spot it marks.
-      const spot = point({ x: annotation.at.x, y: annotation.at.y + PIN_SIZE });
-      return { ...annotation, at: { x: spot.x, y: spot.y - PIN_SIZE } };
+      // Where a viewer draws it once the page turns: its box turns with the page.
+      const box = turnRect({ ...annotation.at, width: PIN_SIZE, height: PIN_SIZE }, size, turns);
+      return { ...annotation, at: { x: box.x, y: box.y } };
     }
     default:
       return { ...annotation, rect: turnRect(annotation.rect, size, turns) };
