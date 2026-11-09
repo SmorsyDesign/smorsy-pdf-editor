@@ -17,6 +17,7 @@ import type { Annotation } from '../edits/annotations';
 import { identityLayout, keepPages, movePages, removePages, turnPages } from '../pages/layout';
 import type { FontBytes } from './choose-font';
 import { PdfEditor } from './editor';
+import { testPng } from '../../../tests/helpers/test-png';
 
 const fonts: FontBytes = {
   bundled: (file) => Promise.resolve(new Uint8Array(readFileSync(join('assets/fonts', file)))),
@@ -343,6 +344,49 @@ describe('saving arranged pages', () => {
     const widgets = saved.getForm().getRadioGroup('choice').acroField.getWidgets();
     expect(widgets).toHaveLength(1);
     expect(widgets[0]?.getNormalAppearance()).toBeDefined();
+  });
+
+  it('leaves nothing of a signature or new text placed on a page removed in the same save', async () => {
+    const png = testPng(40, 20);
+    const box = {
+      id: 't',
+      pageNumber: 2,
+      rect: { x: 72, y: 72, width: 300, height: 30 },
+      angle: 0,
+      text: 'Ünique new words',
+      lines: ['Ünique new words'],
+      firstBaseline: 20,
+      lineHeight: 24,
+      style: {
+        font: 'serif',
+        size: 18,
+        color: { r: 0, g: 0, b: 0 },
+        bold: false,
+        italic: false,
+        align: 'left',
+      },
+      covers: [],
+      original: null,
+    } as const;
+    const saved = await new PdfEditor(await numbered(2), fonts).save(
+      [box],
+      [
+        {
+          id: 's',
+          pageNumber: 2,
+          rect: { x: 100, y: 100, width: 120, height: 60 },
+          angle: 0,
+          image: { id: 'i', png, width: 40, height: 20, ink: null },
+        },
+      ],
+      { layout: removePages(identityLayout(2), new Set([2])) },
+    );
+    const doc = await PDFDocument.load(saved);
+    const kinds = [...doc.context.enumerateIndirectObjects()].map(([, object]) =>
+      object instanceof PDFStream ? object.dict.toString() : '',
+    );
+    expect(kinds.some((kind) => kind.includes('/Image'))).toBe(false);
+    expect(kinds.some((kind) => kind.includes('FontFile'))).toBe(false);
   });
 
   it('makes a new file of just some pages', async () => {

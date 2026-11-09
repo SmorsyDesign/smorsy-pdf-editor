@@ -225,7 +225,12 @@ export class PdfEditor {
       );
     }
     // Last, because every other edit is made on the file's own pages, wherever they end up.
-    if (layout) arrangePages(doc, layout);
+    if (layout) {
+      // Pictures and fonts are only written into the file when it's saved. Writing them now lets
+      // removing a page find and erase anything that was only on it.
+      await doc.flush();
+      arrangePages(doc, layout);
+    }
     return {
       bytes: await doc.save({ updateFieldAppearances: false }),
       fieldsRetired,

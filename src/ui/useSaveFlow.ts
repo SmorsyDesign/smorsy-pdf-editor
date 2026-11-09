@@ -221,7 +221,11 @@ export function useSaveFlow({
           // The same notes as any save, since the new file can have had fields flattened too.
           const note = explainFormChanges(fieldsRetired, fieldsOnTop, annotationsRetired);
           // Only when there's something to say, so it doesn't clear a message about something else.
-          if (note) reportProblem(note);
+          if (note) {
+            reportProblem(note);
+            // So the next save can clear it, as it does its own.
+            shownNote.current = note;
+          }
           return 'saved';
         } catch (error) {
           showDialog(failureDialog(error, 'build-failed'));
