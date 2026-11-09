@@ -99,12 +99,15 @@ function goesTo(context: PDFContext, item: PDFDict, gone: ReadonlySet<PDFRef>): 
 /** Links to a page that's gone would go nowhere, so they go too. Bookmarks keep their names. */
 function dropWaysToPages(doc: PDFDocument, kept: readonly PDFPage[], gone: ReadonlySet<PDFRef>) {
   const { context } = doc;
-  // A document set to open on a page that's gone would open nowhere.
+  // A document set to open on a page that's gone would open nowhere, whichever way it's written.
   const opening = context.lookup(doc.catalog.get(name('OpenAction')));
-  const openingTarget = opening instanceof PDFArray ? opening : null;
-  if (openingTarget?.get(0) instanceof PDFRef && gone.has(openingTarget.get(0) as PDFRef)) {
+  const openingAction = opening instanceof PDFDict ? context.lookup(opening.get(name('D'))) : null;
+  const openingTarget = opening instanceof PDFArray ? opening : openingAction;
+  const openingPage = openingTarget instanceof PDFArray ? openingTarget.get(0) : undefined;
+  if (openingPage instanceof PDFRef && gone.has(openingPage)) {
     doc.catalog.delete(name('OpenAction'));
   }
+  dropNamedWays(doc, gone);
   for (const page of kept) {
     const list = context.lookup(page.node.get(name('Annots')));
     if (!(list instanceof PDFArray)) continue;
@@ -127,6 +130,39 @@ function dropWaysToPages(doc: PDFDocument, kept: readonly PDFPage[], gone: Reado
     visit(item.get(name('Next')), depth + 1);
   };
   if (outline instanceof PDFDict) visit(outline.get(name('First')), 0);
+}
+
+/** Named links to a page that's gone, in either of the two places a file keeps them. */
+function dropNamedWays(doc: PDFDocument, gone: ReadonlySet<PDFRef>): void {
+  const { context } = doc;
+  const toGonePage = (value: PDFObject | undefined) => {
+    const target = context.lookup(value);
+    const destination = target instanceof PDFDict ? context.lookup(target.get(name('D'))) : target;
+    const page = destination instanceof PDFArray ? destination.get(0) : undefined;
+    return page instanceof PDFRef && gone.has(page);
+  };
+  const dests = context.lookup(doc.catalog.get(name('Dests')));
+  if (dests instanceof PDFDict) {
+    for (const [key, value] of dests.entries()) if (toGonePage(value)) dests.delete(key);
+  }
+  const names = context.lookup(doc.catalog.get(name('Names')));
+  const tree = names instanceof PDFDict ? context.lookup(names.get(name('Dests'))) : null;
+  const visit = (node: PDFObject | undefined, depth: number) => {
+    const dict = context.lookup(node);
+    if (!(dict instanceof PDFDict) || depth > 32) return;
+    const pairs = context.lookup(dict.get(name('Names')));
+    if (pairs instanceof PDFArray) {
+      for (let index = pairs.size() - 2; index >= 0; index -= 2) {
+        if (toGonePage(pairs.get(index + 1))) {
+          pairs.remove(index + 1);
+          pairs.remove(index);
+        }
+      }
+    }
+    const kids = context.lookup(dict.get(name('Kids')));
+    if (kids instanceof PDFArray) for (const kid of kids.asArray()) visit(kid, depth + 1);
+  };
+  visit(tree ?? undefined, 0);
 }
 
 /** Fields with every box on pages that are going have nothing left to show, so they go too. */
@@ -220,6 +256,13 @@ export function arrangePages(doc: PDFDocument, layout: Layout): void {
   const staying = new Set<PDFRef>();
   for (const page of kept) partsOfPage(context, page, staying);
   formParts(doc, staying);
+  // Whatever the document as a whole refers to stays too: layers, colour profiles, attachments
+  // and scripts can be shared with a page that's going.
+  for (const [key, value] of doc.catalog.entries()) {
+    if (!['Pages', 'StructTreeRoot', 'AcroForm'].includes(key.decodeText())) {
+      reachable(context, value, staying);
+    }
+  }
   for (const ref of going) {
     if (!staying.has(ref) && context.lookup(ref) !== undefined) context.delete(ref);
   }

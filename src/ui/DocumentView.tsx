@@ -74,7 +74,8 @@ export function DocumentView({
   // Every page number on screen follows the pages as arranged now.
   const pdf = useMemo(
     () =>
-      layout.length === filePdf.pageCount && isIdentity(layout)
+      // Empty until the pages are measured, which means the file's own order.
+      layout.length === 0 || (layout.length === filePdf.pageCount && isIdentity(layout))
         ? filePdf
         : filePdf.arranged(layout),
     [filePdf, layout],
@@ -84,6 +85,10 @@ export function DocumentView({
   const zoom = useZoom(pageSizes[0] ?? LETTER_PAGE);
   const { percent, applyZoom, fit } = zoom;
   const [currentPage, setCurrentPage] = useState(1);
+  // A page deleted in Pages mode can be the one that was current, which then no longer exists.
+  useEffect(() => {
+    setCurrentPage((current) => Math.max(1, Math.min(current, pdf.pageCount)));
+  }, [pdf]);
   const [mode, setMode] = useState<EditorMode>('select');
   const [isProtected] = useState(() => isEncrypted(file.bytes));
   const [signedLocked, setSignedLocked] = useState(() => hasDigitalSignature(file.bytes));

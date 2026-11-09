@@ -284,6 +284,43 @@ describe('saving arranged pages', () => {
     expect(doc.catalog.has(PDFName.of('StructTreeRoot'))).toBe(false);
   });
 
+  it('keeps what the document as a whole shares with a removed page', async () => {
+    const original = await numbered(2, (doc) => {
+      const { context } = doc;
+      const profile = context.register(context.formXObject([], { BBox: [0, 0, 1, 1] }));
+      doc.catalog.set(
+        PDFName.of('OutputIntents'),
+        context.obj([{ Type: 'OutputIntent', S: 'GTS_PDFA1', DestOutputProfile: profile }]),
+      );
+      doc.getPage(1).node.set(PDFName.of('Shared'), profile);
+    });
+    const saved = await PDFDocument.load(
+      await arranged(original, removePages(identityLayout(2), new Set([2]))),
+    );
+    const intents = saved.catalog.lookup(PDFName.of('OutputIntents'), PDFArray);
+    const intent = intents.lookup(0, PDFDict);
+    expect(intent.lookup(PDFName.of('DestOutputProfile'))).toBeInstanceOf(PDFStream);
+  });
+
+  it('drops named links to a page that’s gone, and an opening action written as an action', async () => {
+    const original = await numbered(2, (doc) => {
+      const { context } = doc;
+      const gone = doc.getPage(1).ref;
+      doc.catalog.set(
+        PDFName.of('Dests'),
+        context.obj({ Away: [gone, 'Fit'], Here: [doc.getPage(0).ref, 'Fit'] }),
+      );
+      doc.catalog.set(PDFName.of('OpenAction'), context.obj({ S: 'GoTo', D: [gone, 'Fit'] }));
+    });
+    const saved = await PDFDocument.load(
+      await arranged(original, removePages(identityLayout(2), new Set([2]))),
+    );
+    const dests = saved.catalog.lookup(PDFName.of('Dests'), PDFDict);
+    expect(dests.has(PDFName.of('Away'))).toBe(false);
+    expect(dests.has(PDFName.of('Here'))).toBe(true);
+    expect(saved.catalog.has(PDFName.of('OpenAction'))).toBe(false);
+  });
+
   it('doesn’t open on a page that’s gone', async () => {
     const original = await numbered(2, (doc) => {
       doc.catalog.set(PDFName.of('OpenAction'), doc.context.obj([doc.getPage(1).ref, 'Fit']));

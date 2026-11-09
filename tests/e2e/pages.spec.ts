@@ -104,6 +104,37 @@ test.describe('reordering', () => {
     ]);
   });
 
+  test('several at once by dragging, which stay chosen', async ({ page }) => {
+    await openPages(page);
+    await tile(page, 2).click();
+    await tile(page, 3).click({ modifiers: ['Shift'] });
+    const from = await tile(page, 3).boundingBox();
+    const to = await tile(page, 1).boundingBox();
+    if (!from || !to) throw new Error('Not on screen.');
+    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(to.x + 10, to.y + to.height / 2, { steps: 10 });
+    await page.mouse.up();
+    await expect(status(page)).toHaveText('2 of 3 pages selected');
+    await saveTo(page);
+    expect((await savedFirstLines(page)).slice(0, 2)).toEqual([
+      'Plain text, page 2',
+      'Plain text, page 3',
+    ]);
+  });
+
+  test('the current page is one that exists after deleting the last', async ({ page }) => {
+    await openFixture(page, PLAIN, 'Lease.pdf');
+    await expectOpenDocument(page, 3);
+    await pageElement(page, 3).scrollIntoViewIfNeeded();
+    await expect(status(page)).toHaveText('Page 3 of 3');
+    await pagesMode(page).click();
+    await tile(page, 3).click();
+    await pageTool(page, 'Delete').click();
+    await backToPages(page, 2);
+    await expect(status(page)).not.toHaveText('Page 3 of 2');
+  });
+
   test('by dragging', async ({ page }) => {
     await openPages(page);
     const from = await tile(page, 3).boundingBox();

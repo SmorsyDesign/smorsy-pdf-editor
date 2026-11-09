@@ -17,6 +17,7 @@ const SHEET = { width: 148, height: 192 };
 // How far a press can travel before it counts as dragging pages rather than clicking one.
 const DRAG_START = 6;
 const EDGE_SCROLL = 48;
+const AFTER_DRAG = 400;
 
 interface PagesViewProps {
   readonly document: PdfDocument;
@@ -36,6 +37,10 @@ interface Dragging {
   readonly before: number | null;
 }
 
+const sameLayout = (one: Layout, two: Layout) =>
+  one.length === two.length &&
+  one.every((slot, index) => slot.source === two[index]?.source && slot.turns === two[index].turns);
+
 /** Where the given pages are once a layout has changed, by finding the same slots again. */
 function positionsOf(slots: readonly PageSlot[], layout: Layout): ReadonlySet<number> {
   return new Set(slots.map((slot) => layout.indexOf(slot) + 1).filter((position) => position > 0));
@@ -54,12 +59,19 @@ export function PagesView({
 }: PagesViewProps) {
   const gridRef = useRef<HTMLOListElement>(null);
   const visible = useVisibleItems(gridRef, 'data-tile', '400px 0px', layout.length);
-  const [dragging, setDragging] = useState<Dragging | null>(null);
+  const [dragging, setShownDrag] = useState<Dragging | null>(null);
+  // Read by the pointer handlers, which can run again before React has drawn the last change.
+  const dragRef = useRef<Dragging | null>(null);
+  const setDragging = (next: Dragging | null) => {
+    dragRef.current = next;
+    setShownDrag(next);
+  };
   const [said, setSaid] = useState('');
   // The layout this view last produced. Any other one came from undo or redo.
   const produced = useRef(layout);
   useEffect(() => {
-    if (layout === produced.current) return;
+    // By what's in it, as the same order is worked out afresh whenever page sizes arrive.
+    if (sameLayout(layout, produced.current)) return;
     produced.current = layout;
     selection.reset(layout.length);
   }, [layout, selection]);
@@ -68,6 +80,13 @@ export function PagesView({
     setSaid((current) => (current === message ? `${message}\u00a0` : message));
   };
   const pressed = useRef<{ x: number; y: number; position: number } | null>(null);
+  // When the last drag ended. Clicks just after it are the drag's own, however many a browser sends.
+  const draggedAt = useRef(0);
+  // Each visit starts fresh, as pages may have changed while this was away, by undo for one.
+  useEffect(() => {
+    selection.reset(layout.length);
+    // Only when Pages mode opens.
+  }, [selection.reset]);
   const { selected, focused } = selection;
   const count = layout.length;
   // Something to act on: what's chosen, or failing that the page with the keyboard. Only pages that
@@ -306,6 +325,8 @@ export function PagesView({
                   selection.markFocused(position);
                 }}
                 onClick={(event) => {
+                  // The end of a drag counts as a click, which would undo choosing several pages.
+                  if (performance.now() - draggedAt.current < AFTER_DRAG) return;
                   const modifier = event.metaKey || event.ctrlKey;
                   if (event.shiftKey) selection.extendTo(position);
                   else if (modifier) selection.toggle(position);
@@ -322,8 +343,8 @@ export function PagesView({
                   const start = pressed.current;
                   if (!start) return;
                   const travelled = Math.hypot(event.clientX - start.x, event.clientY - start.y);
-                  if (!ready || (!dragging && travelled < DRAG_START)) return;
-                  if (!dragging) {
+                  if (!ready || (!dragRef.current && travelled < DRAG_START)) return;
+                  if (!dragRef.current) {
                     event.currentTarget.setPointerCapture(event.pointerId);
                     const moving = selected.has(start.position)
                       ? selected
@@ -339,20 +360,22 @@ export function PagesView({
                     if (event.clientY > box.bottom - EDGE_SCROLL) grid.scrollBy(0, 12);
                   }
                   const before = gapAt(event.clientX, event.clientY);
-                  setDragging({ ...dragging, before });
+                  setDragging({ ...dragRef.current, before });
                 }}
                 onPointerUp={() => {
                   pressed.current = null;
-                  if (!dragging) return;
+                  const finished = dragRef.current;
+                  if (!finished) return;
+                  draggedAt.current = performance.now();
                   setDragging(null);
-                  if (dragging.before !== null) move(dragging.before, dragging.moving);
+                  if (finished.before !== null) move(finished.before, finished.moving);
                 }}
                 onPointerCancel={() => {
                   pressed.current = null;
                   setDragging(null);
                 }}
                 onKeyDown={(event) => {
-                  if (event.key === 'Escape' && dragging) {
+                  if (event.key === 'Escape' && dragRef.current) {
                     event.stopPropagation();
                     pressed.current = null;
                     setDragging(null);

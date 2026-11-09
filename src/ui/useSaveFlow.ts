@@ -219,7 +219,9 @@ export function useSaveFlow({
             positions.size === 1 ? 'Page saved as a new file' : 'Pages saved as a new file',
           );
           // The same notes as any save, since the new file can have had fields flattened too.
-          reportProblem(explainFormChanges(fieldsRetired, fieldsOnTop, annotationsRetired));
+          const note = explainFormChanges(fieldsRetired, fieldsOnTop, annotationsRetired);
+          // Only when there's something to say, so it doesn't clear a message about something else.
+          if (note) reportProblem(note);
           return 'saved';
         } catch (error) {
           showDialog(failureDialog(error, 'build-failed'));
