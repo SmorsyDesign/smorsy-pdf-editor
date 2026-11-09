@@ -1,3 +1,5 @@
+import type { Layout } from '../pages/layout';
+import { arrangePages } from './page-arranging';
 import fontkit from '@cantoo/fontkit';
 import { PDFDocument, type PDFFont, type PDFImage, type PDFPage } from '@cantoo/pdf-lib';
 import type { Annotation, SavedSource } from '../edits/annotations';
@@ -31,6 +33,8 @@ export interface SaveExtras {
   readonly answers?: FieldAnswers;
   /** Makes answers part of the page. */
   readonly lock?: boolean;
+  /** The order and turns of the pages, and which are kept. Everything else is on the file's pages. */
+  readonly layout?: Layout;
 }
 
 export interface SaveReport {
@@ -141,7 +145,13 @@ export class PdfEditor {
   async saveWithReport(
     boxes: readonly TextBox[],
     signatures: readonly PlacedSignature[],
-    { annotations: changed = [], removedSaved = [], answers = [], lock = false }: SaveExtras = {},
+    {
+      annotations: changed = [],
+      removedSaved = [],
+      answers = [],
+      lock = false,
+      layout,
+    }: SaveExtras = {},
   ): Promise<SaveReport> {
     // A comment being retyped can be empty at the moment of saving, and it's no comment until it
     // has words.
@@ -214,6 +224,8 @@ export class PdfEditor {
         marks.flatMap((mark) => annotationBounds(mark, pageBox) ?? []),
       );
     }
+    // Last, because every other edit is made on the file's own pages, wherever they end up.
+    if (layout) arrangePages(doc, layout);
     return {
       bytes: await doc.save({ updateFieldAppearances: false }),
       fieldsRetired,

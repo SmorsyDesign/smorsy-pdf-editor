@@ -1,4 +1,5 @@
 import type { FieldValue } from '../forms/fields';
+import type { Layout } from '../pages/layout';
 import type { Annotation, SavedSource } from './annotations';
 
 /** Positions are PDF points as displayed: origin at the page's top left, y going down. */
@@ -114,7 +115,9 @@ export type Edit =
   | { readonly kind: 'change-annotation'; readonly annotation: Annotation }
   | { readonly kind: 'remove-annotation'; readonly id: string }
   | { readonly kind: 'fill-field'; readonly name: string; readonly value: FieldValue }
-  | { readonly kind: 'lock-answers'; readonly lock: boolean };
+  | { readonly kind: 'lock-answers'; readonly lock: boolean }
+  /** The whole arrangement of pages afterwards, which makes undoing it simple. */
+  | { readonly kind: 'arrange-pages'; readonly layout: Layout };
 
 export interface EditEntry {
   readonly edit: Edit;

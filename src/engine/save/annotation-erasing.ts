@@ -39,7 +39,7 @@ function drawingParts(context: PDFContext, start: PDFObject | undefined, found: 
   }
 }
 
-function partsInResources(
+export function partsInResources(
   context: PDFContext,
   value: PDFObject | undefined,
   found: Set<PDFRef>,
@@ -52,7 +52,7 @@ function partsInResources(
   }
 }
 
-function looksOf(context: PDFContext, annotation: PDFDict, found: Set<PDFRef>): void {
+export function looksOf(context: PDFContext, annotation: PDFDict, found: Set<PDFRef>): void {
   const looks = context.lookup(annotation.get(name('AP')));
   if (looks instanceof PDFDict) {
     for (const value of looks.values()) drawingParts(context, value, found);
