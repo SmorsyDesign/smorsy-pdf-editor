@@ -299,6 +299,22 @@ describe('the built app', () => {
     expect(saved.getPage(0).node.Annots()?.size() ?? 0).toBe(0);
   });
 
+  it('turns and reorders pages and saves them through the real app', async () => {
+    await openFromStartScreen(plainText);
+    await waitForPageDrawn();
+    await $('button=Pages').click();
+    await $('button[aria-label="Page 3"]').click();
+    await $('button[title="Move earlier"]').click();
+    await $('button[title="Rotate right"]').click();
+    const target = join(workspace, 'Arranged copy.pdf');
+    await answerDialogs({ save: target });
+    await $('button=Save a copy').click();
+    await expect($('span=Copy saved')).toBeDisplayed();
+    const saved = await PDFDocument.load(new Uint8Array(readFileSync(target)));
+    expect(saved.getPageCount()).toBe(3);
+    expect(saved.getPage(1).getRotation().angle).toBe(90);
+  });
+
   it('fills in a form and saves it through the real app', async () => {
     const form = join(workspace, '08-fillable-form.pdf');
     await openFromStartScreen(form);

@@ -2,7 +2,7 @@ import type { OsFamily } from '../platform';
 import { Icon, type IconName } from './Icon';
 import { shortcutLabel } from './shortcuts';
 
-export type EditorMode = 'select' | 'edit' | 'note' | 'sign';
+export type EditorMode = 'select' | 'edit' | 'note' | 'sign' | 'pages';
 
 interface TopBarProps {
   readonly os: OsFamily;
@@ -26,6 +26,7 @@ const MODES: readonly (readonly [EditorMode, IconName, string])[] = [
   ['edit', 'text', 'Edit text'],
   ['note', 'note', 'Annotate'],
   ['sign', 'sign', 'Sign'],
+  ['pages', 'pages', 'Pages'],
 ];
 
 export function TopBar({

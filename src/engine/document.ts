@@ -12,6 +12,7 @@ import type { FormField } from './forms/fields';
 import type { ExistingNote } from './notes';
 import { readExistingNotes, readFormFields } from './pdf-annotations';
 import { groupTextItems, type PageText, type TextBlock } from './extract';
+import { positionOf, type Layout } from './pages/layout';
 import { fontsInText, rawItems } from './pdf-page-text';
 import { canvasPixels, displayedPageSize, type PageSize } from './zoom';
 
@@ -53,6 +54,8 @@ export interface PdfDocument {
   formFields(): Promise<readonly FormField[]>;
   /** Comments saved in the file earlier, whose words the page itself doesn't show. */
   existingNotes(pageNumber: number): Promise<readonly ExistingNote[]>;
+  /** The same document with its pages in another order or turned. Page numbers follow that. */
+  arranged(layout: Layout): PdfDocument;
   close(): Promise<void>;
 }
 
@@ -89,37 +92,66 @@ function translateOpenError(error: unknown): EngineError {
 class PdfJsDocument implements PdfDocument {
   private readonly proxy: PDFDocumentProxy;
   private readonly loadingTask: PDFDocumentLoadingTask;
-  private readonly hidden = new Map<number, readonly string[]>();
+  /** Shared by every arrangement of one document, as pdf.js keeps one store for it. */
+  private readonly hidden: Map<number, readonly string[]>;
+  /** Null for the file's own order, unturned. */
+  private readonly layout: Layout | null;
 
-  constructor(proxy: PDFDocumentProxy, loadingTask: PDFDocumentLoadingTask) {
+  constructor(
+    proxy: PDFDocumentProxy,
+    loadingTask: PDFDocumentLoadingTask,
+    layout: Layout | null = null,
+    hidden = new Map<number, readonly string[]>(),
+  ) {
     this.proxy = proxy;
     this.loadingTask = loadingTask;
+    this.layout = layout;
+    this.hidden = hidden;
   }
 
   get pageCount(): number {
-    return this.proxy.numPages;
+    return this.layout?.length ?? this.proxy.numPages;
   }
 
-  private async page(pageNumber: number): Promise<PDFPageProxy> {
+  arranged(layout: Layout): PdfDocument {
+    return new PdfJsDocument(this.proxy, this.loadingTask, layout, this.hidden);
+  }
+
+  /** Which of the file's pages is shown here, and how far it's turned. */
+  private slot(pageNumber: number): { readonly source: number; readonly turns: number } {
     if (!Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > this.pageCount) {
       throw new EngineError('page-not-found', `Page ${pageNumber} of ${this.pageCount}`);
     }
+    return this.layout?.[pageNumber - 1] ?? { source: pageNumber, turns: 0 };
+  }
+
+  private async page(pageNumber: number): Promise<PDFPageProxy> {
+    return this.sourcePage(this.slot(pageNumber).source);
+  }
+
+  private async sourcePage(source: number): Promise<PDFPageProxy> {
     try {
-      return await this.proxy.getPage(pageNumber);
+      return await this.proxy.getPage(source);
     } catch (error) {
       // A file can open and still have a page that's broken inside it.
-      throw new EngineError('page-unreadable', `Page ${pageNumber}`, { cause: error });
+      throw new EngineError('page-unreadable', `Page ${source}`, { cause: error });
     }
   }
 
+  /** How a page is shown here: the file's own turn, plus any it's been given since. */
+  private viewport(page: PDFPageProxy, pageNumber: number, scale: number) {
+    const { turns } = this.slot(pageNumber);
+    return page.getViewport({ scale, rotation: (page.rotate + turns * 90) % 360 });
+  }
+
   async pageSize(pageNumber: number): Promise<PageSize> {
-    const { width, height } = (await this.page(pageNumber)).getViewport({ scale: 1 });
+    const { width, height } = this.viewport(await this.page(pageNumber), pageNumber, 1);
     return { width, height };
   }
 
   async pageText(pageNumber: number): Promise<PageText> {
     const page = await this.page(pageNumber);
-    const viewport = page.getViewport({ scale: 1 });
+    const viewport = this.viewport(page, pageNumber, 1);
     // The operator list also loads the page's fonts, which is what makes their details available.
     const [content, operators] = await Promise.all([page.getTextContent(), page.getOperatorList()]);
 
@@ -135,9 +167,9 @@ class PdfJsDocument implements PdfDocument {
     const finished = (async () => {
       const page = await this.page(pageNumber);
       if (stop.signal.aborted) return;
-      const natural = page.getViewport({ scale: 1 });
+      const natural = this.viewport(page, pageNumber, 1);
       const { width } = displayedPageSize(natural, zoomPercent);
-      const viewport = page.getViewport({ scale: width / natural.width });
+      const viewport = this.viewport(page, pageNumber, width / natural.width);
       const layer = new TextLayer({
         textContentSource: page.streamTextContent(),
         container,
@@ -158,7 +190,7 @@ class PdfJsDocument implements PdfDocument {
 
   async searchableText(pageNumber: number): Promise<readonly TextBlock[]> {
     const page = await this.page(pageNumber);
-    const viewport = page.getViewport({ scale: 1 });
+    const viewport = this.viewport(page, pageNumber, 1);
     const content = await page.getTextContent();
     const blocks = groupTextItems(
       rawItems(content.items, viewport.transform),
@@ -176,13 +208,15 @@ class PdfJsDocument implements PdfDocument {
   private hideAnnotations(pageNumber: number, refs: readonly string[]): void {
     const storage = this.proxy.annotationStorage;
     const key = (ref: string) => `pdfjs_internal_editor_hide_${ref}`;
-    for (const ref of this.hidden.get(pageNumber) ?? []) {
+    // Kept by the file's own page, which is what pdf.js knows it by.
+    const { source } = this.slot(pageNumber);
+    for (const ref of this.hidden.get(source) ?? []) {
       if (!refs.includes(ref)) storage.remove(key(ref));
     }
     for (const ref of refs) {
-      storage.setValue(key(ref), { deleted: true, id: ref, pageIndex: pageNumber - 1 });
+      storage.setValue(key(ref), { deleted: true, id: ref, pageIndex: source - 1 });
     }
-    this.hidden.set(pageNumber, refs);
+    this.hidden.set(source, refs);
   }
 
   render({
@@ -198,10 +232,10 @@ class PdfJsDocument implements PdfDocument {
     const finished = (async () => {
       const page = await this.page(pageNumber);
       if (stop.signal.aborted) return;
-      const natural = page.getViewport({ scale: 1 });
+      const natural = this.viewport(page, pageNumber, 1);
       const displayed = displayedPageSize(natural, zoomPercent);
       // Scale from the rounded size, so the canvas and its CSS box match to the pixel.
-      const viewport = page.getViewport({ scale: displayed.width / natural.width });
+      const viewport = this.viewport(page, pageNumber, displayed.width / natural.width);
       const pixels = canvasPixels(displayed, devicePixelRatio);
       canvas.width = pixels.width;
       canvas.height = pixels.height;
@@ -240,11 +274,18 @@ class PdfJsDocument implements PdfDocument {
   }
 
   async existingNotes(pageNumber: number): Promise<readonly ExistingNote[]> {
-    return readExistingNotes(await this.page(pageNumber));
+    const page = await this.page(pageNumber);
+    return readExistingNotes(page, this.viewport(page, pageNumber, 1));
   }
 
   formFields(): Promise<readonly FormField[]> {
-    return readFormFields(this.proxy, (pageNumber) => this.page(pageNumber));
+    return readFormFields(this.proxy, async (source) => {
+      const position = this.layout ? positionOf(this.layout, source) : source;
+      // A field on a page that's been taken out has nowhere to be filled in.
+      if (position === null) return null;
+      const page = await this.sourcePage(source);
+      return { page, position, viewport: this.viewport(page, position, 1) };
+    });
   }
 
   close(): Promise<void> {

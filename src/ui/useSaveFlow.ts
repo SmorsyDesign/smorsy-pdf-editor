@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { copyFileName } from '../engine/copy';
+import { copyFileName, extractFileName } from '../engine/copy';
 import { PLAIN_PROBLEM, UNSUPPORTED_TEXT } from '../engine/errors';
 import { openDocument } from '../engine/document';
 import { SaveFailure, type OpenedFile, type Platform, type SaveFailureKind } from '../platform';
@@ -67,6 +67,7 @@ export function useSaveFlow({
     readonly originalChanged: boolean;
   } | null>(null);
   const afterSave = useRef<(() => void) | null>(null);
+  const [extracted, setExtracted] = useState('');
   const saveNote = useRef<string | null>(null);
   const shownNote = useRef<string | null>(null);
   const current = saved?.file === file ? saved : null;
@@ -182,12 +183,52 @@ export function useSaveFlow({
     [exclusively, settle, writeTo],
   );
 
+  /** Saves just these pages as a new file, leaving the document being worked on as it is. */
+  const extractPages = useCallback(
+    async (positions: ReadonlySet<number>) => {
+      const outcome = await exclusively(async () => {
+        if (!file) return 'stopped';
+        try {
+          if (!(await flush())) return 'stopped';
+          const path = await platform.chooseSaveLocation(extractFileName(file.name, positions));
+          if (path === null) return 'stopped';
+          const replacing =
+            (await platform.isSameFile(file.path, path)) ||
+            (savedPath !== null && (await platform.isSameFile(savedPath, path)));
+          if (replacing) {
+            showDialog({
+              kind: 'save-failed',
+              failure: 'plain-problem',
+              detail:
+                'That’s the file you’re working on. Choose a new name for the pages, so it isn’t replaced.',
+            });
+            return 'stopped';
+          }
+          const { bytes } = await buildBytes(positions);
+          const check = await openDocument(bytes);
+          await check.close();
+          await platform.writeFile(path, bytes);
+          setExtracted(
+            positions.size === 1 ? 'Page saved as a new file' : 'Pages saved as a new file',
+          );
+          return 'saved';
+        } catch (error) {
+          showDialog(failureDialog(error, 'build-failed'));
+          return 'stopped';
+        }
+      });
+      // Nothing waits on this, and it changes nothing about what's saved.
+      if (outcome === undefined) reportProblem('The app is still busy. Try again in a moment.');
+    },
+    [buildBytes, exclusively, file, flush, platform, reportProblem, savedPath, showDialog],
+  );
+
   const keepOriginal = useCallback(() => {
     settle('stopped');
   }, [settle]);
 
   return {
-    announcement: current?.message ?? '',
+    announcement: extracted || (current?.message ?? ''),
     /** What to say about the original, once saying it's unchanged would be untrue. */
     originalNote: current?.originalChanged
       ? current.overOriginal
@@ -197,6 +238,7 @@ export function useSaveFlow({
     saveLabel: savedPath === null ? 'Save a copy' : 'Save',
     save,
     saveCopy,
+    extractPages,
     replaceOriginal,
     keepOriginal,
   };

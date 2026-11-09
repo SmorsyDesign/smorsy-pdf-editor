@@ -1,4 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process';
+import { identityLayout, movePages, removePages, turnPages } from '../../src/engine/pages/layout';
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -157,6 +158,28 @@ describe.each(files)('%s', (name) => {
       const { blocks } = await reopened.pageText(1);
       expect(blocks.map((block) => block.text).join(' ')).toContain(EDIT_TEXT);
       await reopened.close();
+    },
+  );
+
+  it.skipIf(password !== undefined)(
+    'survives its pages being reordered, turned and removed',
+    async () => {
+      const doc = await PDFDocument.load(original, { ignoreEncryption: true });
+      const count = doc.getPageCount();
+      let layout = identityLayout(count);
+      layout = movePages(layout, new Set([count]), 1);
+      layout = turnPages(layout, new Set([1]), 1);
+      if (count > 1) layout = removePages(layout, new Set([count]));
+      const saved = await new PdfEditor(original, fonts).save([], [], { layout });
+      const path = join(temp, `arranged-${name}`);
+      writeFileSync(path, saved);
+      expect([0, 3]).toContain(qpdfStatus(path));
+      const after = await inspect(saved);
+      expect(after.pages).toBe(Math.max(1, count - 1));
+      const reopened = await PDFDocument.load(saved, { ignoreEncryption: true });
+      const first = reopened.getPage(0).getRotation().angle;
+      const lastBefore = doc.getPage(count - 1).getRotation().angle;
+      expect(first).toBe((lastBefore + 90) % 360);
     },
   );
 

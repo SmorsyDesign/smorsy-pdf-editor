@@ -223,6 +223,9 @@ export function App({ platform }: { platform: Platform }) {
           }}
           handleRef={viewRef}
           platform={platform}
+          onExtract={(positions) => {
+            void saving.extractPages(positions);
+          }}
         />
       ) : (
         <StartScreen

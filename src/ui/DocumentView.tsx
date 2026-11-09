@@ -1,7 +1,10 @@
-import { useCallback, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { PdfDocument } from '../engine/document';
 import { hasDigitalSignature, isEncrypted } from '../engine/extract';
+import { isIdentity } from '../engine/pages/layout';
 import { LETTER_PAGE, zoomIn, zoomOut } from '../engine/zoom';
+import { PagesView } from './pages/PagesView';
+import { usePageSelection } from './pages/usePageSelection';
 import type { OpenedFile, OsFamily, Platform } from '../platform';
 import { DocumentStrip, ScanCard, SignedWarning } from './editing/Notices';
 import { EditToasts } from './editing/EditToasts';
@@ -41,13 +44,14 @@ interface DocumentViewProps {
   readonly onSave: () => void;
   readonly handleRef: RefObject<DocumentViewHandle | null>;
   readonly platform: Platform;
+  readonly onExtract: (positions: ReadonlySet<number>) => void;
 }
 
 const NEW_TEXT_INSET = 72;
 
 export function DocumentView({
   file,
-  document: pdf,
+  document: filePdf,
   os,
   announcement,
   originalNote,
@@ -57,8 +61,24 @@ export function DocumentView({
   onSave,
   handleRef,
   platform,
+  onExtract,
 }: DocumentViewProps) {
+  // Edits on turned pages are worked out from the file's own page sizes.
+  const fileSizes = usePageSizes(filePdf);
+  const { setFileSizes, layout } = editor;
+  useEffect(() => {
+    setFileSizes(fileSizes.map((size) => size ?? LETTER_PAGE));
+  }, [fileSizes, setFileSizes]);
+  // Every page number on screen follows the pages as arranged now.
+  const pdf = useMemo(
+    () =>
+      layout.length === filePdf.pageCount && isIdentity(layout)
+        ? filePdf
+        : filePdf.arranged(layout),
+    [filePdf, layout],
+  );
   const pageSizes = usePageSizes(pdf);
+  const selection = usePageSelection();
   const zoom = useZoom(pageSizes[0] ?? LETTER_PAGE);
   const { percent, applyZoom, fit } = zoom;
   const [currentPage, setCurrentPage] = useState(1);
@@ -133,6 +153,11 @@ export function DocumentView({
   const canFillForm = !isProtected && !signedLocked;
   const showsFormPanel = mode === 'select' && canFillForm && form.total > 0;
   const hasPanel = mode === 'sign' || mode === 'note' || showsFormPanel;
+  const pagesMode = mode === 'pages';
+  const changesOn = (position: number) =>
+    editor.boxes.filter((box) => box.pageNumber === position).length +
+    editor.signatures.filter((placed) => placed.pageNumber === position).length +
+    editor.annotations.filter((one) => one.pageNumber === position && !one.saved).length;
 
   return (
     <div className="window" data-os={os}>
@@ -157,104 +182,134 @@ export function DocumentView({
         onSave={onSave}
       />
 
-      <div className={hasPanel ? 'body has-panel' : 'body'}>
-        <Thumbnails
-          document={pdf}
-          pageSizes={pageSizes}
-          currentPage={currentPage}
-          onSelect={(pageNumber) => scrollToPageRef.current?.(pageNumber)}
-        />
-        <div className="stage">
-          <DocumentStrip
-            isProtected={isProtected}
-            signedLocked={signedLocked}
-            onEditAnyway={() => {
-              setSignedWarning('edit');
-            }}
-          />
-          <PageStack
+      {pagesMode ? (
+        <div className="body is-pages">
+          <PagesView
             document={pdf}
             pageSizes={pageSizes}
-            percent={percent}
-            measured={zoom.measured}
-            fileName={file.name}
-            keepOverlayOn={draft?.pageNumber ?? null}
-            onCurrentPageChange={setCurrentPage}
-            onAvailableWidthChange={zoom.setAvailableWidth}
-            onZoomTo={applyZoom}
-            onBackgroundClick={finishOpenEdit}
-            scrollToPageRef={scrollToPageRef}
-            hiddenAnnotations={editor.hiddenAnnotations}
-            renderOverlay={(pageNumber, page, scale) => (
-              <PageEditing
-                document={pdf}
-                pageNumber={pageNumber}
-                page={page}
-                scale={scale}
-                zoomPercent={percent}
-                mode={mode}
-                editor={editor}
-                session={session}
-                signing={signing}
+            layout={layout}
+            selection={selection}
+            changesOn={changesOn}
+            onArrange={(next) => {
+              editor.apply({ kind: 'arrange-pages', layout: next });
+            }}
+            onExtract={onExtract}
+            onOpenPage={(position) => {
+              setMode('select');
+              requestAnimationFrame(() => scrollToPageRef.current?.(position));
+            }}
+          />
+        </div>
+      ) : (
+        <div className={hasPanel ? 'body has-panel' : 'body'}>
+          <Thumbnails
+            document={pdf}
+            pageSizes={pageSizes}
+            currentPage={currentPage}
+            onSelect={(pageNumber) => scrollToPageRef.current?.(pageNumber)}
+          />
+          <div className="stage">
+            <DocumentStrip
+              isProtected={isProtected}
+              signedLocked={signedLocked}
+              onEditAnyway={() => {
+                setSignedWarning('edit');
+              }}
+            />
+            <PageStack
+              document={pdf}
+              pageSizes={pageSizes}
+              percent={percent}
+              measured={zoom.measured}
+              fileName={file.name}
+              keepOverlayOn={draft?.pageNumber ?? null}
+              onCurrentPageChange={setCurrentPage}
+              onAvailableWidthChange={zoom.setAvailableWidth}
+              onZoomTo={applyZoom}
+              onBackgroundClick={finishOpenEdit}
+              scrollToPageRef={scrollToPageRef}
+              hiddenAnnotations={editor.hiddenAnnotations}
+              renderOverlay={(pageNumber, page, scale) => (
+                <PageEditing
+                  document={pdf}
+                  pageNumber={pageNumber}
+                  page={page}
+                  scale={scale}
+                  zoomPercent={percent}
+                  mode={mode}
+                  editor={editor}
+                  session={session}
+                  signing={signing}
+                  annotating={annotating}
+                  form={form}
+                  canFillForm={canFillForm}
+                  onSign={() => {
+                    setMode('sign');
+                  }}
+                  matches={search.matchesOn(pageNumber)}
+                  currentMatch={search.currentMatch}
+                  pageText={pageText}
+                />
+              )}
+            />
+            {mode === 'note' && (
+              <AnnotateBar
                 annotating={annotating}
-                form={form}
-                canFillForm={canFillForm}
-                onSign={() => {
-                  setMode('sign');
+                currentPage={currentPage}
+                centre={{ x: currentPageSize.width / 2, y: currentPageSize.height / 2 }}
+                onChooseImage={() => {
+                  void chooseImage();
                 }}
-                matches={search.matchesOn(pageNumber)}
-                currentMatch={search.currentMatch}
-                pageText={pageText}
               />
             )}
+            {search.open && <SearchBar {...search.barProps} />}
+            <EditToasts editor={editor} session={session} />
+            {scan.showScanCard && !draft && (
+              <ScanCard
+                onAddText={() => {
+                  scan.dismissScanCard();
+                  addTextToCurrentPage();
+                }}
+                onClose={scan.dismissScanCard}
+              />
+            )}
+          </div>
+          <SidePanel
+            mode={mode}
+            showsFormPanel={showsFormPanel}
+            form={form}
+            editor={editor}
+            annotating={annotating}
+            signing={signing}
+            currentPage={currentPage}
+            onLeaveSign={() => {
+              setMode('select');
+            }}
+            onGoToPage={(pageNumber, y) => {
+              scrollToPageRef.current?.(pageNumber, y);
+            }}
+            onJumpToField={(pageNumber, fieldId, y) => {
+              scrollToPageRef.current?.(pageNumber, y);
+              form.focusField(fieldId);
+            }}
           />
-          {mode === 'note' && (
-            <AnnotateBar
-              annotating={annotating}
-              currentPage={currentPage}
-              centre={{ x: currentPageSize.width / 2, y: currentPageSize.height / 2 }}
-              onChooseImage={() => {
-                void chooseImage();
-              }}
-            />
-          )}
-          {search.open && <SearchBar {...search.barProps} />}
-          <EditToasts editor={editor} session={session} />
-          {scan.showScanCard && !draft && (
-            <ScanCard
-              onAddText={() => {
-                scan.dismissScanCard();
-                addTextToCurrentPage();
-              }}
-              onClose={scan.dismissScanCard}
-            />
-          )}
         </div>
-        <SidePanel
-          mode={mode}
-          showsFormPanel={showsFormPanel}
-          form={form}
-          editor={editor}
-          annotating={annotating}
-          signing={signing}
-          currentPage={currentPage}
-          onLeaveSign={() => {
-            setMode('select');
-          }}
-          onGoToPage={(pageNumber, y) => {
-            scrollToPageRef.current?.(pageNumber, y);
-          }}
-          onJumpToField={(pageNumber, fieldId, y) => {
-            scrollToPageRef.current?.(pageNumber, y);
-            form.focusField(fieldId);
-          }}
-        />
-      </div>
+      )}
 
       <StatusBar
         os={os}
-        page={`Page ${currentPage} of ${pdf.pageCount}`}
-        hint={modeHint(mode, annotating, signing, scan.pageIsScan)}
+        page={
+          pagesMode
+            ? selection.selected.size === 0
+              ? `${String(pdf.pageCount)} ${pdf.pageCount === 1 ? 'page' : 'pages'}`
+              : `${String(selection.selected.size)} of ${String(pdf.pageCount)} pages selected`
+            : `Page ${currentPage} of ${pdf.pageCount}`
+        }
+        hint={
+          pagesMode
+            ? `Drag pages to reorder them, or hold ${os === 'mac' ? 'Option' : 'Alt'} and use the arrow keys`
+            : modeHint(mode, annotating, signing, scan.pageIsScan)
+        }
         fontsReplaced={editor.substitutedFonts}
         message={
           ((editor.changes === 0 && announcement) || originalNote) ??

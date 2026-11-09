@@ -43,6 +43,10 @@ const PATHS = {
     <path d="M2 11.5c2-5 3.5-8 4.75-8 1.75 0-1.25 8 .5 8 1.25 0 1.75-2.75 3-2.75 1 0 .75 2 2 2h1.75M2 14.25h12" />
   ),
   rotr: <path d="M13.5 3v3.5H10M13.2 6.5A5.5 5.5 0 108 13.5" />,
+  rotl: <path d="M2.5 3v3.5H6M2.8 6.5A5.5 5.5 0 118 13.5" />,
+  pages: <path d="M5.5 4.5v-2h8v9h-2M2.5 4.5h9v9h-9z" />,
+  extract: <path d="M3 9.5v4h10v-4M8 2.5v8M5 7.5l3 3 3-3" />,
+  check: <path d="M3 8.5l3.5 3.5 6.5-8" />,
   copy: <path d="M5.5 5.5h8v8h-8zM10.5 5.5v-3h-8v8h3" />,
   select: <path d="M3.5 2.5l9 5-4 1-2 4z" />,
   text: <path d="M3 4V2.75h10V4M8 2.75v10.5M6 13.25h4" />,

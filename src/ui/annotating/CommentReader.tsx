@@ -67,7 +67,11 @@ export function CommentReader({
     comment.kind === 'comment'
       ? [
           {
-            id: comment.id,
+            // The file's own name for it where there is one, which is what pdf.js knew it by first, so an
+
+            // open comment stays open when the app finishes reading the file's annotations.
+
+            id: comment.saved?.ref ?? comment.id,
             rect: boundsOfAnnotation(comment),
             text: comment.text,
             author: inFile.find((saved) => saved.id === comment.saved?.ref)?.author ?? '',

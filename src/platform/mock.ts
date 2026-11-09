@@ -17,6 +17,8 @@ interface MockControls {
   nextOpen: OpenedFile | 'read-failure' | null;
   nextImage: PickedImage | 'read-failure' | null;
   nextSavePath: string | null;
+  /** The name the last save dialog suggested. */
+  lastSuggestedName: string | null;
   nextWriteFailure: SaveFailureKind | null;
   /** Runs before a write finishes, so tests can act while a save is under way. */
   beforeWrite: (() => Promise<void>) | null;
@@ -96,6 +98,7 @@ export function createMockPlatform(): Platform {
     nextOpen: null,
     nextImage: null,
     nextSavePath: null,
+    lastSuggestedName: null,
     nextWriteFailure: null,
     beforeWrite: null,
     lastWrite: null,
@@ -128,7 +131,8 @@ export function createMockPlatform(): Platform {
       }
       return Promise.resolve(next);
     },
-    chooseSaveLocation() {
+    chooseSaveLocation(suggestedName) {
+      controls.lastSuggestedName = suggestedName;
       const next = controls.nextSavePath;
       controls.nextSavePath = null;
       return Promise.resolve(next);

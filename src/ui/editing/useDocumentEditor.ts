@@ -9,9 +9,7 @@ import {
   deriveAnnotations,
   deriveFieldAnswers,
   deriveLock,
-  savedChanges,
   deriveSignatures,
-  deriveTextBoxes,
   record,
   redo,
   undo,
@@ -28,6 +26,9 @@ import type { FontOutcome, SystemFontStyle } from '../../engine/save/choose-font
 import { unchangedCopy } from '../../engine/copy';
 import type { OpenedFile, Platform } from '../../platform';
 import { SaveClient } from '../../workers/save-client';
+import { isIdentity, keepPages, type Layout } from '../../engine/pages/layout';
+import type { PageSize } from '../../engine/zoom';
+import { arrangeEdits } from './arrangement';
 import { useExistingAnnotations } from './useExistingAnnotations';
 
 const SYSTEM_STYLES: readonly SystemFontStyle[] = ['regular', 'bold', 'italic', 'bold-italic'];
@@ -59,6 +60,10 @@ export interface DocumentEditor {
   readonly isDrawnByApp: (annotation: Annotation) => boolean;
   /** Annotations the file has that can't be offered for editing, which people should hear about. */
   readonly unreadAnnotations: number;
+  /** The order and turns of the pages, which every page number on screen follows. */
+  readonly layout: Layout;
+  /** The file's own pages as measured, which edits on turned pages are worked out from. */
+  readonly setFileSizes: (sizes: readonly PageSize[]) => void;
   /** Form answers that have been changed, by field name. */
   readonly answers: ReadonlyMap<string, FieldValue>;
   /** Whether saving makes answers part of the page. */
@@ -80,13 +85,13 @@ export interface DocumentEditor {
   readonly undo: () => void;
   readonly redo: () => void;
   /** The bytes to write: the original exactly, unless there are edits. */
-  readonly buildBytes: () => Promise<BuiltFile>;
+  readonly buildBytes: (keep?: ReadonlySet<number>) => Promise<BuiltFile>;
   readonly markSaved: (entry: EditEntry | undefined) => void;
 }
 
-function changedBox(edit: Edit, boxes: readonly TextBox[]): TextBox | undefined {
-  if (edit.kind === 'add-text' || edit.kind === 'replace-text') return edit.box;
-  if (edit.kind === 'update-text') return boxes.find((box) => box.id === edit.id);
+function changedBoxId(edit: Edit): string | undefined {
+  if (edit.kind === 'add-text' || edit.kind === 'replace-text') return edit.box.id;
+  if (edit.kind === 'update-text') return edit.id;
   return undefined;
 }
 
@@ -147,25 +152,19 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
     setProblem,
   );
 
-  const boxes = useMemo(() => deriveTextBoxes(activeEdits(log)), [log]);
-  const signatures = useMemo(() => deriveSignatures(activeEdits(log)), [log]);
-  const annotations = useMemo(() => deriveAnnotations(activeEdits(log), existing), [log, existing]);
-  const savedChange = useMemo(() => savedChanges(activeEdits(log), existing), [log, existing]);
+  // The file's pages as measured, which edits on turned pages are worked out from.
+  const [fileSizes, setFileSizes] = useState<readonly PageSize[]>([]);
+  const fileSizesRef = useRef(fileSizes);
+  fileSizesRef.current = fileSizes;
+  const arranged = useMemo(
+    () => arrangeEdits(activeEdits(log), existing, fileSizes),
+    [log, existing, fileSizes],
+  );
+  const { boxes, signatures, annotations, savedChange, hiddenAnnotations, layout } = arranged;
   const redrawn = useMemo(
     () => new Set(savedChange.changed.filter(({ saved }) => !saved?.foreign).map(({ id }) => id)),
     [savedChange],
   );
-  const hiddenAnnotations = useMemo(() => {
-    const hidden = new Map<number, string[]>();
-    const sources = [
-      ...savedChange.removed,
-      ...savedChange.changed.flatMap(({ saved }) => (saved && !saved.foreign ? [saved] : [])),
-    ];
-    for (const { pageNumber, ref } of sources) {
-      hidden.set(pageNumber, [...(hidden.get(pageNumber) ?? []), ref]);
-    }
-    return hidden;
-  }, [savedChange]);
   const answers = useMemo(() => deriveFieldAnswers(activeEdits(log)), [log]);
   const locksAnswers = useMemo(() => deriveLock(activeEdits(log)), [log]);
 
@@ -180,12 +179,16 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
     (edit: Edit, group?: string) => {
       const next = record(logRef.current, edit, group);
       moveTo(next);
-      const box = changedBox(edit, deriveTextBoxes(activeEdits(next)));
+      const id = changedBoxId(edit);
+      const now = arrangeEdits(activeEdits(next), existingRef.current, fileSizesRef.current);
+      // The font check reads the file's own page, and the notice points at the box as shown.
+      const fileBox = now.fileBoxes.find((one) => one.id === id);
+      const box = now.boxes.find((one) => one.id === id);
       const client = clientRef.current;
-      if (!box || !client) return;
+      if (!fileBox || !box || !client) return;
       const change = latestChange.current;
       client
-        .then((opened) => opened.resolveFont(box))
+        .then((opened) => opened.resolveFont(fileBox))
         .then((outcome) => {
           setOutcomes((current) => new Map(current).set(box.id, outcome));
           if (change === latestChange.current) setNotice({ box, outcome });
@@ -209,49 +212,58 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
     moveTo(redo(logRef.current));
   }, [moveTo]);
 
-  const buildBytes = useCallback(async (): Promise<BuiltFile> => {
-    const current = logRef.current;
-    const entry = currentEntry(current);
-    const edits = activeEdits(current);
-    const active = deriveTextBoxes(edits);
-    const placed = deriveSignatures(edits);
-    const { changed, removed } = savedChanges(edits, existingRef.current);
-    const marks = [...deriveAnnotations(edits).filter(({ saved }) => !saved), ...changed];
-    const filled = [...deriveFieldAnswers(edits)];
-    const lock = deriveLock(edits);
-    const nothingToDo =
-      active.length === 0 &&
-      placed.length === 0 &&
-      marks.length === 0 &&
-      removed.length === 0 &&
-      filled.length === 0;
-    if (nothingToDo && !lock) {
-      if (!file) throw new Error('The document closed before it could be saved.');
-      return {
-        bytes: unchangedCopy(file.bytes),
-        edited: false,
-        entry,
-        fieldsRetired: 0,
-        fieldsOnTop: 0,
-        annotationsRetired: 0,
-      };
-    }
-    let client = await clientRef.current;
-    if (!client) throw new Error('The document closed before it could be saved.');
-    // The edits are safe on this side, so a worker that died only needs replacing.
-    if (client.failed && createClientRef.current) {
-      client.close();
-      clientRef.current = createClientRef.current();
-      client = await clientRef.current;
-    }
-    const report = await client.save(active, placed, {
-      annotations: marks,
-      removedSaved: removed,
-      answers: filled,
-      lock,
-    });
-    return { ...report, edited: true, entry };
-  }, [file]);
+  const buildBytes = useCallback(
+    async (keep?: ReadonlySet<number>): Promise<BuiltFile> => {
+      const current = logRef.current;
+      const entry = currentEntry(current);
+      const edits = activeEdits(current);
+      // Saving works on the file's own pages, and arranges them only at the end.
+      const now = arrangeEdits(edits, existingRef.current, fileSizesRef.current);
+      const { onFile, fileBoxes: active } = now;
+      const placed = deriveSignatures(onFile);
+      const { changed, removed } = now.savedChange;
+      const marks = [...deriveAnnotations(onFile).filter(({ saved }) => !saved), ...changed];
+      const filled = [...deriveFieldAnswers(edits)];
+      const lock = deriveLock(edits);
+      const layout = keep ? keepPages(now.layout, keep) : now.layout;
+      const nothingToDo =
+        active.length === 0 &&
+        placed.length === 0 &&
+        marks.length === 0 &&
+        removed.length === 0 &&
+        filled.length === 0 &&
+        layout.length === fileSizesRef.current.length &&
+        isIdentity(layout);
+      if (nothingToDo && !lock) {
+        if (!file) throw new Error('The document closed before it could be saved.');
+        return {
+          bytes: unchangedCopy(file.bytes),
+          edited: false,
+          entry,
+          fieldsRetired: 0,
+          fieldsOnTop: 0,
+          annotationsRetired: 0,
+        };
+      }
+      let client = await clientRef.current;
+      if (!client) throw new Error('The document closed before it could be saved.');
+      // The edits are safe on this side, so a worker that died only needs replacing.
+      if (client.failed && createClientRef.current) {
+        client.close();
+        clientRef.current = createClientRef.current();
+        client = await clientRef.current;
+      }
+      const report = await client.save(active, placed, {
+        annotations: marks,
+        removedSaved: removed,
+        answers: filled,
+        lock,
+        layout,
+      });
+      return { ...report, edited: true, entry };
+    },
+    [file],
+  );
 
   const markSaved = useCallback((entry: EditEntry | undefined) => {
     savedRef.current = entry;
@@ -274,6 +286,8 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
     signatures,
     annotations,
     hiddenAnnotations,
+    layout,
+    setFileSizes,
     isDrawnByApp: (annotation: Annotation) =>
       !annotation.saved || annotation.saved.noLook === true || redrawn.has(annotation.id),
     unreadAnnotations,

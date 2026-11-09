@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { copyFileName, unchangedCopy } from './copy';
+import { copyFileName, extractFileName, unchangedCopy } from './copy';
 
 describe('unchangedCopy', () => {
   it('returns byte-identical data, so an existing digital signature stays valid', () => {
@@ -26,5 +26,21 @@ describe('copyFileName', () => {
 
   it('copes with a name that has no extension', () => {
     expect(copyFileName('scan')).toBe('scan-edited.pdf');
+  });
+});
+
+describe('extractFileName', () => {
+  it('names one page', () => {
+    expect(extractFileName('Lease.pdf', new Set([3]))).toBe('Lease (page 3).pdf');
+  });
+
+  it('writes runs of pages with a dash, and the rest with commas', () => {
+    expect(extractFileName('Lease.pdf', new Set([4, 2, 3, 7, 9, 10]))).toBe(
+      'Lease (pages 2–4, 7, 9–10).pdf',
+    );
+  });
+
+  it('copes with a name that has no extension', () => {
+    expect(extractFileName('Lease', new Set([1, 2]))).toBe('Lease (pages 1–2).pdf');
   });
 });
