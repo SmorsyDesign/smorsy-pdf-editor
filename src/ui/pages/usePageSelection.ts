@@ -19,9 +19,9 @@ export function usePageSelection() {
       setFocused(position);
       setAnchor(position);
     }, []),
-    /** After pages change some other way, such as undo, choices no longer mean the same pages. */
     /** Focus arriving by click or Tab, which shouldn't move where a Shift range starts. */
     markFocused: setFocused,
+    /** After pages change some other way, such as undo, choices no longer mean the same pages. */
     reset: useCallback((count: number) => {
       setSelected(new Set());
       setFocused((current) => Math.min(Math.max(1, current), Math.max(1, count)));

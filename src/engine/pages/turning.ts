@@ -2,8 +2,7 @@ import type { Point } from '../coordinates';
 import { PIN_SIZE, type Annotation } from '../edits/annotations';
 import type { PlacedSignature, Rect, TextBox } from '../edits/model';
 import type { PageSize } from '../zoom';
-
-const quarter = (turns: number) => ((turns % 4) + 4) % 4;
+import { quarter } from './layout';
 
 /** The page's size as shown after these quarter turns. */
 export function sizeAfter(size: PageSize, turns: number): PageSize {
@@ -33,7 +32,8 @@ export function turnRect(rect: Rect, size: PageSize, turns: number): Rect {
   };
 }
 
-const turnAngle = (angle: number, turns: number) => (angle + quarter(turns) * 90) % 360;
+/** An angle on the page, as it reads once the page turns. */
+export const turnAngle = (angle: number, turns: number) => (angle + quarter(turns) * 90) % 360;
 
 /** Text boxes turn about their top left corner, which is where their rectangle starts. */
 export function turnTextBox(box: TextBox, size: PageSize, turns: number): TextBox {
@@ -73,8 +73,6 @@ export function turnPlacement(
     angle: turnAngle(placement.angle, turns),
   };
 }
-
-export const turnSignatureAngle = turnAngle;
 
 export function turnAnnotation(annotation: Annotation, size: PageSize, turns: number): Annotation {
   if (quarter(turns) === 0) return annotation;

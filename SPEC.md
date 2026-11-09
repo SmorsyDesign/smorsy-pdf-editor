@@ -96,7 +96,7 @@ End every phase with the Part 7 gates and a check-in, then wait for "continue". 
 3. **Signatures:** draw, type, upload; reuse within the open document; place, resize, rotate; date stamp.
 4. **Annotations and forms.**
 4b. **Organising annotations:** edit saved annotations after reopening; comments replace sticky notes; side panel tabs and a whole-document view; tags. New screens need design approval first.
-5. **Page tools.**
+5. **Page tools.** Split while building: 5a covers reorder, rotate, delete and extract in one document; 5b covers duplicate, insert, merge and split.
 6. **Document tools:** OCR, redaction, page numbers, watermarks, headers and footers, compression, metadata, passwords.
 7. **Certificate signing.**
 8. **Release:** file associations, single instance, auto-updates, installers, `DEPLOY.md`, `FAMILY-GUIDE.md`, final pass on both platforms (Part 8).

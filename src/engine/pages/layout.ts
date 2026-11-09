@@ -15,7 +15,8 @@ export function identityLayout(pageCount: number): Layout {
 export const isIdentity = (layout: Layout) =>
   layout.every((slot, index) => slot.source === index + 1 && slot.turns === 0);
 
-const quarter = (turns: number) => ((turns % 4) + 4) % 4;
+/** Quarter turns brought into 0 to 3, whichever way and however far they went. */
+export const quarter = (turns: number) => ((turns % 4) + 4) % 4;
 
 /** Turns the pages at these positions, counting from 1, a quarter turn either way. */
 export function turnPages(layout: Layout, positions: ReadonlySet<number>, by: 1 | -1): Layout {

@@ -1,4 +1,5 @@
 import { canTag } from '../engine/edits/annotations';
+import type { OsFamily } from '../platform';
 import { isMarkupTool, type Annotating } from './annotating/useAnnotating';
 import type { Signing } from './signing/useSigning';
 import type { EditorMode } from './TopBar';
@@ -34,6 +35,17 @@ export function modeHint(
   if (signing.picked || signing.moving) return 'Click where it goes on the page';
   if (signing.selected) return 'Drag the corners to resize, or the top handle to rotate';
   return 'Create a signature to place it';
+}
+
+/** What the status bar says to do in Pages mode, where the keyboard moves pages too. */
+export function pagesHint(os: OsFamily): string {
+  return `Drag pages to reorder them, or hold ${os === 'mac' ? 'Option' : 'Alt'} and use the arrow keys`;
+}
+
+/** How many pages there are in Pages mode, or how many of them are chosen. */
+export function pagesCountLabel(selected: number, pageCount: number): string {
+  if (selected > 0) return `${String(selected)} of ${String(pageCount)} pages selected`;
+  return pageCount === 1 ? '1 page' : `${String(pageCount)} pages`;
 }
 
 interface FileFacts {

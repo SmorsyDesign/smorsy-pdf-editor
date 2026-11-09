@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import type { PdfDocument } from '../engine/document';
 import { hasDigitalSignature, isEncrypted } from '../engine/extract';
-import { isIdentity } from '../engine/pages/layout';
 import { LETTER_PAGE, zoomIn, zoomOut } from '../engine/zoom';
 import { PagesView } from './pages/PagesView';
+import { useArrangedDocument } from './pages/useArrangedDocument';
 import { usePageSelection } from './pages/usePageSelection';
 import type { OpenedFile, OsFamily, Platform } from '../platform';
 import { DocumentStrip, ScanCard, SignedWarning } from './editing/Notices';
@@ -18,7 +18,7 @@ import { useSigning } from './signing/useSigning';
 import { AnnotateBar } from './annotating/AnnotateBar';
 import { useAnnotating } from './annotating/useAnnotating';
 import { useFormFields } from './forms/useFormFields';
-import { fileStateLabel, modeHint } from './statusText';
+import { fileStateLabel, modeHint, pagesCountLabel, pagesHint } from './statusText';
 import { PageStack } from './PageStack';
 import { SidePanel } from './SidePanel';
 import { SearchBar } from './SearchBar';
@@ -65,21 +65,7 @@ export function DocumentView({
   platform,
   onExtract,
 }: DocumentViewProps) {
-  // Edits on turned pages are worked out from the file's own page sizes.
-  const fileSizes = usePageSizes(filePdf);
-  const { setFileSizes, layout } = editor;
-  useEffect(() => {
-    setFileSizes(fileSizes.map((size) => size ?? LETTER_PAGE));
-  }, [fileSizes, setFileSizes]);
-  // Every page number on screen follows the pages as arranged now.
-  const pdf = useMemo(
-    () =>
-      // Empty until the pages are measured, which means the file's own order.
-      layout.length === 0 || (layout.length === filePdf.pageCount && isIdentity(layout))
-        ? filePdf
-        : filePdf.arranged(layout),
-    [filePdf, layout],
-  );
+  const { pdf, allMeasured } = useArrangedDocument(filePdf, editor.layout, editor.setFileSizes);
   const pageSizes = usePageSizes(pdf);
   const selection = usePageSelection();
   const zoom = useZoom(pageSizes[0] ?? LETTER_PAGE);
@@ -194,14 +180,14 @@ export function DocumentView({
           <PagesView
             document={pdf}
             pageSizes={pageSizes}
-            layout={layout}
+            layout={editor.layout}
             selection={selection}
             changesOn={changesOn}
             onArrange={(next) => {
               editor.apply({ kind: 'arrange-pages', layout: next });
             }}
             onExtract={onExtract}
-            ready={fileSizes.every((size) => size !== undefined)}
+            ready={allMeasured}
             onOpenPage={(position) => {
               setMode('select');
               requestAnimationFrame(() => scrollToPageRef.current?.(position));
@@ -308,16 +294,10 @@ export function DocumentView({
         os={os}
         page={
           pagesMode
-            ? selection.selected.size === 0
-              ? `${String(pdf.pageCount)} ${pdf.pageCount === 1 ? 'page' : 'pages'}`
-              : `${String(selection.selected.size)} of ${String(pdf.pageCount)} pages selected`
+            ? pagesCountLabel(selection.selected.size, pdf.pageCount)
             : `Page ${currentPage} of ${pdf.pageCount}`
         }
-        hint={
-          pagesMode
-            ? `Drag pages to reorder them, or hold ${os === 'mac' ? 'Option' : 'Alt'} and use the arrow keys`
-            : modeHint(mode, annotating, signing, scan.pageIsScan)
-        }
+        hint={pagesMode ? pagesHint(os) : modeHint(mode, annotating, signing, scan.pageIsScan)}
         fontsReplaced={editor.substitutedFonts}
         message={
           (extracted || (editor.changes === 0 && announcement) || originalNote) ??

@@ -6,10 +6,8 @@ import {
   canUndo,
   changesSince,
   currentEntry,
-  deriveAnnotations,
   deriveFieldAnswers,
   deriveLock,
-  deriveSignatures,
   record,
   redo,
   undo,
@@ -24,11 +22,11 @@ import { embeddingAllowed } from '../../engine/fonts/embedded';
 import type { FieldValue } from '../../engine/forms/fields';
 import type { FontOutcome, SystemFontStyle } from '../../engine/save/choose-font';
 import { unchangedCopy } from '../../engine/copy';
+import type { Layout } from '../../engine/pages/layout';
+import type { PageSize } from '../../engine/zoom';
 import type { OpenedFile, Platform } from '../../platform';
 import { SaveClient } from '../../workers/save-client';
-import { isIdentity, keepPages, type Layout } from '../../engine/pages/layout';
-import type { PageSize } from '../../engine/zoom';
-import { arrangeEdits } from './arrangement';
+import { arrangeEdits, editsToSave } from './arrangement';
 import { useExistingAnnotations } from './useExistingAnnotations';
 
 const SYSTEM_STYLES: readonly SystemFontStyle[] = ['regular', 'bold', 'italic', 'bold-italic'];
@@ -216,30 +214,13 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
     async (keep?: ReadonlySet<number>): Promise<BuiltFile> => {
       const current = logRef.current;
       const entry = currentEntry(current);
-      const edits = activeEdits(current);
-      // Saving works on the file's own pages, and arranges them only at the end.
-      const now = arrangeEdits(edits, existingRef.current, fileSizesRef.current);
-      const { onFile, fileBoxes: active } = now;
-      const placed = deriveSignatures(onFile);
-      const { changed, removed } = now.savedChange;
-      const marks = [...deriveAnnotations(onFile).filter(({ saved }) => !saved), ...changed];
-      const filled = [...deriveFieldAnswers(edits)];
-      const lock = deriveLock(edits);
-      const layout = keep ? keepPages(now.layout, keep) : now.layout;
-      const kept = new Set(layout.map((slot) => slot.source));
-      const keptOnly = <T extends { readonly pageNumber: number }>(items: readonly T[]) =>
-        fileSizesRef.current.length === 0
-          ? items
-          : items.filter((item) => kept.has(item.pageNumber));
-      const nothingToDo =
-        active.length === 0 &&
-        placed.length === 0 &&
-        marks.length === 0 &&
-        removed.length === 0 &&
-        filled.length === 0 &&
-        layout.length === fileSizesRef.current.length &&
-        isIdentity(layout);
-      if (nothingToDo && !lock) {
+      const toSave = editsToSave(
+        activeEdits(current),
+        existingRef.current,
+        fileSizesRef.current,
+        keep,
+      );
+      if (toSave.unchanged) {
         if (!file) throw new Error('The document closed before it could be saved.');
         return {
           bytes: unchangedCopy(file.bytes),
@@ -258,13 +239,7 @@ export function useDocumentEditor(file: OpenedFile | null, platform: Platform): 
         clientRef.current = createClientRef.current();
         client = await clientRef.current;
       }
-      const report = await client.save(keptOnly(active), keptOnly(placed), {
-        annotations: keptOnly(marks),
-        removedSaved: removed,
-        answers: filled,
-        lock,
-        layout,
-      });
+      const report = await client.save(toSave.boxes, toSave.signatures, toSave.extras);
       return { ...report, edited: true, entry };
     },
     [file],

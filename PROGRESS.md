@@ -1,6 +1,6 @@
 # Progress
 
-**Current phase:** 4b finished, waiting for the owner's "continue" before Phase 5.
+**Current phase:** 5a finished, waiting for the owner's "continue" before Phase 5b.
 
 ## Phase 0: Plan and design
 
@@ -92,10 +92,20 @@ Added by the owner after Phase 4, to come before Phase 5.
 - [x] Tags such as "Chapter 1", saved in the file
 - [x] Part 7 gates and check-in
 
-## Phase 5: Page tools
+## Phase 5a: Page tools in one document
 
-- [ ] Reorder, rotate, delete, duplicate, insert
-- [ ] Merge, split, extract
+Split from Phase 5, which grew past plan.
+
+- [x] Reorder (drag, buttons, keyboard), rotate, delete
+- [x] Extract chosen pages to a new file
+- [x] Edits follow their page when it moves or turns
+- [x] Part 7 gates and check-in
+
+## Phase 5b: Page tools across documents
+
+- [ ] Duplicate and insert pages
+- [ ] Merge another PDF in
+- [ ] Split into several files
 - [ ] Part 7 gates and check-in
 
 ## Phase 6: Document tools
@@ -133,6 +143,14 @@ Added by the owner after Phase 4, to come before Phase 5.
 - [ ] Part 7 gates and final check-in
 
 ## Skipped minor findings
+
+- **Phase 5a, deleting pages drops the whole tag tree that screen readers use.** A tree can't be trimmed reliably, and leaving it would keep the deleted pages' words in the file. Kept pages still read in order.
+- **Phase 5a, page labels and reading threads aren't renumbered after reordering.** Few family documents have either. The pages themselves are right.
+- **Phase 5a, a radio group that lost an option on a deleted page still lists that option.** Choosing it does nothing, and the rest of the group works.
+- **Phase 5a, a bookmark pointing into the dropped tag tree can keep that tag's alternative text.** Bookmarks of that kind are very rare.
+- **Phase 5a, comment pins on turned pages show sideways or upside down in other viewers.** Their position is right; their drawing turns with the page, as other annotations do.
+- **Phase 5a, the design's page tags ("Landscape", "Scanned", "Receipt") aren't shown.** Change counts are. Working out which pages are scans means reading every page, which is too slow for a long document here.
+- **Phase 5a, design differences kept on purpose.** Move earlier and Move later buttons, so reordering never needs dragging (WCAG 2.5.7). Unavailable tools say why, rather than greying out silently.
 
 - **Phase 4b, not checked in Adobe Reader or macOS Preview.** The check-in asks the owner to try one. Comments use the standard PDF note type, so they should show there, but that's untested.
 - **Phase 4b, a pop-up also listed on another page keeps its words after its comment is deleted.** No app writes files this way, and leaving it is what stops that other page losing something.

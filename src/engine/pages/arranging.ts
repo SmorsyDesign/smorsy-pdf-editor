@@ -4,11 +4,11 @@ import type { PageSize } from '../zoom';
 import { identityLayout, positionOf, type Layout } from './layout';
 import {
   sizeAfter,
+  turnAngle,
   turnAnnotation,
   turnPlacement,
   turnPlacementRect,
   turnPoint,
-  turnSignatureAngle,
   turnTextBox,
 } from './turning';
 
@@ -79,10 +79,7 @@ export function editsOnFilePages(
         const page = onFilePage(edit.placement.pageNumber);
         if (!page) break;
         pageOfSignature.set(edit.placement.id, page.source);
-        angleOfSignature.set(
-          edit.placement.id,
-          turnSignatureAngle(edit.placement.angle, page.back),
-        );
+        angleOfSignature.set(edit.placement.id, turnAngle(edit.placement.angle, page.back));
         result.push({
           ...edit,
           placement: {
@@ -114,10 +111,10 @@ export function editsOnFilePages(
           const fromPosition = positionOf(layout, currentSource);
           const fromSlot = fromPosition === null ? undefined : layout[fromPosition - 1];
           const before = angleOfSignature.get(edit.id);
-          if (fromSlot && before !== undefined) angle = turnSignatureAngle(before, fromSlot.turns);
+          if (fromSlot && before !== undefined) angle = turnAngle(before, fromSlot.turns);
         }
         if (changes.pageNumber !== undefined) pageOfSignature.set(edit.id, page.source);
-        const fileAngle = angle === undefined ? undefined : turnSignatureAngle(angle, page.back);
+        const fileAngle = angle === undefined ? undefined : turnAngle(angle, page.back);
         if (fileAngle !== undefined) angleOfSignature.set(edit.id, fileAngle);
         result.push({
           ...edit,

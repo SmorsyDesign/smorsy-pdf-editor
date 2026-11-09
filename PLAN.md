@@ -121,6 +121,10 @@ Editing PDF text isn't like editing a Word document. A PDF stores positioned gly
 - **Deleting erases rather than unlists.** A save writes every object it knows of, so unlisted words would still be in the file. This matters for comments to students.
 - **pdf.js is told to skip a changed saved annotation through its editor's storage.** There's no other way to stop it being drawn. It relies on an internal prefix, which pixel tests would catch moving.
 - **Other apps' annotations can have words and tags changed, or be deleted, but not be moved or recoloured.** Their drawings can't be redrawn reliably.
+- **Page tools keep every edit editable.** A page arrangement is one edit holding the whole new order and turns. Other edits are restated against the file's own unturned pages, shown on the pages as arranged, and saved on the file's pages before they're arranged. Undo covers it all.
+- **pdf.js shows the arrangement directly** through a view of the same open document, with each page's turn added to its viewport. Everything that reads pages (search, forms, comments, text) follows it without changes of its own.
+- **Removing pages erases what they held**, including pictures, masks, thumbnails, attachments, form fields and the tag tree, while keeping anything kept pages or the document as a whole still use.
+- **Phase 5 was split.** Duplicating, inserting and merging bring a second source of pages, and splitting writes several files, which needs a careful look at write access.
 - **A signature over a solid form field moves that field's looks into the page.** Viewers always paint fields last, so nothing can sit on top of a solid one. The field stays and stays fillable, but becomes see-through. Over other annotations, whose order viewers do respect, the signature becomes a stamp annotation.
 - **A filled-in field under an edit becomes part of the page, and the app says so.** Leaving it as a field would mean changing it later showed the old text underneath. A form's own buttons stay on top, also with a note.
 - **The date stamp starts off,** though the design mockup shows it ticked, so nothing is added that wasn't asked for.
@@ -210,18 +214,19 @@ Later phases add folders inside `engine/` and `ui/` as they outgrow one level. F
 
 ## 8. Phases
 
-| Phase | Scope                     | Relative size |
-| ----- | ------------------------- | ------------- |
-| 0     | Plan and design           | S             |
-| 1     | Foundation, CI, test PDFs | M             |
-| 2     | Text editing              | **XL**        |
-| 3     | Signatures                | M             |
-| 4     | Annotations and forms     | L             |
-| 4b    | Organising annotations    | L             |
-| 5     | Page tools                | M             |
-| 6     | Document tools            | L             |
-| 7     | Certificate signing       | M             |
-| 8     | Release                   | L             |
+| Phase | Scope                       | Relative size |
+| ----- | --------------------------- | ------------- |
+| 0     | Plan and design             | S             |
+| 1     | Foundation, CI, test PDFs   | M             |
+| 2     | Text editing                | **XL**        |
+| 3     | Signatures                  | M             |
+| 4     | Annotations and forms       | L             |
+| 4b    | Organising annotations      | L             |
+| 5a    | Page tools in one document  | M             |
+| 5b    | Page tools across documents | M             |
+| 6     | Document tools              | L             |
+| 7     | Certificate signing         | M             |
+| 8     | Release                     | L             |
 
 Phase 2 may split if the stretch goal or font matching grows. I'll tell you if it does.
 

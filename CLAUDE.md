@@ -45,6 +45,7 @@ Node is pinned to 26 LTS in `.nvmrc`. Use terse test reporters and show only fai
 - Signatures are never stored on the computer, only held in memory while a PDF is open.
 - Viewers always paint form fields last, so anything drawn over a solid field needs `clearFieldsUnder` first. They paint all annotations over the page, so whiteout needs `clearForWhiteout` too.
 - Annotations save as real PDF annotations, on top of the page, carrying what it takes to edit them after reopening. Whiteout and images go in the page itself.
+- Pages are arranged by an `arrange-pages` edit. Other edits are stored as made, restated on the file's own pages by `editsOnFilePages`, and saving arranges pages last with `arrangePages`.
 - Deleting erases with `eraseAnnotation`. A save writes every object it knows of, so only unlisting would leave the words in the file. Treat everything read from a file as untrusted.
 - Lock answers with `lockAnswers`, never the library's `flatten`, which paints hidden fields and can lose answers.
 - The webview has no network route. The update check runs in Rust.

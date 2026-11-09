@@ -1,5 +1,3 @@
-import type { Layout } from '../pages/layout';
-import { arrangePages } from './page-arranging';
 import fontkit from '@cantoo/fontkit';
 import { PDFDocument, type PDFFont, type PDFImage, type PDFPage } from '@cantoo/pdf-lib';
 import type { Annotation, SavedSource } from '../edits/annotations';
@@ -7,6 +5,7 @@ import type { PlacedSignature, TextBox } from '../edits/model';
 import { UNSUPPORTED_TEXT, nameCharacter } from '../errors';
 import { findEmbeddedFont } from '../fonts/embedded';
 import { bundledFaceFile } from '../fonts/match';
+import type { Layout } from '../pages/layout';
 import { placementInPdf } from '../signatures/placement';
 import { readAnnotations, type ReadAnnotations } from './annotation-reading';
 import {
@@ -19,6 +18,7 @@ import { fillFields, type FieldAnswers } from './field-filling';
 import { clearFieldsUnder, clearForWhiteout, countSolidFieldsOver } from './form-fields';
 import { lockAnswers } from './lock-answers';
 import { giveOwnAnnotationList } from './page-annotations';
+import { arrangePages } from './page-arranging';
 import { boundsOfWhiteout, drawWhiteout, pageBoxOf, textBoxBounds } from './page-geometry';
 import { boundsOfPlacement, drawSignaturePicture } from './signature-drawing';
 import { drawCovers, drawLines, type DrawFont } from './text-drawing';
